@@ -67,7 +67,18 @@ export class CoreService {
     return this.repository.createShort({
       id: randomUUID(), episodeId: candidate.episodeId, candidateId, title: candidate.topic,
       sourceRanges: [{ startMs: candidate.startMs, endMs: candidate.endMs }],
-      templateId, composition: structuredClone(template.composition),
+      templateId,
+      templateLineage: { templateId, templateVersion: template.version, parentTemplateId: null },
+      composition: structuredClone(template.composition),
+      captions: {
+        enabled: true,
+        segments: [],
+        style: { fontFamily: "Arial", fontSize: 64, color: "#ffffff", highlightColor: "#ffdc5e" }
+      },
+      audio: {
+        sourceGainDb: 0, muted: false, fadeInMs: 0, fadeOutMs: 0,
+        bedAssetId: null, bedGainDb: null, normalizeLoudness: false
+      },
       copy: {
         cleanedTranscript: candidate.transcript, rewrite: "", hookVariants: [candidate.hook],
         titles: [candidate.topic], description: "", hashtags: [], thumbnailText: ""

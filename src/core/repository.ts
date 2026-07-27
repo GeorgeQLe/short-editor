@@ -227,7 +227,11 @@ function mapCandidate(row: Row): ClipCandidate {
     endMs: Number(row.end_ms), transcript: String(row.transcript), topic: String(row.topic),
     hook: String(row.hook), reason: String(row.reason), score: Number(row.score),
     scores: JSON.parse(String(row.scores_json)), duplicateGroup: row.duplicate_group ? String(row.duplicate_group) : null,
-    reviewStatus: row.review_status as ClipCandidate["reviewStatus"], createdAt: String(row.created_at)
+    reviewStatus: row.review_status as ClipCandidate["reviewStatus"],
+    generationProvenance: {
+      artifactId: null, transcriptRevision: 1, generationVersion: "legacy-v1", provider: null
+    },
+    createdAt: String(row.created_at)
   };
 }
 
@@ -236,7 +240,17 @@ function mapShort(row: Row): ShortProject {
     id: String(row.id), episodeId: String(row.episode_id),
     candidateId: row.candidate_id ? String(row.candidate_id) : null, title: String(row.title),
     sourceRanges: JSON.parse(String(row.source_ranges_json)), templateId: String(row.template_id),
-    composition: JSON.parse(String(row.composition_json)), copy: JSON.parse(String(row.copy_json)),
+    templateLineage: { templateId: String(row.template_id), templateVersion: 1, parentTemplateId: null },
+    composition: JSON.parse(String(row.composition_json)),
+    captions: {
+      enabled: true, segments: [],
+      style: { fontFamily: "Arial", fontSize: 64, color: "#ffffff", highlightColor: "#ffdc5e" }
+    },
+    audio: {
+      sourceGainDb: 0, muted: false, fadeInMs: 0, fadeOutMs: 0,
+      bedAssetId: null, bedGainDb: null, normalizeLoudness: false
+    },
+    copy: JSON.parse(String(row.copy_json)),
     approved: bool(row.approved), revision: Number(row.revision),
     createdAt: String(row.created_at), updatedAt: String(row.updated_at)
   };
@@ -245,9 +259,11 @@ function mapShort(row: Row): ShortProject {
 function mapJob(row: Row): Job {
   return {
     id: String(row.id), type: row.type as Job["type"], entityId: row.entity_id ? String(row.entity_id) : null,
+    provider: null,
     state: row.state as Job["state"], progress: Number(row.progress), stage: String(row.stage),
-    attempts: Number(row.attempts), errorCode: row.error_code ? String(row.error_code) : null,
+    attempts: Number(row.attempts), errorCode: row.error_code ? String(row.error_code) as Job["errorCode"] : null,
     errorMessage: row.error_message ? String(row.error_message) : null,
+    cancelRequested: bool(row.cancel_requested), payloadReference: null,
     createdAt: String(row.created_at), updatedAt: String(row.updated_at)
   };
 }

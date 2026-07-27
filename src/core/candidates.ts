@@ -73,7 +73,14 @@ function scoreWindow(episodeId: string, segments: TranscriptSegment[]): ClipCand
     transcript: text, topic: keywords.slice(0, 3).join(" · ") || "Untitled idea",
     hook: first, reason: reasonFor(scores), score, scores,
     duplicateGroup: createHash("sha1").update(keywords.slice(0, 5).sort().join("|")).digest("hex").slice(0, 10),
-    reviewStatus: "pending", createdAt: new Date().toISOString()
+    reviewStatus: "pending",
+    generationProvenance: {
+      artifactId: null,
+      transcriptRevision: 1,
+      generationVersion: "deterministic-window-v1",
+      provider: null
+    },
+    createdAt: new Date().toISOString()
   };
 }
 

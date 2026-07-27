@@ -1,0 +1,453 @@
+import { z } from "zod";
+import { apiErrorCodeSchema } from "./error-contracts.js";
+import {
+  dateSchema,
+  idSchema,
+  ianaTimezoneSchema,
+  normalizedRectangleSchema,
+  positiveRevisionSchema,
+  sourceRangeSchema,
+  sourceRangesSchema,
+  timeRangeSchema,
+  utcInstantSchema,
+  wallTimeSchema
+} from "./validators.js";
+
+const nullableNonempty = z.string().min(1).nullable();
+const confidenceSchema = z.number().min(0).max(1);
+const jsonValueSchema: z.ZodType<unknown> = z.json();
+
+export const episodeStatuses = [
+  "discovered", "indexing", "analyzing", "ready", "error", "source_missing"
+] as const;
+export const episodeStatusSchema = z.enum(episodeStatuses);
+export type EpisodeStatus = z.infer<typeof episodeStatusSchema>;
+
+export const episodeSchema = z.strictObject({
+  id: idSchema,
+  sourcePath: z.string().min(1),
+  canonicalPath: z.string().min(1),
+  fingerprint: z.string().min(1),
+  contentHash: nullableNonempty,
+  fileSize: z.number().int().nonnegative(),
+  modifiedAtMs: z.number().int().nonnegative(),
+  durationMs: z.number().int().positive().nullable(),
+  width: z.number().int().positive().nullable(),
+  height: z.number().int().positive().nullable(),
+  videoCodec: nullableNonempty,
+  audioCodec: nullableNonempty,
+  status: episodeStatusSchema,
+  missing: z.boolean(),
+  candidateCount: z.number().int().nonnegative(),
+  renderedShortCount: z.number().int().nonnegative(),
+  scheduledCount: z.number().int().nonnegative(),
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema
+});
+export type Episode = z.infer<typeof episodeSchema>;
+
+export const watchedFolderScanStatuses = ["never_scanned", "scanning", "succeeded", "failed"] as const;
+export const watchedFolderScanStatusSchema = z.enum(watchedFolderScanStatuses);
+export const watchedFolderSchema = z.strictObject({
+  id: idSchema,
+  canonicalPath: z.string().min(1),
+  enabled: z.boolean(),
+  recursive: z.boolean(),
+  includePatterns: z.array(z.string().min(1)),
+  lastScanStatus: watchedFolderScanStatusSchema,
+  lastScannedAt: utcInstantSchema.nullable(),
+  lastScanError: nullableNonempty,
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema
+});
+export type WatchedFolder = z.infer<typeof watchedFolderSchema>;
+
+export const providerClasses = ["local", "network", "cloud"] as const;
+export const providerClassSchema = z.enum(providerClasses);
+export const providerProvenanceSchema = z.strictObject({
+  provider: z.string().min(1),
+  providerClass: providerClassSchema,
+  modelId: z.string().min(1),
+  providerVersion: z.string().min(1),
+  optionsVersion: z.string().min(1),
+  createdAt: utcInstantSchema
+});
+export type ProviderProvenance = z.infer<typeof providerProvenanceSchema>;
+
+export const transcriptWordSchema = timeRangeSchema.extend({
+  text: z.string().min(1),
+  confidence: confidenceSchema.optional(),
+  speaker: z.string().min(1).optional()
+});
+export type TranscriptWord = z.infer<typeof transcriptWordSchema>;
+
+export const transcriptSegmentSchema = timeRangeSchema.extend({
+  id: idSchema,
+  text: z.string().min(1),
+  words: z.array(transcriptWordSchema),
+  speaker: z.string().min(1).nullable(),
+  confidence: confidenceSchema.nullable()
+}).superRefine((segment, context) => {
+  let priorEnd = segment.startMs;
+  segment.words.forEach((word, index) => {
+    if (word.startMs < segment.startMs || word.endMs > segment.endMs) {
+      context.addIssue({ code: "custom", path: ["words", index], message: "Word timing must be within its segment" });
+    }
+    if (word.startMs < priorEnd) {
+      context.addIssue({ code: "custom", path: ["words", index, "startMs"], message: "Words must be ordered and non-overlapping" });
+    }
+    priorEnd = word.endMs;
+  });
+});
+export type TranscriptSegment = z.infer<typeof transcriptSegmentSchema>;
+
+export const timedSegmentsSchema = z.array(transcriptSegmentSchema).min(1).superRefine((segments, context) => {
+  for (let index = 1; index < segments.length; index++) {
+    if (segments[index]!.startMs < segments[index - 1]!.endMs) {
+      context.addIssue({ code: "custom", path: [index, "startMs"], message: "Segments must be ordered and non-overlapping" });
+    }
+  }
+});
+export const transcriptAcceptedStates = ["proposed", "accepted", "superseded"] as const;
+export const transcriptAcceptedStateSchema = z.enum(transcriptAcceptedStates);
+export const transcriptRevisionSchema = z.strictObject({
+  id: idSchema,
+  episodeId: idSchema,
+  revision: positiveRevisionSchema,
+  language: z.string().min(2),
+  segments: timedSegmentsSchema,
+  provenance: providerProvenanceSchema,
+  acceptedState: transcriptAcceptedStateSchema,
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema
+});
+export type TranscriptRevision = z.infer<typeof transcriptRevisionSchema>;
+
+export const artifactKinds = [
+  "transcript", "episode_analysis", "candidate_generation", "content_package", "reframing"
+] as const;
+export const artifactKindSchema = z.enum(artifactKinds);
+export const artifactOwnerTypes = ["episode", "transcript_revision", "candidate", "short_project"] as const;
+export const artifactOwnerTypeSchema = z.enum(artifactOwnerTypes);
+export const artifactStates = ["proposed", "accepted", "superseded", "corrupt"] as const;
+export const artifactStateSchema = z.enum(artifactStates);
+export const analysisArtifactSchema = z.strictObject({
+  id: idSchema,
+  entityId: idSchema,
+  ownerType: artifactOwnerTypeSchema,
+  kind: artifactKindSchema,
+  state: artifactStateSchema,
+  provenance: providerProvenanceSchema,
+  inputHash: z.string().min(1),
+  rawOutput: jsonValueSchema,
+  acceptedProjection: jsonValueSchema.nullable(),
+  createdAt: utcInstantSchema
+});
+export type AnalysisArtifact = z.infer<typeof analysisArtifactSchema>;
+
+export const scoreBreakdownSchema = z.strictObject({
+  hook: confidenceSchema,
+  coherence: confidenceSchema,
+  payoff: confidenceSchema,
+  independence: confidenceSchema,
+  delivery: confidenceSchema,
+  visualActivity: confidenceSchema
+});
+export const candidateReviewStatuses = ["pending", "approved", "rejected"] as const;
+export const candidateReviewStatusSchema = z.enum(candidateReviewStatuses);
+export const generationProvenanceSchema = z.strictObject({
+  artifactId: idSchema.nullable(),
+  transcriptRevision: positiveRevisionSchema,
+  generationVersion: z.string().min(1),
+  provider: providerProvenanceSchema.nullable()
+});
+export const candidateSchema = z.strictObject({
+  id: idSchema,
+  episodeId: idSchema,
+  startMs: z.number().int().nonnegative(),
+  endMs: z.number().int().positive(),
+  sourceRange: sourceRangeSchema.optional(),
+  transcript: z.string().min(1),
+  topic: z.string().min(1),
+  hook: z.string().min(1),
+  reason: z.string().min(1),
+  score: confidenceSchema,
+  scores: scoreBreakdownSchema,
+  duplicateGroup: z.string().min(1).nullable(),
+  reviewStatus: candidateReviewStatusSchema,
+  generationProvenance: generationProvenanceSchema,
+  createdAt: utcInstantSchema
+}).superRefine((candidate, context) => {
+  if (candidate.endMs <= candidate.startMs) {
+    context.addIssue({ code: "custom", path: ["endMs"], message: "Candidate end must be after its start" });
+  }
+  if (candidate.sourceRange && (
+    candidate.sourceRange.startMs !== candidate.startMs || candidate.sourceRange.endMs !== candidate.endMs
+  )) {
+    context.addIssue({ code: "custom", path: ["sourceRange"], message: "Source range must match candidate timing" });
+  }
+});
+export type Candidate = z.infer<typeof candidateSchema>;
+export type ClipCandidate = Candidate;
+
+export const cropKeyframeSchema = z.strictObject({
+  atMs: z.number().int().nonnegative(),
+  ...normalizedRectangleSchema.shape,
+  source: z.enum(["automatic", "manual"])
+}).superRefine((frame, context) => {
+  if (frame.x + frame.width > 1) {
+    context.addIssue({ code: "custom", path: ["width"], message: "Crop exceeds horizontal bounds" });
+  }
+  if (frame.y + frame.height > 1) {
+    context.addIssue({ code: "custom", path: ["height"], message: "Crop exceeds vertical bounds" });
+  }
+});
+export const layerSchema = z.strictObject({
+  id: z.string().min(1),
+  type: z.enum(["video", "image", "captions", "shape", "logo"]),
+  source: z.enum(["episode", "asset", "none"]),
+  region: normalizedRectangleSchema,
+  fit: z.enum(["fill", "fit"]),
+  cropTrack: z.array(cropKeyframeSchema).default([])
+});
+export const compositionSchema = z.strictObject({
+  width: z.literal(1080),
+  height: z.literal(1920),
+  background: z.string().min(1),
+  safeArea: z.strictObject({
+    top: z.number().nonnegative(),
+    right: z.number().nonnegative(),
+    bottom: z.number().nonnegative(),
+    left: z.number().nonnegative()
+  }),
+  layers: z.array(layerSchema)
+});
+export type Composition = z.infer<typeof compositionSchema>;
+
+export const contentPackageSchema = z.strictObject({
+  cleanedTranscript: z.string(),
+  rewrite: z.string(),
+  hookVariants: z.array(z.string()),
+  titles: z.array(z.string()),
+  description: z.string(),
+  hashtags: z.array(z.string()),
+  thumbnailText: z.string()
+});
+export const captionStateSchema = z.strictObject({
+  enabled: z.boolean(),
+  segments: z.array(transcriptSegmentSchema),
+  style: z.strictObject({
+    fontFamily: z.string().min(1),
+    fontSize: z.number().positive(),
+    color: z.string().min(1),
+    highlightColor: z.string().min(1)
+  })
+});
+export const audioStateSchema = z.strictObject({
+  sourceGainDb: z.number(),
+  muted: z.boolean(),
+  fadeInMs: z.number().int().nonnegative(),
+  fadeOutMs: z.number().int().nonnegative(),
+  bedAssetId: idSchema.nullable(),
+  bedGainDb: z.number().nullable(),
+  normalizeLoudness: z.boolean()
+});
+export const templateLineageSchema = z.strictObject({
+  templateId: z.string().min(1),
+  templateVersion: positiveRevisionSchema,
+  parentTemplateId: z.string().min(1).nullable()
+});
+export const shortProjectSchema = z.strictObject({
+  id: idSchema,
+  episodeId: idSchema,
+  candidateId: idSchema.nullable(),
+  title: z.string().min(1),
+  sourceRanges: sourceRangesSchema,
+  templateId: z.string().min(1),
+  templateLineage: templateLineageSchema,
+  composition: compositionSchema,
+  captions: captionStateSchema,
+  audio: audioStateSchema,
+  copy: contentPackageSchema,
+  approved: z.boolean(),
+  revision: positiveRevisionSchema,
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema
+});
+export type ShortProject = z.infer<typeof shortProjectSchema>;
+
+export const templateSchema = z.strictObject({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string(),
+  version: positiveRevisionSchema,
+  revision: positiveRevisionSchema,
+  parentTemplateId: z.string().min(1).nullable(),
+  builtIn: z.boolean(),
+  composition: compositionSchema,
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema
+});
+export type Template = z.infer<typeof templateSchema>;
+
+export const assetKinds = ["image", "video", "audio", "logo"] as const;
+export const assetKindSchema = z.enum(assetKinds);
+export const assetSchema = z.strictObject({
+  id: idSchema,
+  sourcePath: z.string().min(1).nullable(),
+  ownedArtifactPath: z.string().min(1).nullable(),
+  kind: assetKindSchema,
+  provenance: z.string().min(1),
+  reusable: z.boolean(),
+  tags: z.array(z.string().min(1)),
+  width: z.number().int().positive().nullable(),
+  height: z.number().int().positive().nullable(),
+  durationMs: z.number().int().positive().nullable(),
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema
+}).refine((asset) => (asset.sourcePath === null) !== (asset.ownedArtifactPath === null), {
+  path: ["sourcePath"],
+  message: "Exactly one asset path must be supplied"
+});
+export type Asset = z.infer<typeof assetSchema>;
+
+export const renderStates = ["queued", "running", "succeeded", "failed", "cancelled", "stale"] as const;
+export const renderStateSchema = z.enum(renderStates);
+export const validationSeverities = ["error", "warning"] as const;
+export const validationSeveritySchema = z.enum(validationSeverities);
+export const renderValidationFindingSchema = z.strictObject({
+  code: z.string().min(1),
+  severity: validationSeveritySchema,
+  message: z.string().min(1),
+  details: jsonValueSchema.optional()
+});
+export const renderValidationResultSchema = z.strictObject({
+  valid: z.boolean(),
+  findings: z.array(renderValidationFindingSchema),
+  width: z.number().int().positive().nullable(),
+  height: z.number().int().positive().nullable(),
+  durationMs: z.number().int().positive().nullable(),
+  videoCodec: nullableNonempty,
+  audioCodec: nullableNonempty,
+  validatedAt: utcInstantSchema
+});
+export const renderSchema = z.strictObject({
+  id: idSchema,
+  shortId: idSchema,
+  projectRevision: positiveRevisionSchema,
+  encoder: z.strictObject({
+    ffmpegVersion: z.string().min(1),
+    videoCodec: z.string().min(1),
+    audioCodec: z.string().min(1),
+    settings: jsonValueSchema
+  }),
+  outputPath: z.string().min(1).nullable(),
+  validation: renderValidationResultSchema.nullable(),
+  state: renderStateSchema,
+  error: z.strictObject({ code: apiErrorCodeSchema, message: z.string().min(1) }).nullable(),
+  contentHash: nullableNonempty,
+  decisionHash: nullableNonempty,
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema
+});
+export type Render = z.infer<typeof renderSchema>;
+
+export const scheduleRulesSchema = z.strictObject({
+  startDate: dateSchema,
+  timezone: ianaTimezoneSchema,
+  allowedWeekdays: z.array(z.number().int().min(0).max(6)).min(1),
+  times: z.array(wallTimeSchema).min(1),
+  maxPerDay: z.number().int().positive(),
+  blackoutDates: z.array(dateSchema),
+  minimumSameEpisodeSpacingHours: z.number().int().nonnegative()
+});
+export type ScheduleRules = z.infer<typeof scheduleRulesSchema>;
+export const scheduleRuleSetSchema = scheduleRulesSchema.extend({
+  id: z.union([idSchema, z.string().min(1)]),
+  revision: positiveRevisionSchema,
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema
+});
+export type ScheduleRuleSet = z.infer<typeof scheduleRuleSetSchema>;
+
+export const scheduleEntryStatuses = ["draft", "planned", "published"] as const;
+export const scheduleEntryStatusSchema = z.enum(scheduleEntryStatuses);
+export const scheduleEntrySchema = z.strictObject({
+  id: idSchema,
+  shortId: idSchema,
+  renderId: idSchema,
+  episodeId: idSchema,
+  publishAt: utcInstantSchema,
+  timezone: ianaTimezoneSchema,
+  status: scheduleEntryStatusSchema,
+  priority: z.number().int(),
+  rationale: z.string().min(1),
+  locked: z.boolean(),
+  youtubeUrl: z.string().url().nullable(),
+  needsRerender: z.boolean(),
+  revision: positiveRevisionSchema,
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema
+}).refine((entry) => entry.status !== "published" || entry.locked, {
+  path: ["locked"],
+  message: "Published entries must be locked"
+});
+export type ScheduleEntry = z.infer<typeof scheduleEntrySchema>;
+
+export const jobTypes = ["probe", "hash", "analyze", "candidates", "render"] as const;
+export const jobTypeSchema = z.enum(jobTypes);
+export const jobStates = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
+export const jobStateSchema = z.enum(jobStates);
+export const jobSchema = z.strictObject({
+  id: idSchema,
+  type: jobTypeSchema,
+  entityId: idSchema.nullable(),
+  provider: z.string().min(1).nullable(),
+  state: jobStateSchema,
+  progress: z.number().min(0).max(1),
+  stage: z.string().min(1),
+  attempts: z.number().int().nonnegative(),
+  cancelRequested: z.boolean(),
+  errorCode: apiErrorCodeSchema.nullable(),
+  errorMessage: nullableNonempty,
+  payloadReference: z.string().min(1).nullable(),
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema
+});
+export type Job = z.infer<typeof jobSchema>;
+
+export const domainEntityNames = [
+  "Episode", "WatchedFolder", "TranscriptRevision", "AnalysisArtifact", "Candidate",
+  "ShortProject", "Template", "Asset", "Render", "ScheduleRuleSet", "ScheduleEntry", "Job"
+] as const;
+
+export const domainEntitySchemas = {
+  Episode: episodeSchema,
+  WatchedFolder: watchedFolderSchema,
+  TranscriptRevision: transcriptRevisionSchema,
+  AnalysisArtifact: analysisArtifactSchema,
+  Candidate: candidateSchema,
+  ShortProject: shortProjectSchema,
+  Template: templateSchema,
+  Asset: assetSchema,
+  Render: renderSchema,
+  ScheduleRuleSet: scheduleRuleSetSchema,
+  ScheduleEntry: scheduleEntrySchema,
+  Job: jobSchema
+} as const;
+
+export const lifecycleInventories = {
+  Episode: episodeStatuses,
+  Job: jobStates,
+  Candidate: candidateReviewStatuses,
+  Render: renderStates,
+  ScheduleEntry: scheduleEntryStatuses,
+  AnalysisArtifact: artifactStates
+} as const;
+
+export const EPISODE_STATUSES = episodeStatuses;
+export const JOB_STATES = jobStates;
+export const CANDIDATE_REVIEW_STATUSES = candidateReviewStatuses;
+export const RENDER_STATES = renderStates;
+export const SCHEDULE_ENTRY_STATUSES = scheduleEntryStatuses;
+export const ARTIFACT_STATES = artifactStates;

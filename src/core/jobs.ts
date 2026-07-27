@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Job } from "../shared/domain.js";
-import { AppError } from "../shared/errors.js";
+import { AppError, normalizeError } from "../shared/errors.js";
 import type { Repository } from "./repository.js";
 
 export interface JobRequest {
@@ -25,8 +25,10 @@ export class JobQueue {
     const now = new Date().toISOString();
     const job: Job = {
       id: randomUUID(), type: request.type, entityId: request.entityId ?? null,
+      provider: request.provider ?? null,
       state: "queued", progress: 0, stage: "queued", attempts: 0,
-      errorCode: null, errorMessage: null, createdAt: now, updatedAt: now
+      cancelRequested: false, errorCode: null, errorMessage: null, payloadReference: null,
+      createdAt: now, updatedAt: now
     };
     this.repository.insertJob(job, request.payload ?? {});
     return job;
@@ -86,9 +88,7 @@ export class JobQueue {
   }
 
   fail(id: string, error: unknown): void {
-    const appError = error instanceof AppError ? error : new AppError(
-      "INTERNAL_ERROR", error instanceof Error ? error.message : String(error), 500
-    );
+    const appError = normalizeError(error);
     this.repository.db.prepare(`
       UPDATE jobs SET state='failed',stage='failed',error_code=?,error_message=?,updated_at=?
       WHERE id=? AND state='running'

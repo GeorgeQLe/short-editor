@@ -24,7 +24,19 @@ describe("repository revisions and recovery", () => {
     const project = repository.createShort({
       id: crypto.randomUUID(), episodeId: source.id, candidateId: proposal.id, title: "A",
       sourceRanges: [{ startMs: 0, endMs: 30_000 }],
-      templateId: starterTemplates[1]!.id, composition: structuredClone(starterTemplates[1]!.composition),
+      templateId: starterTemplates[1]!.id,
+      templateLineage: {
+        templateId: starterTemplates[1]!.id, templateVersion: starterTemplates[1]!.version, parentTemplateId: null
+      },
+      composition: structuredClone(starterTemplates[1]!.composition),
+      captions: {
+        enabled: true, segments: [],
+        style: { fontFamily: "Arial", fontSize: 64, color: "#fff", highlightColor: "#ff0" }
+      },
+      audio: {
+        sourceGainDb: 0, muted: false, fadeInMs: 0, fadeOutMs: 0,
+        bedAssetId: null, bedGainDb: null, normalizeLoudness: false
+      },
       copy: { cleanedTranscript: "", rewrite: "", hookVariants: [], titles: [], description: "", hashtags: [], thumbnailText: "" },
       approved: true, revision: 1, createdAt: now, updatedAt: now
     });
@@ -57,7 +69,8 @@ describe("repository revisions and recovery", () => {
     const now = new Date().toISOString();
     repository.insertJob({
       id: crypto.randomUUID(), type: "analyze", entityId: null, state: "running",
-      progress: .3, stage: "transcribing", attempts: 1, errorCode: null, errorMessage: null,
+      progress: .3, provider: null, stage: "transcribing", attempts: 1,
+      cancelRequested: false, errorCode: null, errorMessage: null, payloadReference: null,
       createdAt: now, updatedAt: now
     }, {});
     expect(repository.recoverJobs()).toBe(1);

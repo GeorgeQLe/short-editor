@@ -1,20 +1,18 @@
-import type { Composition } from "./domain.js";
-
-export interface Template {
-  id: string;
-  name: string;
-  version: number;
-  description: string;
-  composition: Composition;
-}
+import type { Template } from "./domain.js";
 
 const safeArea = { top: 120, right: 60, bottom: 260, left: 60 };
+const builtInAt = "2026-07-27T00:00:00.000Z";
 
 export const starterTemplates: Template[] = [
   {
     id: "split-subject-speaker-v1",
     name: "Subject + Speaker",
     version: 1,
+    revision: 1,
+    parentTemplateId: null,
+    builtIn: true,
+    createdAt: builtInAt,
+    updatedAt: builtInAt,
     description: "Subject media on top with a tracked speaker below.",
     composition: {
       width: 1080, height: 1920, background: "#090b10", safeArea,
@@ -29,6 +27,11 @@ export const starterTemplates: Template[] = [
     id: "fullscreen-speaker-v1",
     name: "Tracked Speaker",
     version: 1,
+    revision: 1,
+    parentTemplateId: null,
+    builtIn: true,
+    createdAt: builtInAt,
+    updatedAt: builtInAt,
     description: "Full-screen tracked speaker with highlighted captions.",
     composition: {
       width: 1080, height: 1920, background: "#000000", safeArea,
@@ -42,6 +45,11 @@ export const starterTemplates: Template[] = [
     id: "screen-speaker-v1",
     name: "Screen + Speaker",
     version: 1,
+    revision: 1,
+    parentTemplateId: null,
+    builtIn: true,
+    createdAt: builtInAt,
+    updatedAt: builtInAt,
     description: "Two independent crops from one source: screen above, speaker below.",
     composition: {
       width: 1080, height: 1920, background: "#090b10", safeArea,

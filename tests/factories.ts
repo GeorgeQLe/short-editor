@@ -33,6 +33,10 @@ export function candidate(episodeId: string, overrides: Partial<ClipCandidate> =
     topic: "practical lesson", hook: "Here is why this matters.",
     reason: "Strong hook and payoff.", score: 0.8,
     scores: { hook: .9, coherence: .8, payoff: .8, independence: .8, delivery: .7, visualActivity: .5 },
-    duplicateGroup: null, reviewStatus: "approved", createdAt: now, ...overrides
+    duplicateGroup: null, reviewStatus: "approved",
+    generationProvenance: {
+      artifactId: null, transcriptRevision: 1, generationVersion: "fixture-v1", provider: null
+    },
+    createdAt: now, ...overrides
   };
 }

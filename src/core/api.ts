@@ -2,7 +2,7 @@ import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { compositionSchema, scheduleRulesSchema, transcriptSegmentSchema } from "../shared/domain.js";
-import { AppError } from "../shared/errors.js";
+import { errorEnvelope, normalizeError } from "../shared/errors.js";
 import { candidateGenerateInput, type CoreService, importPathsInput } from "./service.js";
 
 const id = z.string().uuid();
@@ -94,14 +94,9 @@ export function createApi(service: CoreService) {
   }));
 
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    if (error instanceof z.ZodError) {
-      return res.status(422).json({ code: "VALIDATION_ERROR", message: "Invalid request", details: error.issues });
-    }
-    if (error instanceof AppError) {
-      return res.status(error.status).json({ code: error.code, message: error.message, details: error.details });
-    }
-    console.error(error);
-    return res.status(500).json({ code: "INTERNAL_ERROR", message: "Unexpected internal error" });
+    const normalized = normalizeError(error);
+    if (normalized.code === "INTERNAL_ERROR") console.error("Unexpected internal error");
+    return res.status(normalized.status).json(errorEnvelope(normalized));
   });
   return app;
 }
