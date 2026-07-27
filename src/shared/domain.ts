@@ -1,6 +1,7 @@
 export * from "./validators.js";
 export * from "./contracts.js";
 export * from "./job-messages.js";
+export * from "./python-worker-protocol.js";
 export * from "./error-contracts.js";
 export * from "./episode-transitions.js";
 

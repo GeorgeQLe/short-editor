@@ -13,13 +13,15 @@ The current vertical slice includes:
 - persistent, restart-safe jobs and an explicit local/cloud authorization boundary;
 - deterministic transcript-window candidate generation and review;
 - revision-safe Short projects and invalidation of stale renders/schedules;
+- a versioned, supervised Python worker host with strict framing, capability
+  reporting, bounded cancellation/restart, and typed provider-operation results;
 - versioned starter composition templates;
 - render preflight/output validation through `ffprobe`;
 - a timezone-aware, rules-based launch scheduler;
 - a versioned HTTP API, React dashboard, Electron shell, and typed MCP adapter.
 
-The Python analysis worker, production crop tracking, complete FFmpeg filter graph,
-and provider-specific AI calls are intentionally behind interfaces for later phases.
+Concrete transcription/analysis providers, production crop tracking, and the
+complete FFmpeg filter graph are intentionally behind interfaces for later phases.
 
 ## Development
 

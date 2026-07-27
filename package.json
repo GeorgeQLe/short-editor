@@ -63,6 +63,11 @@
         "from": "resources/bin",
         "to": "bin",
         "filter": ["**/*"]
+      },
+      {
+        "from": "resources/worker",
+        "to": "worker",
+        "filter": ["**/*"]
       }
     ],
     "win": {

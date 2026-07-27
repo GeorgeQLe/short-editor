@@ -299,6 +299,10 @@ absorb a downstream task.
 
 ### PRO-01 — Define and supervise the versioned Python worker protocol
 
+- **Status:** Implemented 2026-07-27. The development host, strict NDJSON
+  protocol, bounded supervisor, dependency/capability reporting, and automated
+  compatibility/fault fixtures are complete. Frozen/embedded runtime assembly
+  and clean Windows startup/shutdown evidence remain in WIN-02/WIN-03.
 - **SPEC / gates:** 4.1, 4.3, 5.1–5.2, 6.2; G2, G9, G10.
 - **Prerequisites / unblocks:** FND-01 and FND-03; unblocks PRO-02, PRO-03, and
   PRO-05.

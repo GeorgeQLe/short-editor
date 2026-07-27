@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] PRO-01 — Define and supervise the versioned Python worker protocol.
+- [ ] PRO-02 — Implement local faster-whisper transcription.
 
 ## Completed
 
+- [x] PRO-01 — Define and supervise the versioned Python worker protocol.
 - [x] INV-02/INV-03 — Add watched-folder reconciliation, missing-source
   detection, and identity-safe relinking.
 - [x] INV-01 — Make batch import identity-safe and format-aware.

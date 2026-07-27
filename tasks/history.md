@@ -2,6 +2,15 @@
 
 ## 2026-07-27
 
+- Completed PRO-01 with a strict versioned Python worker protocol covering
+  transcription, diarization, visual sampling, and provider calls, plus typed
+  capability, dependency, progress, result, cancellation, and status messages.
+- Added a bounded stdio supervisor with NDJSON frame limits, heartbeat/job
+  timeouts, cancellation grace, crash restart limits, credential-free launch
+  arguments, fully redacted stderr, and typed error mapping before storage.
+- Added a SQLite-free development worker host and compatibility/fault fixtures
+  for malformed/partial/version-mismatched frames, missing runtime, oversized
+  output, timeout, crash, restart, cancellation, and startup/shutdown.
 - Completed the combined INV-02/INV-03 inventory milestone with persisted
   watched-folder configuration, debounced chokidar events, durable startup,
   manual, and five-minute scans, scan deduplication/progress/cancellation, and

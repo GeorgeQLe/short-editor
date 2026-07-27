@@ -2,33 +2,42 @@
 
 ## User goal
 
-Complete INV-01: make batch media import identity-safe and format-aware, then
-wrap up the session and ship the result.
+Complete PRO-01 by defining and supervising the versioned Python worker
+protocol, then wrap up the session and ship the result.
 
 ## Changed files and per-file purpose
 
-- `src/core/media.ts` makes import asynchronous, validates media with FFprobe
-  before persistence, samples file content for quick fingerprints, resolves
-  ambiguous identity with stable SHA-256 hashes, serializes identity
-  finalization, persists probe metadata, and returns safe typed rejections.
-- `src/core/repository.ts` returns every quick-fingerprint candidate and supports
-  deterministic content-hash lookup.
-- `src/core/service.ts` awaits validated imports and queues hashing only when
-  identity resolution did not already produce a full hash.
-- `src/shared/contracts.ts` defines the typed per-input import rejection shape.
-- `src/electron/main.ts`, `src/ui/api.ts`, and `src/ui/App.tsx` expose readable
-  video selection, the typed result, and imported/duplicate/rejected counts.
-- `src/mcp/server.ts` describes the format-aware source-in-place behavior.
-- `tests/media.test.ts` covers mixed formats, malformed and unsupported media,
-  canonical/symlink/hard-link/content duplicates, sampled-fingerprint
-  collisions, concurrent imports, source mutation, unavailable FFprobe,
-  read-only sources, and hash-job scheduling.
-- `SPEC.md` reconciles the implementation matrix with the completed INV-01
-  boundary and leaves watched folders, missing-source reconciliation, and
-  relinking pending.
-- `tasks/todo.md` marks INV-01 complete and promotes INV-02 as the sole current
+- `src/shared/python-worker-protocol.ts` defines strict v1 NDJSON commands,
+  events, operation inputs, typed results, provenance, runtime status,
+  capabilities, dependency state, progress, cancellation, and framing limits.
+- `src/shared/domain.ts` exports the worker protocol through the shared domain
+  surface.
+- `src/core/python-worker-supervisor.ts` launches development or packaged worker
+  targets, validates every frame, bounds startup/heartbeat/job/cancellation/
+  shutdown behavior, maps failures to typed errors, redacts stderr, and limits
+  crash restarts.
+- `resources/worker/worker.py` provides the SQLite-free development host and
+  reports intentionally unavailable provider capabilities until PRO-02/03/05.
+- `tests/fixtures/python-worker-fixture.mjs` supplies deterministic normal,
+  malformed, partial, mismatched, oversized, hung, crashing, restart, and stderr
+  behaviors.
+- `tests/python-worker-protocol.test.ts` proves strict versioning, required
+  fields, operation coverage, and rejection of credential-shaped inputs.
+- `tests/python-worker-supervisor.test.ts` proves lifecycle, status, capability,
+  progress, typed results, framing limits, timeouts, cancellation, restart
+  bounds, missing-runtime mapping, SQLite isolation, and diagnostic redaction.
+- `tests/python-worker-host.test.ts` starts the real development host, checks its
+  degraded dependency state, exercises a typed unavailable result, and shuts it
+  down.
+- `package.json` includes worker resources in the Electron packaging boundary.
+- `README.md` describes the supervised worker slice and clarifies that concrete
+  providers remain future work.
+- `IMPLEMENTATION_PLAN.md` records PRO-01 implementation evidence and preserves
+  frozen-runtime and Windows acceptance work in WIN-02/WIN-03.
+- `tasks/todo.md` marks PRO-01 complete and promotes PRO-02 as the sole current
   executable task.
-- `tasks/history.md` records the completed import work.
+- `tasks/history.md` records the completed protocol, supervisor, host, and fault
+  fixtures.
 - `tasks/ship-manifest.md` records this exact shipping proof.
 
 Generated `.agents/skillpacks/`, `.claude/skills/`, and `.codex/skills/` local
@@ -36,64 +45,71 @@ artifacts are excluded from the commit. `.agents/project.json` is unchanged.
 
 ## User-goal mapping
 
-The media and repository changes implement safe batch inspection and identity
-resolution. Service and shared-contract changes carry the result through the
-core boundary. Electron, UI, and MCP changes expose the broader readable-video
-contract. The media suite proves the failure modes and invariants, while SPEC
-and task documents reconcile the completed scope and route the next inventory
-task.
+The shared schemas define the compatibility and data-safety boundary. The
+supervisor enforces that boundary across process lifecycle and failures. The
+development host establishes the provider-independent runtime contract, while
+the fixtures and three focused suites prove protocol, supervisor, and real-host
+behavior. Packaging configuration, project documentation, and task records
+reconcile the completed PRO-01 scope and route the first concrete provider.
 
 ## Tests run
 
-- `npm test`: 13 test files and 69 tests passed.
+- `npm test`: 17 test files and 91 tests passed, including 15 worker-specific
+  protocol, supervisor, and development-host tests.
 - `npm run build`: TypeScript application checking, Vite production build, and
   Node-target TypeScript build passed.
 - `git diff --check`: passed.
+- A targeted secret-signature scan over the shipping paths found no credential
+  material. Credential-looking fixture text is deliberately synthetic and
+  covered by redaction assertions.
 
 ## Skipped tests
 
 - No lint script or lint/check target exists in `package.json`, and there is no
-  Makefile, Justfile, Python, or Cargo validation surface. TypeScript checking,
-  the production build, and the full Vitest suite are the available executable
-  gates.
-- `npm run package:win` is deferred because this macOS development host cannot
-  establish Windows-native SQLite, long-path, picker, FFprobe packaging, or
-  installer evidence.
-- An interactive Electron smoke test was not run because the automated suite
-  directly covers import behavior and this environment does not provide the
-  representative Windows media corpus required for release acceptance.
+  Makefile, Justfile, Python, or Cargo validation surface. The full Vitest suite,
+  TypeScript checks, production web build, and Node build are the available
+  executable gates.
+- `npm run package:win` is deferred because frozen/embedded worker assembly is
+  explicitly owned by WIN-02 and this macOS host cannot provide Windows-native
+  packaged startup/shutdown evidence.
+- Interactive Electron validation is deferred to UI-03/WIN-03 because PRO-01
+  does not yet connect provider controls to the UI; the real development-host
+  lifecycle is exercised directly by `tests/python-worker-host.test.ts`.
 
 ## Adversarial review
 
-A failure-oriented changed-file review traced canonical-path, symlink,
-hard-link, sampled-fingerprint, and content-hash identity; concurrent calls and
-batch ordering; transaction boundaries; source mutation; FFprobe spawn,
-non-zero, invalid-JSON, missing-video, missing-metadata, and diagnostic-redaction
-paths; hash-job duplication; and API/UI/MCP compatibility.
+An explicitly justified failure-oriented review was used as the quality-sweep
+equivalent because no standalone `quality-sweep` or `expert-review` command is
+installed. The review traced mismatched and partial startup frames; unexpected
+response types and IDs; frame overflow before parse/storage; invalid result
+kinds; missing runtime; job, heartbeat, cancellation, and shutdown deadlines;
+crash-loop bounds; duplicate jobs; restart/stop races; credential-shaped
+arguments/options; stderr disclosure; direct SQLite access; development versus
+packaged launch paths; and task/document scope.
 
-The full suite additionally exercises every added behavior. No blocking finding
-or warning remains.
+The focused worker suites and full regression suite exercise the applicable
+failure paths. No blocking finding or warning remains.
 
 ## Residual risk
 
-- Windows long paths, native file-picker filters, packaged FFprobe discovery,
-  read-only permissions, and representative codecs still require the G1
-  Windows 11 acceptance run.
-- Stability checks use file size and modification time around reads. A source
-  rewritten in place while preserving both values could evade mutation
-  detection; content hashing still protects ambiguous duplicate merges, but a
-  unique import could retain probe metadata from the racing read.
-- Import serialization is scoped to the application `MediaService` instance.
-  The runtime creates one instance; a future multi-process importer would need a
-  database-level content-identity arbitration design.
+- The packaged launcher expects a frozen `short-editor-worker` executable while
+  this slice ships the development Python host source. WIN-02 owns frozen
+  runtime assembly and WIN-03 owns clean Windows startup/shutdown evidence, so
+  packaged execution is not claimed by PRO-01.
+- The placeholder host reports all provider operations unavailable by design.
+  PRO-02/03/05 must add concrete adapters without weakening strict framing,
+  typed provenance, credential isolation, or cancellation behavior.
+- The stdio lifecycle is covered under Node and the local Python runtime on
+  macOS. Windows process signaling, path handling, antivirus interaction, and
+  installer resource placement remain acceptance risks until WIN-02/WIN-03.
 
 ## Rollback note
 
-Revert the INV-01 commit. This change adds no database migration, so rollback
-does not require data restoration; episodes imported under the broader format
-contract may remain in an existing database and should be reviewed before
-running an older MP4-oriented build.
+Revert the PRO-01 commit. This change adds no database migration and the
+placeholder worker writes no application data, so rollback requires no data
+restoration. Remove any separately assembled worker executable when reverting a
+future packaged build.
 
 ## Next command
 
-`$exec INV-02`
+`$exec PRO-02`
