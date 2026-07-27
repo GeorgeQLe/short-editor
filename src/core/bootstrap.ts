@@ -17,6 +17,13 @@ import {
   LocalTranscriptionProvider,
   localTranscriptionOptionsSchema
 } from "./local-transcription.js";
+import {
+  analysisInputHash,
+  createAnalysisArtifact,
+  localAnalysisJobOptionsSchema,
+  LocalVisualSampler,
+  OllamaAnalysisProvider
+} from "./local-analysis.js";
 import { AppError } from "../shared/errors.js";
 
 export function createCore(databasePath?: string): CoreService {
@@ -37,6 +44,8 @@ export function createCore(databasePath?: string): CoreService {
     coreVersion: "0.1.0"
   });
   const localTranscription = new LocalTranscriptionProvider(worker);
+  const localVisualSampling = new LocalVisualSampler(worker);
+  const ollamaAnalysis = new OllamaAnalysisProvider(worker);
   let service!: CoreService;
   const runner = new JobRunner(jobs, {
     probe: async (job) => {
@@ -52,6 +61,89 @@ export function createCore(databasePath?: string): CoreService {
         );
       }
       const episode = repository.getEpisode(job.entityId!);
+      const localAnalysis = localAnalysisJobOptionsSchema.safeParse(payload);
+      if (localAnalysis.success) {
+        const transcript = repository.getAcceptedTranscriptRevision(episode.id);
+        if (!episode.contentHash) {
+          throw new AppError("INVALID_STATE", "Episode hashing must finish before analysis", 409);
+        }
+        const inputHash = analysisInputHash({
+          sourceHash: episode.contentHash,
+          transcript,
+          ollama: localAnalysis.data.ollama,
+          visual: localAnalysis.data.visual
+        });
+        if (repository.findAnalysisArtifact(episode.id, "episode_analysis", inputHash)) {
+          jobs.progress(job.id, 1, "reused matching local analysis");
+          return;
+        }
+        const cancellation = setInterval(() => {
+          if (jobs.cancellationRequested(job.id)) void worker.cancel(job.id);
+        }, 100);
+        try {
+          const visual = await localVisualSampling.sample(
+            job.id,
+            episode.sourcePath,
+            localAnalysis.data.visual,
+            (progress, stage) => jobs.progress(job.id, progress * 0.45, stage)
+          );
+          if (jobs.cancellationRequested(job.id)) return;
+          const artifactRoot = `artifacts/episodes/${episode.id}/analysis-inputs/${job.id}`;
+          const transcriptRecord = artifacts.finalize({
+            kind: "analysis_transcript_input",
+            ownerType: "episode",
+            ownerId: episode.id,
+            ownerRevision: transcript.revision,
+            relativePath: `${artifactRoot}/transcript.json`,
+            producerVersion: "analysis-input-v1",
+            bytes: Buffer.from(JSON.stringify({
+              revision: transcript.revision,
+              language: transcript.language,
+              segments: transcript.segments
+            }))
+          });
+          const visualRecord = artifacts.finalize({
+            kind: "analysis_visual_input",
+            ownerType: "episode",
+            ownerId: episode.id,
+            ownerRevision: transcript.revision,
+            relativePath: `${artifactRoot}/visual.json`,
+            producerVersion: "visual-sampling-v1",
+            bytes: Buffer.from(JSON.stringify({
+              capabilities: visual.capabilities,
+              samples: visual.samples,
+              provenance: visual.provenance
+            }))
+          });
+          const analyzed = await ollamaAnalysis.analyze(
+            job.id,
+            [
+              artifacts.resolveOwnedPath(transcriptRecord.relativePath),
+              artifacts.resolveOwnedPath(visualRecord.relativePath)
+            ],
+            localAnalysis.data.ollama,
+            (progress, stage) => jobs.progress(job.id, 0.45 + progress * 0.5, stage)
+          );
+          if (jobs.cancellationRequested(job.id)) return;
+          repository.insertAnalysisArtifact(createAnalysisArtifact(
+            episode.id,
+            inputHash,
+            analyzed.output,
+            analyzed.provenance
+          ));
+          jobs.progress(job.id, 0.98, "stored typed local analysis");
+        } catch (error) {
+          if (
+            error instanceof AppError &&
+            error.code === "JOB_CANCELLED" &&
+            jobs.cancellationRequested(job.id)
+          ) return;
+          throw error;
+        } finally {
+          clearInterval(cancellation);
+        }
+        return;
+      }
       const options = localTranscriptionOptionsSchema.parse(payload);
       const cancellation = setInterval(() => {
         if (jobs.cancellationRequested(job.id)) void worker.cancel(job.id);
@@ -98,7 +190,9 @@ export function createCore(databasePath?: string): CoreService {
       await runner.stop();
       await worker.stop();
     },
-    localTranscription
+    localTranscription,
+    ollamaAnalysis,
+    localVisualSampling
   );
   runner.start();
   void watchedFolders.start();

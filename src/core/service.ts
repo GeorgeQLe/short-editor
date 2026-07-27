@@ -23,6 +23,12 @@ import { validateRender } from "./render.js";
 import type { ArtifactStore } from "./artifact-store.js";
 import { WatchedFolderCoordinator } from "./watched-folders.js";
 import {
+  classifyProviderEndpoint,
+  localAnalysisJobOptionsSchema,
+  type OllamaAnalysisProvider,
+  type LocalVisualSampler
+} from "./local-analysis.js";
+import {
   localTranscriptionOptionsSchema,
   type LocalTranscriptionProvider
 } from "./local-transcription.js";
@@ -35,7 +41,9 @@ export class CoreService {
     readonly artifacts?: ArtifactStore,
     readonly watchedFolders?: WatchedFolderCoordinator,
     private readonly stopWorker?: () => void | Promise<void>,
-    readonly localTranscription?: LocalTranscriptionProvider
+    readonly localTranscription?: LocalTranscriptionProvider,
+    readonly ollamaAnalysis?: OllamaAnalysisProvider,
+    readonly localVisualSampling?: LocalVisualSampler
   ) {}
 
   async stop(): Promise<void> {
@@ -104,6 +112,84 @@ export class CoreService {
       throw new AppError("DEPENDENCY_UNAVAILABLE", "Local transcription is unavailable", 503);
     }
     return this.localTranscription.status();
+  }
+
+  startOllamaAnalysis(
+    episodeId: string,
+    options: {
+      baseUrl?: string;
+      modelId?: string;
+      timeoutMs?: number;
+      networkDisclosed?: boolean;
+      cloudAuthorized?: boolean;
+      temperature?: number;
+      intervalMs?: number;
+      maximumSamples?: number;
+      fixtureId?: string;
+    } = {}
+  ) {
+    const episode = this.repository.getEpisode(episodeId);
+    if (episode.missing) {
+      throw new AppError("SOURCE_MISSING", "Cannot analyze an Episode with missing source media", 409);
+    }
+    if (!episode.contentHash) {
+      throw new AppError("INVALID_STATE", "Episode hashing must finish before analysis", 409);
+    }
+    this.repository.getAcceptedTranscriptRevision(episodeId);
+    const baseUrl = options.baseUrl ?? process.env.SHORT_EDITOR_OLLAMA_BASE_URL ??
+      "http://127.0.0.1:11434";
+    const endpointClass = classifyProviderEndpoint(baseUrl);
+    if (endpointClass === "network" && !options.networkDisclosed) {
+      throw new AppError(
+        "CLOUD_CONFIRMATION_REQUIRED",
+        "Private-LAN Ollama analysis requires disclosure of the endpoint and transmitted data",
+        403
+      );
+    }
+    const persistedCloudAuthorization = endpointClass === "cloud" &&
+      this.repository.hasCloudAuthorization("project", episodeId, "ollama", "analysis");
+    if (endpointClass === "cloud" && !persistedCloudAuthorization) {
+      throw new AppError(
+        "CLOUD_NOT_AUTHORIZED",
+        "Public Ollama analysis requires persisted cloud authorization",
+        403
+      );
+    }
+    const payload = localAnalysisJobOptionsSchema.parse({
+      mode: "ollama",
+      ollama: {
+        baseUrl,
+        modelId: options.modelId ?? process.env.SHORT_EDITOR_OLLAMA_MODEL ?? "gemma3",
+        timeoutMs: options.timeoutMs ?? 120_000,
+        networkDisclosed: options.networkDisclosed ?? false,
+        cloudAuthorized: persistedCloudAuthorization,
+        temperature: options.temperature ?? 0
+      },
+      visual: {
+        intervalMs: options.intervalMs ?? 2_000,
+        maximumSamples: options.maximumSamples ?? 300,
+        ...(options.fixtureId ? { fixtureId: options.fixtureId } : {})
+      }
+    });
+    return this.jobs.enqueue({
+      type: "analyze",
+      entityId: episodeId,
+      provider: "local",
+      cloudAuthorized: endpointClass === "cloud" ? persistedCloudAuthorization : true,
+      payload
+    });
+  }
+
+  ollamaStatus(baseUrl = process.env.SHORT_EDITOR_OLLAMA_BASE_URL ?? "http://127.0.0.1:11434") {
+    if (!this.ollamaAnalysis || !this.localVisualSampling) {
+      throw new AppError("DEPENDENCY_UNAVAILABLE", "Local analysis providers are unavailable", 503);
+    }
+    return this.ollamaAnalysis.status(baseUrl);
+  }
+
+  listAnalysisArtifacts(episodeId: string) {
+    this.repository.getEpisode(episodeId);
+    return this.repository.listAnalysisArtifacts(episodeId);
   }
 
   setTranscript(episodeId: string, segments: TranscriptSegment[]) {

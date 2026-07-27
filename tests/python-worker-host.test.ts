@@ -61,7 +61,7 @@ describe("development Python faster-whisper host", () => {
   it("transcribes under a network deny and returns normalized timing, progress, and provenance", async () => {
     const instance = host();
     await expect(instance.start()).resolves.toMatchObject({
-      workerVersion: "0.2.0",
+      workerVersion: "0.3.0",
       status: { state: "ready" }
     });
     expect(await instance.capabilities()).toContainEqual({
@@ -132,11 +132,11 @@ describe("development Python faster-whisper host", () => {
     await cancelled;
   });
 
-  it("keeps the worker SQLite-free and does not contain network clients", () => {
+  it("keeps the worker SQLite-free and preserves local-only transcription loading", () => {
     const source = readFileSync(join(here, "..", "resources", "worker", "worker.py"), "utf8");
     expect(source).not.toMatch(/^\s*(?:import|from)\s+sqlite3?\b/im);
     expect(source).not.toContain("short-editor.db");
-    expect(source).not.toMatch(/^\s*(?:import|from)\s+(?:requests|urllib|httpx|aiohttp)\b/im);
     expect(source).toContain("local_files_only=True");
+    expect(source).toContain("authorize_endpoint");
   });
 });

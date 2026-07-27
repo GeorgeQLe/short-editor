@@ -2,6 +2,22 @@
 
 ## 2026-07-27
 
+- Completed PRO-03 with configurable Ollama base URL/model selection,
+  schema-constrained structured analysis, model capability discovery, typed
+  provider provenance, and no silent provider fallback.
+- Classified loopback, private-LAN, and public endpoints before execution;
+  required disclosure for private-LAN use, persisted scoped authorization for
+  public endpoints, and reclassified redirects before sending analysis data
+  while preserving the stricter original/target policy.
+- Added local FFmpeg frame sampling with bounded interval/count options and
+  visual-activity scores; speaker framing, face detection, and screen-share
+  detection are explicitly unsupported when the installed stack lacks them.
+- Added prompt/schema/visual option versions and cache identity over source
+  hash, accepted transcript revision, provider/model/endpoint class, normalized
+  options, and sampling configuration.
+- Added deterministic Ollama and visual fixtures for success, unavailable,
+  timeout, malformed output, schema drift, endpoint policy/redirects, no-face,
+  multi-face, screen-share, and option-driven cache misses.
 - Completed PRO-02 with installed-model-only faster-whisper English
   transcription, normalized timed segments and optional words, explicit absent
   diarization, typed local provenance, progress, and bounded cancellation.

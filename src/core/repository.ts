@@ -435,6 +435,16 @@ export class Repository {
     `).all(episodeId) as Row[]).map(mapTranscriptRevision);
   }
 
+  getAcceptedTranscriptRevision(episodeId: string): TranscriptRevision {
+    const row = this.db.prepare(`
+      SELECT * FROM transcript_revisions
+      WHERE episode_id=? AND accepted_state='accepted'
+      ORDER BY revision DESC LIMIT 1
+    `).get(episodeId) as Row | undefined;
+    if (!row) throw new AppError("INVALID_STATE", "Episode has no accepted transcript", 409);
+    return mapTranscriptRevision(row);
+  }
+
   replaceCandidates(episodeId: string, candidates: ClipCandidate[]): void {
     this.db.transaction(() => {
       this.db.prepare("DELETE FROM candidates WHERE episode_id=? AND review_status='pending'").run(episodeId);
@@ -576,6 +586,19 @@ export class Repository {
     return (this.db.prepare(`
       SELECT * FROM analysis_artifacts WHERE entity_id=? ORDER BY created_at
     `).all(entityId) as Row[]).map(mapAnalysisArtifact);
+  }
+
+  findAnalysisArtifact(
+    entityId: string,
+    kind: AnalysisArtifact["kind"],
+    inputHash: string
+  ): AnalysisArtifact | undefined {
+    const row = this.db.prepare(`
+      SELECT * FROM analysis_artifacts
+      WHERE entity_id=? AND kind=? AND input_hash=? AND state IN ('proposed','accepted')
+      ORDER BY created_at DESC LIMIT 1
+    `).get(entityId, kind, inputHash) as Row | undefined;
+    return row ? mapAnalysisArtifact(row) : undefined;
   }
 
   createTemplate(template: Template): Template {

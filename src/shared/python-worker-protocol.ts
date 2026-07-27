@@ -69,12 +69,13 @@ export const visualSamplingWorkerJobSchema = z.strictObject({
   kind: z.literal("visual_sampling"),
   sourcePath: z.string().min(1),
   intervalMs: z.number().int().positive(),
-  maximumSamples: z.number().int().positive().max(10_000)
+  maximumSamples: z.number().int().positive().max(10_000),
+  fixtureId: z.string().regex(/^[A-Za-z0-9_-]+$/).optional()
 });
 export const providerCallWorkerJobSchema = z.strictObject({
   kind: z.literal("provider_call"),
   ...providerInput,
-  operation: z.enum(["analysis", "candidates", "copy"]),
+  operation: z.enum(["analysis", "candidates", "copy", "capabilities"]),
   inputArtifactPaths: z.array(z.string().min(1)),
   schemaVersion: z.string().min(1),
   options: z.record(z.string(), z.json())
@@ -171,10 +172,18 @@ export const diarizationWorkerResultSchema = z.strictObject({
 });
 export const visualSamplingWorkerResultSchema = z.strictObject({
   kind: z.literal("visual_sampling"),
+  capabilities: z.strictObject({
+    activity: z.literal("supported"),
+    speakerFraming: z.enum(["supported", "unsupported"]),
+    faceDetection: z.enum(["supported", "unsupported"]),
+    screenShareDetection: z.enum(["supported", "unsupported"])
+  }),
   samples: z.array(z.strictObject({
     atMs: z.number().int().nonnegative(),
     activity: z.number().min(0).max(1),
-    speakerFraming: z.number().min(0).max(1).nullable()
+    speakerFraming: z.number().min(0).max(1).nullable(),
+    faceCount: z.number().int().nonnegative().nullable(),
+    screenShare: z.boolean().nullable()
   })),
   provenance: providerProvenanceSchema
 });

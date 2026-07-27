@@ -1,9 +1,11 @@
 # Current work
 
-- [ ] PRO-03 — Implement Ollama analysis and local visual sampling.
+- [ ] PRO-04 — Add Windows-protected credentials and persisted cloud
+  authorization.
 
 ## Completed
 
+- [x] PRO-03 — Implement Ollama analysis and local visual sampling.
 - [x] PRO-02 — Implement local faster-whisper transcription.
 - [x] PRO-01 — Define and supervise the versioned Python worker protocol.
 - [x] INV-02/INV-03 — Add watched-folder reconciliation, missing-source

@@ -364,6 +364,12 @@ absorb a downstream task.
 
 ### PRO-03 — Implement Ollama analysis and local visual sampling
 
+- **Status:** Implemented 2026-07-27. Configurable schema-constrained Ollama
+  analysis, endpoint/redirect classification, persisted public-endpoint
+  authorization enforcement, FFmpeg visual-activity sampling, explicit
+  unsupported detections, typed provenance, normalized cache identity, and
+  deterministic provider/visual fixtures are complete. Configured Windows
+  validation remains in WIN-03.
 - **SPEC / gates:** 3.3, 6.2–6.3, 6.6; G2–G4.
 - **Prerequisites / unblocks:** PRO-01 and PRO-02; unblocks quality Candidate and
   crop automation work.

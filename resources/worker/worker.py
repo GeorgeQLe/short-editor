@@ -7,16 +7,26 @@ is invoked with ``local_files_only=True``.
 """
 
 import importlib.metadata
+import ipaddress
 import json
 import math
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 import threading
 import time
+from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin, urlparse
+from urllib.request import (
+    HTTPRedirectHandler,
+    Request,
+    build_opener,
+)
 
 PROTOCOL_VERSION = "v1"
-WORKER_VERSION = "0.2.0"
+WORKER_VERSION = "0.3.0"
 DEFAULT_MODEL_IDS = ("small.en",)
 active_jobs = {}
 active_lock = threading.Lock()
@@ -109,12 +119,33 @@ def dependencies():
                 "detail": None if installed else "Install this model in the configured local model directory",
             }
         )
+    ffmpeg = shutil.which(os.environ.get("SHORT_EDITOR_FFMPEG_PATH", "ffmpeg"))
+    values.append(
+        {
+            "id": "ffmpeg:visual-sampling",
+            "state": "available" if ffmpeg else "missing",
+            "version": ffmpeg_version(ffmpeg) if ffmpeg else None,
+            "detail": None if ffmpeg else "Install FFmpeg or configure SHORT_EDITOR_FFMPEG_PATH",
+        }
+    )
+    values.append(
+        {
+            "id": "ollama:http-api",
+            "state": "available",
+            "version": "v1",
+            "detail": "Availability of the configured Ollama endpoint is checked per operation",
+        }
+    )
     return values
 
 
 def status():
     current_dependencies = dependencies()
-    ready = all(item["state"] == "available" for item in current_dependencies)
+    ready = all(
+        item["state"] == "available"
+        for item in current_dependencies
+        if item["id"] != "ollama:http-api"
+    )
     with active_lock:
         job_ids = sorted(active_jobs)
     return {
@@ -128,6 +159,7 @@ def capabilities():
     package_available, _ = faster_whisper_state()
     model_available = any(resolve_model_path(model_id) for model_id in configured_model_ids())
     transcription_available = package_available and model_available
+    visual_available = shutil.which(os.environ.get("SHORT_EDITOR_FFMPEG_PATH", "ffmpeg")) is not None
     return [
         {
             "operation": "transcription",
@@ -137,16 +169,47 @@ def capabilities():
             if transcription_available
             else [],
         },
-        *[
-            {
-                "operation": operation,
-                "available": False,
-                "providers": [],
-                "features": [],
-            }
-            for operation in ("diarization", "visual_sampling", "provider_call")
-        ],
+        {
+            "operation": "diarization",
+            "available": False,
+            "providers": [],
+            "features": ["explicit-unsupported"],
+        },
+        {
+            "operation": "visual_sampling",
+            "available": visual_available,
+            "providers": ["ffmpeg"] if visual_available else [],
+            "features": [
+                "activity",
+                "explicit-unsupported-speaker-framing",
+                "explicit-unsupported-face-detection",
+                "explicit-unsupported-screen-share",
+            ] if visual_available else [],
+        },
+        {
+            "operation": "provider_call",
+            "available": True,
+            "providers": ["ollama"],
+            "features": ["structured-output", "redirect-policy", "no-fallback"],
+        },
     ]
+
+
+def ffmpeg_version(executable):
+    if not executable:
+        return None
+    try:
+        completed = subprocess.run(
+            [executable, "-version"],
+            capture_output=True,
+            check=False,
+            timeout=3,
+        )
+        first_line = completed.stdout.decode("utf-8", errors="replace").splitlines()[0]
+        parts = first_line.split()
+        return parts[2] if len(parts) > 2 else "installed"
+    except (OSError, subprocess.SubprocessError, IndexError):
+        return "installed"
 
 
 def heartbeat():
@@ -347,6 +410,383 @@ def transcribe(job_id, request_id, job, cancelled):
     )
 
 
+def utc_now():
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def visual_fixture(job):
+    fixture_id = job.get("fixtureId")
+    root = os.environ.get("SHORT_EDITOR_VISUAL_FIXTURE_DIR")
+    if not fixture_id or not root:
+        return None
+    if not all(character.isalnum() or character in "_-" for character in fixture_id):
+        return None
+    path = Path(root) / (fixture_id + ".json")
+    if not path.is_file():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def pgm_frames(data):
+    offset = 0
+    while offset < len(data):
+        if data[offset : offset + 2] != b"P5":
+            raise ValueError("Invalid FFmpeg sampling frame")
+        offset += 2
+        tokens = []
+        while len(tokens) < 3:
+            while offset < len(data) and data[offset] in b" \t\r\n":
+                offset += 1
+            if offset < len(data) and data[offset] == 35:
+                while offset < len(data) and data[offset] != 10:
+                    offset += 1
+                continue
+            end = offset
+            while end < len(data) and data[end] not in b" \t\r\n":
+                end += 1
+            tokens.append(int(data[offset:end]))
+            offset = end
+        width, height, maximum = tokens
+        if width <= 0 or height <= 0 or maximum != 255:
+            raise ValueError("Unsupported FFmpeg sampling frame")
+        if offset >= len(data) or data[offset] not in b" \t\r\n":
+            raise ValueError("Invalid FFmpeg sampling frame header")
+        offset += 1
+        length = width * height
+        pixels = data[offset : offset + length]
+        if len(pixels) != length:
+            raise ValueError("Truncated FFmpeg sampling frame")
+        offset += length
+        yield pixels
+
+
+def visual_sampling(job_id, request_id, job, cancelled):
+    fixture = visual_fixture(job)
+    if fixture is not None:
+        progress(job_id, 0.5, "sampling local visual fixture")
+        if cancelled.is_set():
+            send_cancelled(job_id)
+            return
+        result = fixture
+        result["kind"] = "visual_sampling"
+        result["provenance"] = {
+            "provider": "visual-fixture",
+            "providerClass": "local",
+            "modelId": "fixture",
+            "providerVersion": "1",
+            "optionsVersion": "visual-sampling-v1",
+            "createdAt": utc_now(),
+        }
+        send({
+            "protocolVersion": PROTOCOL_VERSION,
+            "type": "job.result",
+            "jobId": job_id,
+            "result": result,
+        })
+        return
+
+    executable = shutil.which(os.environ.get("SHORT_EDITOR_FFMPEG_PATH", "ffmpeg"))
+    if not executable:
+        error(
+            request_id,
+            job_id,
+            "DEPENDENCY_UNAVAILABLE",
+            "FFmpeg is required for local visual sampling",
+            False,
+        )
+        return
+    interval_seconds = job["intervalMs"] / 1000.0
+    maximum_samples = job["maximumSamples"]
+    command = [
+        executable,
+        "-nostdin",
+        "-v",
+        "error",
+        "-i",
+        job["sourcePath"],
+        "-vf",
+        "fps=1/{:.6f},scale=160:-2,format=gray".format(interval_seconds),
+        "-frames:v",
+        str(maximum_samples),
+        "-f",
+        "image2pipe",
+        "-vcodec",
+        "pgm",
+        "pipe:1",
+    ]
+    progress(job_id, 0.05, "sampling local video frames")
+    try:
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        while True:
+            try:
+                stdout, _ = process.communicate(timeout=0.1)
+                break
+            except subprocess.TimeoutExpired:
+                if not cancelled.is_set():
+                    continue
+                process.terminate()
+                try:
+                    process.communicate(timeout=1)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.communicate()
+                send_cancelled(job_id)
+                return
+        if process.returncode != 0:
+            raise ValueError("FFmpeg could not sample the source")
+        samples = []
+        previous = None
+        for index, pixels in enumerate(pgm_frames(stdout)):
+            if cancelled.is_set():
+                send_cancelled(job_id)
+                return
+            activity = 0.0
+            if previous is not None and len(previous) == len(pixels):
+                activity = sum(abs(left - right) for left, right in zip(previous, pixels))
+                activity = max(0.0, min(1.0, activity / (len(pixels) * 255.0) * 4.0))
+            samples.append({
+                "atMs": index * job["intervalMs"],
+                "activity": round(activity, 6),
+                "speakerFraming": None,
+                "faceCount": None,
+                "screenShare": None,
+            })
+            previous = pixels
+            progress(
+                job_id,
+                0.1 + 0.8 * min(1.0, (index + 1) / maximum_samples),
+                "measuring local visual activity",
+            )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        error(
+            request_id,
+            job_id,
+            "PROVIDER_OUTPUT_INVALID",
+            "Local visual sampling could not decode this source",
+            False,
+        )
+        return
+    send({
+        "protocolVersion": PROTOCOL_VERSION,
+        "type": "job.result",
+        "jobId": job_id,
+        "result": {
+            "kind": "visual_sampling",
+            "capabilities": {
+                "activity": "supported",
+                "speakerFraming": "unsupported",
+                "faceDetection": "unsupported",
+                "screenShareDetection": "unsupported",
+            },
+            "samples": samples,
+            "provenance": {
+                "provider": "ffmpeg",
+                "providerClass": "local",
+                "modelId": "frame-difference",
+                "providerVersion": ffmpeg_version(executable) or "installed",
+                "optionsVersion": "visual-sampling-v1",
+                "createdAt": utc_now(),
+            },
+        },
+    })
+
+
+CLASS_RANK = {"local": 0, "network": 1, "cloud": 2}
+
+
+def endpoint_class(url):
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or parsed.username or parsed.password:
+        raise ValueError("Unsupported Ollama endpoint")
+    hostname = (parsed.hostname or "").lower()
+    if hostname == "localhost":
+        return "local"
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        return "cloud"
+    if getattr(address, "ipv4_mapped", None):
+        address = address.ipv4_mapped
+    if address.is_loopback:
+        return "local"
+    if address.is_private or address.is_link_local:
+        return "network"
+    return "cloud"
+
+
+def authorize_endpoint(url, options):
+    classification = endpoint_class(url)
+    maximum = options.get("maximumEndpointClass")
+    if maximum not in CLASS_RANK:
+        raise PermissionError("Missing endpoint policy")
+    effective = classification
+    if CLASS_RANK[maximum] > CLASS_RANK[effective]:
+        effective = maximum
+    if effective == "network" and not options.get("networkConsent"):
+        raise PermissionError("Private-LAN Ollama use requires network disclosure")
+    if effective == "cloud" and not options.get("cloudConsent"):
+        raise PermissionError("Public Ollama use requires cloud authorization")
+    return classification
+
+
+def effective_endpoint_class(url, options):
+    classification = endpoint_class(url)
+    maximum = options.get("maximumEndpointClass", classification)
+    return maximum if CLASS_RANK.get(maximum, -1) > CLASS_RANK[classification] else classification
+
+
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, request, file_pointer, code, message, headers, new_url):
+        return None
+
+
+def ollama_discover(base_url, options):
+    current = base_url.rstrip("/")
+    opener = build_opener(NoRedirect)
+    for _ in range(6):
+        authorize_endpoint(current, options)
+        request = Request(current + "/api/version", method="GET")
+        try:
+            response = opener.open(request, timeout=options["timeoutMs"] / 1000.0)
+            payload = json.loads(response.read(64 * 1024))
+            version = payload.get("version")
+            if not isinstance(version, str) or not version:
+                raise ValueError("Invalid Ollama version response")
+            return current, version
+        except HTTPError as http_error:
+            if http_error.code not in (301, 302, 303, 307, 308):
+                raise
+            location = http_error.headers.get("Location")
+            if not location:
+                raise ValueError("Ollama redirect is missing a target")
+            target = urljoin(current + "/api/version", location)
+            parsed = urlparse(target)
+            suffix = parsed.path
+            if suffix.endswith("/api/version"):
+                suffix = suffix[: -len("/api/version")]
+            current = parsed._replace(path=suffix.rstrip("/"), query="", fragment="").geturl()
+            authorize_endpoint(current, options)
+    raise ValueError("Too many Ollama redirects")
+
+
+def read_analysis_inputs(paths):
+    values = []
+    total = 0
+    for raw_path in paths:
+        path = Path(raw_path)
+        size = path.stat().st_size
+        total += size
+        if total > 4 * 1024 * 1024:
+            raise ValueError("Analysis inputs exceed the local worker limit")
+        values.append(json.loads(path.read_text(encoding="utf-8")))
+    return values
+
+
+def ollama_provider_call(job_id, request_id, job, cancelled):
+    if job.get("provider") != "ollama" or job.get("operation") not in ("analysis", "capabilities"):
+        error(request_id, job_id, "DEPENDENCY_UNAVAILABLE", "Unsupported local provider call", False)
+        return
+    options = job.get("options") or {}
+    try:
+        progress(job_id, 0.05, "checking Ollama endpoint policy")
+        base_url, provider_version = ollama_discover(options["baseUrl"], options)
+        if cancelled.is_set():
+            send_cancelled(job_id)
+            return
+        if job.get("operation") == "capabilities":
+            request = Request(base_url.rstrip("/") + "/api/tags", method="GET")
+            response = build_opener(NoRedirect).open(
+                request,
+                timeout=options["timeoutMs"] / 1000.0,
+            )
+            payload = json.loads(response.read(4 * 1024 * 1024))
+            models = []
+            for model in payload.get("models", []):
+                details = model.get("details") or {}
+                model_id = model.get("model") or model.get("name")
+                if not isinstance(model_id, str) or not model_id:
+                    raise ValueError("Invalid Ollama model inventory")
+                size = model.get("size")
+                models.append({
+                    "modelId": model_id,
+                    "size": size if isinstance(size, int) and size >= 0 else None,
+                    "family": details.get("family") if isinstance(details.get("family"), str) else None,
+                })
+            output = {"models": models}
+            raise StopIteration
+        inputs = read_analysis_inputs(job.get("inputArtifactPaths") or [])
+        prompt = (
+            "Analyze the transcript and visual samples for short-form video highlights. "
+            "Use only provided evidence, millisecond timing, and return JSON matching the schema. "
+            "Input artifacts:\n" + json.dumps(inputs, separators=(",", ":"))
+        )
+        body = json.dumps({
+            "model": job["modelId"],
+            "prompt": prompt,
+            "stream": False,
+            "format": options["outputSchema"],
+            "options": {"temperature": options.get("temperature", 0)},
+        }, separators=(",", ":")).encode("utf-8")
+        authorize_endpoint(base_url, options)
+        progress(job_id, 0.2, "running schema-constrained Ollama analysis")
+        request = Request(
+            base_url.rstrip("/") + "/api/generate",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        response = build_opener(NoRedirect).open(
+            request,
+            timeout=options["timeoutMs"] / 1000.0,
+        )
+        response_body = response.read(8 * 1024 * 1024 + 1)
+        if len(response_body) > 8 * 1024 * 1024:
+            raise ValueError("Ollama response exceeds the worker limit")
+        envelope = json.loads(response_body)
+        raw_output = envelope.get("response")
+        if not isinstance(raw_output, str):
+            raise ValueError("Ollama response is missing structured output")
+        output = json.loads(raw_output)
+        if not isinstance(output, dict):
+            raise ValueError("Ollama structured output must be an object")
+    except StopIteration:
+        pass
+    except PermissionError as policy_error:
+        error(request_id, job_id, "PROVIDER_UNAVAILABLE", str(policy_error), False)
+        return
+    except (HTTPError, URLError, TimeoutError):
+        error(request_id, job_id, "PROVIDER_UNAVAILABLE", "The configured Ollama endpoint is unavailable", True)
+        return
+    except (KeyError, OSError, ValueError, TypeError):
+        error(request_id, job_id, "PROVIDER_OUTPUT_INVALID", "Ollama returned invalid structured analysis output", False)
+        return
+    if cancelled.is_set():
+        send_cancelled(job_id)
+        return
+    send({
+        "protocolVersion": PROTOCOL_VERSION,
+        "type": "job.result",
+        "jobId": job_id,
+        "result": {
+            "kind": "provider_call",
+            "schemaVersion": job["schemaVersion"],
+            "output": output,
+            "provenance": {
+                "provider": "ollama",
+                "providerClass": effective_endpoint_class(base_url, options),
+                "modelId": job["modelId"],
+                "providerVersion": provider_version,
+                "optionsVersion": options["promptVersion"] + "+" + job["schemaVersion"],
+                "createdAt": utc_now(),
+            },
+        },
+    })
+
+
 def send_cancelled(job_id):
     send(
         {
@@ -361,6 +801,10 @@ def run_job(job_id, request_id, job, cancelled):
     try:
         if job.get("kind") == "transcription":
             transcribe(job_id, request_id, job, cancelled)
+        elif job.get("kind") == "visual_sampling":
+            visual_sampling(job_id, request_id, job, cancelled)
+        elif job.get("kind") == "provider_call":
+            ollama_provider_call(job_id, request_id, job, cancelled)
         else:
             error(
                 request_id,

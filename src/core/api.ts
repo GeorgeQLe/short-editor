@@ -53,6 +53,27 @@ export function createApi(service: CoreService) {
   app.get("/v1/analysis/local-transcription/status", route(() =>
     service.transcriptionStatus()
   ));
+  app.post("/v1/analysis/ollama/start", route((req) => {
+    const input = z.strictObject({
+      episodeId: id,
+      baseUrl: z.string().url().optional(),
+      modelId: z.string().min(1).optional(),
+      timeoutMs: z.number().int().positive().optional(),
+      networkDisclosed: z.boolean().optional(),
+      cloudAuthorized: z.boolean().optional(),
+      temperature: z.number().min(0).max(2).optional(),
+      intervalMs: z.number().int().positive().optional(),
+      maximumSamples: z.number().int().positive().optional()
+    }).parse(req.body);
+    return service.startOllamaAnalysis(input.episodeId, input);
+  }));
+  app.get("/v1/analysis/ollama/status", route((req) => {
+    const baseUrl = asString(req.query.baseUrl);
+    return baseUrl ? service.ollamaStatus(baseUrl) : service.ollamaStatus();
+  }));
+  app.get("/v1/analysis/:episodeId/artifacts", route((req) =>
+    service.listAnalysisArtifacts(id.parse(req.params.episodeId))
+  ));
   app.put("/v1/analysis/:episodeId/transcript", route((req) => service.setTranscript(
     id.parse(req.params.episodeId), z.array(transcriptSegmentSchema).parse(req.body.segments)
   )));
