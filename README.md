@@ -97,6 +97,8 @@ do not replace the required Windows release build and validation.
 ## Safety and privacy
 
 Sources are referenced in place and never modified. Local mode makes no cloud
-requests. Cloud work requires an explicit authorization token on each job request;
-credential storage is represented by an adapter boundary and is not emulated with
-plaintext files.
+requests. Cloud work requires a current persisted project or batch grant created
+through the desktop disclosure UI; caller-supplied authorization flags are
+ignored or rejected. Credential values are encrypted with Electron
+`safeStorage` (DPAPI on Windows), while SQLite and public APIs retain only opaque
+handles and non-secret grant metadata.

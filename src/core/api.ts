@@ -1,8 +1,9 @@
 import cors from "cors";
+import { timingSafeEqual } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { compositionSchema, scheduleRulesSchema, transcriptSegmentSchema } from "../shared/domain.js";
-import { errorEnvelope, normalizeError } from "../shared/errors.js";
+import { AppError, errorEnvelope, normalizeError } from "../shared/errors.js";
 import {
   candidateGenerateInput,
   confirmRelinkInput,
@@ -16,7 +17,7 @@ const id = z.string().uuid();
 const revision = z.number().int().positive();
 const ok = <T>(data: T) => ({ apiVersion: "v1" as const, data });
 
-export function createApi(service: CoreService) {
+export function createApi(service: CoreService, desktopToken?: string) {
   const app = express();
   app.use(cors({ origin: ["http://localhost:5173", "app://short-editor"] }));
   app.use(express.json({ limit: "2mb" }));
@@ -39,15 +40,16 @@ export function createApi(service: CoreService) {
     id.parse(req.params.id), confirmRelinkInput.parse(req.body).confirmationToken
   )));
   app.post("/v1/analysis/start", route((req) => {
-    const input = z.object({
+    const input = z.strictObject({
       episodeId: id, provider: z.enum(["local", "openai"]).default("local"),
-      cloudAuthorized: z.boolean().default(false),
       modelId: z.string().min(1).optional(),
-      wordTimestamps: z.boolean().optional()
+      wordTimestamps: z.boolean().optional(),
+      authorizationBatchId: id.optional()
     }).parse(req.body);
-    return service.startAnalysis(input.episodeId, input.provider, input.cloudAuthorized, {
+    return service.startAnalysis(input.episodeId, input.provider, {
       modelId: input.modelId,
-      wordTimestamps: input.wordTimestamps
+      wordTimestamps: input.wordTimestamps,
+      authorizationBatchId: input.authorizationBatchId
     });
   }));
   app.get("/v1/analysis/local-transcription/status", route(() =>
@@ -60,7 +62,6 @@ export function createApi(service: CoreService) {
       modelId: z.string().min(1).optional(),
       timeoutMs: z.number().int().positive().optional(),
       networkDisclosed: z.boolean().optional(),
-      cloudAuthorized: z.boolean().optional(),
       temperature: z.number().min(0).max(2).optional(),
       intervalMs: z.number().int().positive().optional(),
       maximumSamples: z.number().int().positive().optional()
@@ -142,12 +143,59 @@ export function createApi(service: CoreService) {
     return service.markPublished(id.parse(req.params.id), input.expectedRevision, input.youtubeUrl);
   }));
 
+  const desktopOnly = (req: Request, res: Response, next: NextFunction) => {
+    const supplied = req.header("x-short-editor-desktop-token");
+    if (!desktopToken || !supplied || !safeEqual(desktopToken, supplied)) {
+      return res.status(403).json(errorEnvelope(new AppError(
+        "CLOUD_NOT_AUTHORIZED",
+        "This security gate is available only through the desktop application",
+        403
+      )));
+    }
+    next();
+  };
+  app.post("/v1/desktop/credentials/synchronize", desktopOnly, route((req) => {
+    const input = z.strictObject({ handles: z.array(z.string().min(1)).max(100) }).parse(req.body);
+    service.synchronizeCredentialHandles(input.handles);
+    return { synchronized: input.handles.length };
+  }));
+  app.post("/v1/desktop/credentials/:handle/removed", desktopOnly, route((req) => {
+    service.removeCredentialHandle(z.string().min(1).parse(req.params.handle));
+    return { revoked: true };
+  }));
+  app.get("/v1/desktop/cloud-authorizations", desktopOnly, route((req) =>
+    service.listCloudAuthorizations(asString(req.query.scopeId))
+  ));
+  app.post("/v1/desktop/cloud-authorizations", desktopOnly, route((req) => {
+    const input = z.strictObject({
+      scopeType: z.enum(["project", "batch"]),
+      scopeId: id,
+      provider: z.enum(["openai", "ollama"]),
+      operationClasses: z.array(z.enum(["transcription", "analysis"])).min(1),
+      credentialHandle: z.string().min(1).nullable(),
+      dataDescription: z.string().min(1).max(500),
+      networkUseConfirmed: z.literal(true),
+      costsConfirmed: z.literal(true)
+    }).parse(req.body);
+    return service.grantCloudAuthorization(input);
+  }));
+  app.post("/v1/desktop/cloud-authorizations/:id/revoke", desktopOnly, route((req) => {
+    service.revokeCloudAuthorization(id.parse(req.params.id));
+    return { revoked: true };
+  }));
+
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const normalized = normalizeError(error);
     if (normalized.code === "INTERNAL_ERROR") console.error("Unexpected internal error");
     return res.status(normalized.status).json(errorEnvelope(normalized));
   });
   return app;
+}
+
+function safeEqual(expected: string, supplied: string): boolean {
+  const left = Buffer.from(expected);
+  const right = Buffer.from(supplied);
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 function route(handler: (request: Request) => unknown | Promise<unknown>) {

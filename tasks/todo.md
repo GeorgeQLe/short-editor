@@ -1,10 +1,11 @@
 # Current work
 
-- [ ] PRO-04 — Add Windows-protected credentials and persisted cloud
-  authorization.
+- [ ] PRO-05 — Implement OpenAI adapters, provenance, and cache identity.
 
 ## Completed
 
+- [x] PRO-04 — Add Windows-protected credentials and persisted cloud
+  authorization.
 - [x] PRO-03 — Implement Ollama analysis and local visual sampling.
 - [x] PRO-02 — Implement local faster-whisper transcription.
 - [x] PRO-01 — Define and supervise the versioned Python worker protocol.

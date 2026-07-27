@@ -21,6 +21,6 @@ export const api = {
     rejected: ImportRejectedResult[];
   }>("/library/import", { method: "POST", body: JSON.stringify({ paths }) }),
   startAnalysis: (episodeId: string) => request<Job>("/analysis/start", {
-    method: "POST", body: JSON.stringify({ episodeId, provider: "local", cloudAuthorized: false })
+    method: "POST", body: JSON.stringify({ episodeId, provider: "local" })
   })
 };

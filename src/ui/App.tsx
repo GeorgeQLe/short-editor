@@ -2,10 +2,53 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Episode, Job } from "../shared/domain";
 import { api } from "./api";
 
-type View = "Library" | "Candidates" | "Editor" | "Calendar";
+type View = "Library" | "Candidates" | "Editor" | "Calendar" | "Cloud Access";
+interface CredentialSummary {
+  handle: string;
+  provider: string;
+  label: string;
+  createdAt: string;
+  updatedAt: string;
+}
+interface CloudAuthorization {
+  id: string;
+  scopeType: "project" | "batch";
+  scopeId: string;
+  provider: string;
+  operationClasses: string[];
+  credentialHandle: string | null;
+  grantedAt: string;
+  revokedAt: string | null;
+}
 declare global {
   interface Window {
-    desktop?: { selectMedia(): Promise<string[]> };
+    desktop?: {
+      selectMedia(): Promise<string[]>;
+      credentials: {
+        list(): Promise<CredentialSummary[]>;
+        save(input: {
+          handle?: string;
+          provider: string;
+          label: string;
+          secret: string;
+        }): Promise<CredentialSummary>;
+        remove(handle: string): Promise<void>;
+      };
+      cloudAuthorizations: {
+        list(scopeId?: string): Promise<CloudAuthorization[]>;
+        grant(input: {
+          scopeType: "project" | "batch";
+          scopeId: string;
+          provider: "openai" | "ollama";
+          operationClasses: string[];
+          credentialHandle: string | null;
+          dataDescription: string;
+          networkUseConfirmed: boolean;
+          costsConfirmed: boolean;
+        }): Promise<CloudAuthorization>;
+        revoke(id: string): Promise<void>;
+      };
+    };
   }
 }
 
@@ -61,7 +104,7 @@ export function App() {
       <aside aria-label="Primary navigation">
         <div className="brand"><span aria-hidden="true">S</span><strong>Short Editor</strong></div>
         <nav>
-          {(["Library", "Candidates", "Editor", "Calendar"] as View[]).map((item) => (
+          {(["Library", "Candidates", "Editor", "Calendar", "Cloud Access"] as View[]).map((item) => (
             <button key={item} aria-current={view === item ? "page" : undefined} onClick={() => setView(item)}>
               <span aria-hidden="true">{icons[item]}</span>{item}
             </button>
@@ -97,7 +140,9 @@ export function App() {
               }} /> : <EmptyLibrary onImport={importMedia} />}
             </section>
           </>
-        ) : <ComingSoon view={view} />}
+        ) : view === "Cloud Access"
+          ? <CloudAccess episodes={episodes} announce={setMessage} />
+          : <ComingSoon view={view} />}
       </main>
     </div>
   );
@@ -131,7 +176,153 @@ function EmptyLibrary({ onImport }: { onImport(): void }) {
   </div>;
 }
 
-function ComingSoon({ view }: { view: View }) {
+function CloudAccess({
+  episodes,
+  announce
+}: {
+  episodes: Episode[];
+  announce(message: string): void;
+}) {
+  const [credentials, setCredentials] = useState<CredentialSummary[]>([]);
+  const [authorizations, setAuthorizations] = useState<CloudAuthorization[]>([]);
+  const [label, setLabel] = useState("");
+  const [secret, setSecret] = useState("");
+  const [editingHandle, setEditingHandle] = useState<string>();
+  const [episodeId, setEpisodeId] = useState("");
+  const [credentialHandle, setCredentialHandle] = useState("");
+  const [networkConfirmed, setNetworkConfirmed] = useState(false);
+  const [costsConfirmed, setCostsConfirmed] = useState(false);
+
+  const refresh = useCallback(async () => {
+    if (!window.desktop) return;
+    const [credentialRows, authorizationRows] = await Promise.all([
+      window.desktop.credentials.list(),
+      window.desktop.cloudAuthorizations.list()
+    ]);
+    setCredentials(credentialRows);
+    setAuthorizations(authorizationRows);
+    setCredentialHandle((current) =>
+      credentialRows.some((credential) => credential.handle === current)
+        ? current
+        : credentialRows[0]?.handle ?? ""
+    );
+  }, []);
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const saveCredential = async () => {
+    if (!window.desktop) return;
+    try {
+      await window.desktop.credentials.save({
+        ...(editingHandle ? { handle: editingHandle } : {}),
+        provider: "openai",
+        label,
+        secret
+      });
+      setLabel("");
+      setSecret("");
+      setEditingHandle(undefined);
+      announce("Protected credential saved. Its value is not stored in the project database.");
+      await refresh();
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Could not save protected credential");
+    }
+  };
+  const grant = async () => {
+    if (!window.desktop || !episodeId) return;
+    try {
+      await window.desktop.cloudAuthorizations.grant({
+        scopeType: "project",
+        scopeId: episodeId,
+        provider: "openai",
+        operationClasses: ["transcription", "analysis"],
+        credentialHandle,
+        dataDescription: "Episode audio and transcript-derived analysis inputs",
+        networkUseConfirmed: networkConfirmed,
+        costsConfirmed
+      });
+      announce("Cloud authorization granted for the selected project.");
+      setNetworkConfirmed(false);
+      setCostsConfirmed(false);
+      await refresh();
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Could not grant cloud authorization");
+    }
+  };
+
+  return <section className="cloud-grid" aria-label="Cloud access security gates">
+    <article className="panel security-card">
+      <h2>Protected credentials</h2>
+      <p>Credential values are protected by the operating system and never enter SQLite, logs, or API responses.</p>
+      <label>Label<input value={label} onChange={(event) => setLabel(event.target.value)}
+        placeholder="OpenAI production key" /></label>
+      <label>Credential value<input type="password" autoComplete="off" value={secret}
+        onChange={(event) => setSecret(event.target.value)} /></label>
+      <button className="primary" disabled={!label.trim() || !secret} onClick={saveCredential}>
+        {editingHandle ? "Update protected credential" : "Save protected credential"}
+      </button>
+      <ul className="security-list">{credentials.map((credential) => <li key={credential.handle}>
+        <span><strong>{credential.label}</strong><small>{credential.provider} · protected</small></span>
+        <span className="actions">
+          <button className="secondary" onClick={() => {
+            setEditingHandle(credential.handle);
+            setLabel(credential.label);
+            setSecret("");
+          }}>Edit</button>
+          <button className="secondary danger" onClick={async () => {
+            try {
+              await window.desktop?.credentials.remove(credential.handle);
+              announce("Credential removed and its active authorizations revoked.");
+              await refresh();
+            } catch (error) {
+              announce(error instanceof Error ? error.message : "Could not remove credential");
+            }
+          }}>Remove</button>
+        </span>
+      </li>)}</ul>
+    </article>
+    <article className="panel security-card">
+      <h2>Project cloud authorization</h2>
+      <p>OpenAI will receive episode audio and transcript-derived inputs over the public network. Provider usage may incur costs.</p>
+      <label>Project<select value={episodeId} onChange={(event) => setEpisodeId(event.target.value)}>
+        <option value="">Select an episode</option>
+        {episodes.map((episode) => <option key={episode.id} value={episode.id}>
+          {fileName(episode.sourcePath)}
+        </option>)}
+      </select></label>
+      <label>Protected credential<select value={credentialHandle}
+        onChange={(event) => setCredentialHandle(event.target.value)}>
+        <option value="">Select a credential</option>
+        {credentials.map((credential) => <option key={credential.handle} value={credential.handle}>
+          {credential.label}
+        </option>)}
+      </select></label>
+      <label className="check"><input type="checkbox" checked={networkConfirmed}
+        onChange={(event) => setNetworkConfirmed(event.target.checked)} />
+        I understand data will leave this workstation over the public network.</label>
+      <label className="check"><input type="checkbox" checked={costsConfirmed}
+        onChange={(event) => setCostsConfirmed(event.target.checked)} />
+        I understand provider usage may incur costs.</label>
+      <button className="primary" disabled={
+        !episodeId || !credentialHandle || !networkConfirmed || !costsConfirmed
+      } onClick={grant}>Authorize transcription and analysis</button>
+      <ul className="security-list">{authorizations.filter((item) => !item.revokedAt).map((item) =>
+        <li key={item.id}><span><strong>{item.provider} · {item.operationClasses.join(", ")}</strong>
+          <small>{fileName(episodes.find((episode) => episode.id === item.scopeId)?.sourcePath ?? item.scopeId)}</small>
+        </span><button className="secondary danger" onClick={async () => {
+          try {
+            await window.desktop?.cloudAuthorizations.revoke(item.id);
+            announce("Cloud authorization revoked.");
+            await refresh();
+          } catch (error) {
+            announce(error instanceof Error ? error.message : "Could not revoke cloud authorization");
+          }
+        }}>Revoke</button></li>
+      )}</ul>
+    </article>
+  </section>;
+}
+
+function ComingSoon({ view }: { view: Exclude<View, "Cloud Access"> }) {
   const copy = {
     Candidates: "Generate and review sentence-aligned highlight proposals after an episode has a transcript.",
     Editor: "Approved candidates open in the normalized 1080×1920 composition editor.",
@@ -141,5 +332,7 @@ function ComingSoon({ view }: { view: View }) {
   return <section className="panel empty"><div className="empty-icon" aria-hidden="true">◇</div><h2>{view} workspace</h2><p>{copy}</p></section>;
 }
 
-const icons: Record<View, string> = { Library: "▦", Candidates: "✦", Editor: "◫", Calendar: "□" };
+const icons: Record<View, string> = {
+  Library: "▦", Candidates: "✦", Editor: "◫", Calendar: "□", "Cloud Access": "⌁"
+};
 const fileName = (path: string) => path.split(/[\\/]/).at(-1) ?? path;

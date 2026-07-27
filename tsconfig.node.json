@@ -10,6 +10,6 @@
     "sourceMap": true,
     "jsx": "react-jsx"
   },
-  "include": ["src/core/**/*.ts", "src/shared/**/*.ts", "src/electron/**/*.ts", "src/mcp/**/*.ts"],
+  "include": ["src/core/**/*.ts", "src/shared/**/*.ts", "src/security/**/*.ts", "src/electron/**/*.ts", "src/mcp/**/*.ts"],
   "exclude": ["src/**/*.test.ts"]
 }

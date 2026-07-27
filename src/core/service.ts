@@ -21,6 +21,7 @@ import type { JobQueue } from "./jobs.js";
 import { draftSchedule, type SchedulableShort } from "./scheduler.js";
 import { validateRender } from "./render.js";
 import type { ArtifactStore } from "./artifact-store.js";
+import type { CloudAuthorization } from "./repository.js";
 import { WatchedFolderCoordinator } from "./watched-folders.js";
 import {
   classifyProviderEndpoint,
@@ -43,7 +44,8 @@ export class CoreService {
     private readonly stopWorker?: () => void | Promise<void>,
     readonly localTranscription?: LocalTranscriptionProvider,
     readonly ollamaAnalysis?: OllamaAnalysisProvider,
-    readonly localVisualSampling?: LocalVisualSampler
+    readonly localVisualSampling?: LocalVisualSampler,
+    private readonly activeCredentialHandles: Set<string> = new Set()
   ) {}
 
   async stop(): Promise<void> {
@@ -87,8 +89,11 @@ export class CoreService {
   startAnalysis(
     episodeId: string,
     provider: "local" | "openai",
-    cloudAuthorized = false,
-    options: { modelId?: string; wordTimestamps?: boolean } = {}
+    options: {
+      modelId?: string;
+      wordTimestamps?: boolean;
+      authorizationBatchId?: string;
+    } = {}
   ) {
     const episode = this.repository.getEpisode(episodeId);
     if (episode.missing) {
@@ -102,8 +107,76 @@ export class CoreService {
       type: "analyze",
       entityId: episodeId,
       provider,
-      cloudAuthorized,
+      ...(provider === "openai" ? { cloudOperationClass: "transcription" } : {}),
+      ...(provider === "openai" && options.authorizationBatchId ? {
+        cloudScope: { type: "batch" as const, id: options.authorizationBatchId }
+      } : {}),
       payload: transcription
+    });
+  }
+
+  synchronizeCredentialHandles(handles: string[]): void {
+    this.activeCredentialHandles.clear();
+    for (const handle of handles) this.activeCredentialHandles.add(handle);
+  }
+
+  grantCloudAuthorization(input: {
+    scopeType: "project" | "batch";
+    scopeId: string;
+    provider: "openai" | "ollama";
+    operationClasses: string[];
+    credentialHandle: string | null;
+    dataDescription: string;
+    networkUseConfirmed: boolean;
+    costsConfirmed: boolean;
+  }): CloudAuthorization {
+    if (!input.operationClasses.length || input.operationClasses.some(
+      (operation) => operation !== "transcription" && operation !== "analysis"
+    )) {
+      throw new AppError("VALIDATION_ERROR", "Unsupported cloud operation class", 422);
+    }
+    if (!input.networkUseConfirmed || !input.costsConfirmed || !input.dataDescription.trim()) {
+      throw new AppError(
+        "CLOUD_CONFIRMATION_REQUIRED",
+        "Cloud authorization requires data, network, and cost disclosure",
+        409
+      );
+    }
+    if (input.scopeType === "project") this.repository.getEpisode(input.scopeId);
+    if (input.provider === "openai" && (
+      !input.credentialHandle || !this.activeCredentialHandles.has(input.credentialHandle)
+    )) {
+      throw new AppError(
+        "CLOUD_CONFIRMATION_REQUIRED",
+        "Select an available protected OpenAI credential before authorizing",
+        409
+      );
+    }
+    const now = new Date().toISOString();
+    return this.repository.grantCloudAuthorization({
+      id: randomUUID(),
+      scopeType: input.scopeType,
+      scopeId: input.scopeId,
+      provider: input.provider,
+      operationClasses: [...new Set(input.operationClasses)],
+      credentialHandle: input.credentialHandle,
+      grantedAt: now,
+      revokedAt: null
+    });
+  }
+
+  listCloudAuthorizations(scopeId?: string) {
+    return this.repository.listCloudAuthorizations(scopeId);
+  }
+
+  revokeCloudAuthorization(id: string): void {
+    this.repository.revokeCloudAuthorization(id);
+  }
+
+  removeCredentialHandle(handle: string): void {
+    this.repository.transaction(() => {
+      this.repository.revokeCloudAuthorizationsForCredential(handle);
+      this.activeCredentialHandles.delete(handle);
     });
   }
 
@@ -175,7 +248,6 @@ export class CoreService {
       type: "analyze",
       entityId: episodeId,
       provider: "local",
-      cloudAuthorized: endpointClass === "cloud" ? persistedCloudAuthorization : true,
       payload
     });
   }

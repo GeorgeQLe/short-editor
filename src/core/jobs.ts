@@ -8,19 +8,34 @@ export interface JobRequest {
   entityId?: string;
   payload?: unknown;
   provider?: "local" | "openai";
-  cloudAuthorized?: boolean;
+  cloudOperationClass?: string;
+  cloudScope?: { type: "project" | "batch"; id: string };
 }
 
 export class JobQueue {
-  constructor(private readonly repository: Repository) {}
+  constructor(
+    private readonly repository: Repository,
+    private readonly credentialHandleAvailable: (handle: string) => boolean = () => false
+  ) {}
 
   enqueue(request: JobRequest): Job {
-    if (request.provider === "openai" && !request.cloudAuthorized) {
-      throw new AppError(
-        "CLOUD_NOT_AUTHORIZED",
-        "This cloud job requires explicit authorization after reviewing network and cost implications",
-        403
+    let payload = request.payload ?? {};
+    if (request.provider === "openai") {
+      if (!request.entityId || !request.cloudOperationClass) throw cloudNotAuthorized();
+      const scope = request.cloudScope ?? { type: "project" as const, id: request.entityId };
+      const authorization = this.repository.findCloudAuthorization(
+        scope.type, scope.id, request.provider, request.cloudOperationClass
       );
+      if (
+        !authorization?.credentialHandle ||
+        !this.credentialHandleAvailable(authorization.credentialHandle)
+      ) throw cloudNotAuthorized();
+      payload = {
+        operation: request.cloudOperationClass,
+        authorizationScope: scope,
+        options: payload,
+        credentialHandle: authorization.credentialHandle
+      };
     }
     const now = new Date().toISOString();
     const job: Job = {
@@ -30,7 +45,7 @@ export class JobQueue {
       cancelRequested: false, errorCode: null, errorMessage: null, payloadReference: null,
       createdAt: now, updatedAt: now
     };
-    this.repository.insertJob(job, request.payload ?? {});
+    this.repository.insertJob(job, payload);
     return job;
   }
 
@@ -72,13 +87,57 @@ export class JobQueue {
         SELECT id FROM jobs WHERE state='queued' AND cancel_requested=0 ORDER BY created_at LIMIT 1
       `).get() as { id: string } | undefined;
       if (!row) return undefined;
+      const stored = this.repository.db.prepare(
+        "SELECT entity_id,provider,payload_json FROM jobs WHERE id=?"
+      ).get(row.id) as {
+        entity_id: string | null;
+        provider: string | null;
+        payload_json: string;
+      };
+      const payload = JSON.parse(stored.payload_json) as unknown;
+      if (stored.provider === "openai" && !this.cloudPayloadIsCurrentlyAuthorized(
+        stored.entity_id,
+        payload
+      )) {
+        const now = new Date().toISOString();
+        this.repository.db.prepare(`
+          UPDATE jobs SET state='failed',stage='failed',error_code='CLOUD_NOT_AUTHORIZED',
+            error_message=?,updated_at=? WHERE id=? AND state='queued'
+        `).run(cloudNotAuthorized().message, now, row.id);
+        return undefined;
+      }
       const now = new Date().toISOString();
       this.repository.db.prepare(`
         UPDATE jobs SET state='running',stage='starting',attempts=attempts+1,updated_at=? WHERE id=?
       `).run(now, row.id);
-      const stored = this.repository.db.prepare("SELECT payload_json FROM jobs WHERE id=?").get(row.id) as { payload_json: string };
-      return { job: this.repository.listJobs().find((job) => job.id === row.id)!, payload: JSON.parse(stored.payload_json) };
+      return { job: this.repository.listJobs().find((job) => job.id === row.id)!, payload };
     })();
+  }
+
+  private cloudPayloadIsCurrentlyAuthorized(entityId: string | null, payload: unknown): boolean {
+    if (!entityId || !payload || typeof payload !== "object") return false;
+    const candidate = payload as {
+      operation?: unknown;
+      credentialHandle?: unknown;
+      authorizationScope?: { type?: unknown; id?: unknown };
+    };
+    if (
+      typeof candidate.operation !== "string" ||
+      typeof candidate.credentialHandle !== "string" ||
+      (candidate.authorizationScope?.type !== "project" &&
+        candidate.authorizationScope?.type !== "batch") ||
+      typeof candidate.authorizationScope.id !== "string"
+    ) {
+      return false;
+    }
+    const authorization = this.repository.findCloudAuthorization(
+      candidate.authorizationScope.type,
+      candidate.authorizationScope.id,
+      "openai",
+      candidate.operation
+    );
+    return authorization?.credentialHandle === candidate.credentialHandle &&
+      this.credentialHandleAvailable(candidate.credentialHandle);
   }
 
   progress(id: string, progress: number, stage: string): void {
@@ -112,6 +171,14 @@ export class JobQueue {
       { cancel_requested: number } | undefined;
     return row?.cancel_requested === 1;
   }
+}
+
+function cloudNotAuthorized(): AppError {
+  return new AppError(
+    "CLOUD_NOT_AUTHORIZED",
+    "This cloud job requires a current persisted authorization and protected credential",
+    403
+  );
 }
 
 export class JobRunner {

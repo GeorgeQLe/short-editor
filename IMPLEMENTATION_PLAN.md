@@ -429,6 +429,13 @@ absorb a downstream task.
 - **Evidence / acceptance:** A security test proves every cloud adapter receives
   a core-verified credential handle and matching persisted grant, never caller
   assertion or plaintext.
+- **Implementation evidence (2026-07-27):** Electron `safeStorage` protects
+  credential ciphertext (DPAPI on Windows); the desktop-main process exposes
+  only opaque metadata and authenticates its private core channel with a
+  per-launch secret. Public HTTP/MCP schemas reject authorization booleans.
+  Queue and claim-time checks require a matching live grant and synchronized
+  protected handle. Vault, disclosure, scope, revocation, forgery, and race
+  tests pass; native packaged Windows validation remains assigned to WIN-03.
 
 ### PRO-05 — Implement OpenAI adapters, provenance, and cache identity
 

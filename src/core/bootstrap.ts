@@ -33,7 +33,8 @@ export function createCore(databasePath?: string): CoreService {
     : dirname(selectedDatabasePath);
   ensureLayout(dataDirectory);
   const repository = new Repository(openDatabase(selectedDatabasePath));
-  const jobs = new JobQueue(repository);
+  const activeCredentialHandles = new Set<string>();
+  const jobs = new JobQueue(repository, (handle) => activeCredentialHandles.has(handle));
   const media = new MediaService(repository);
   const artifacts = new ArtifactStore(dataDirectory, repository);
   artifacts.reconcile();
@@ -192,7 +193,8 @@ export function createCore(databasePath?: string): CoreService {
     },
     localTranscription,
     ollamaAnalysis,
-    localVisualSampling
+    localVisualSampling,
+    activeCredentialHandles
   );
   runner.start();
   void watchedFolders.start();

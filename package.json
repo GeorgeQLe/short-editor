@@ -6,7 +6,7 @@
   "type": "module",
   "main": "dist/electron/main.js",
   "scripts": {
-    "dev": "npm run build && concurrently -k \"vite\" \"tsx watch src/core/cli.ts\" \"wait-on tcp:5173 tcp:43120 && electron .\"",
+    "dev": "npm run build && concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
     "dev:core": "tsx watch src/core/cli.ts",
     "dev:web": "vite",
     "build": "npm run typecheck && vite build && tsc -p tsconfig.node.json",

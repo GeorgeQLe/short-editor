@@ -73,9 +73,9 @@ register(
 
 register("analysis.start", "Queue episode analysis. OpenAI requires explicit cloud authorization.", {
   episodeId: uuid, provider: z.enum(["local", "openai"]).default("local"),
-  cloudAuthorized: z.boolean().default(false),
   modelId: z.string().min(1).optional(),
-  wordTimestamps: z.boolean().optional()
+  wordTimestamps: z.boolean().optional(),
+  authorizationBatchId: uuid.optional()
 }, (input) => core("/analysis/start", "POST", input));
 register(
   "analysis.local_transcription_status",

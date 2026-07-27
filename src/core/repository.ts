@@ -881,11 +881,32 @@ export class Repository {
     provider: string,
     operationClass: string
   ): boolean {
+    return Boolean(this.findCloudAuthorization(scopeType, scopeId, provider, operationClass));
+  }
+
+  findCloudAuthorization(
+    scopeType: CloudAuthorization["scopeType"],
+    scopeId: string,
+    provider: string,
+    operationClass: string
+  ): CloudAuthorization | undefined {
     const row = this.db.prepare(`
-      SELECT operation_classes_json FROM cloud_authorizations
+      SELECT * FROM cloud_authorizations
       WHERE scope_type=? AND scope_id=? AND provider=? AND revoked_at IS NULL
-    `).get(scopeType, scopeId, provider) as { operation_classes_json: string } | undefined;
-    return row ? json<string[]>(row.operation_classes_json).includes(operationClass) : false;
+    `).get(scopeType, scopeId, provider) as Row | undefined;
+    if (!row) return undefined;
+    const authorization = mapCloudAuthorization(row);
+    return authorization.operationClasses.includes(operationClass) ? authorization : undefined;
+  }
+
+  revokeCloudAuthorizationsForCredential(
+    credentialHandle: string,
+    revokedAt = new Date().toISOString()
+  ): number {
+    return this.db.prepare(`
+      UPDATE cloud_authorizations SET revoked_at=?
+      WHERE credential_handle=? AND revoked_at IS NULL
+    `).run(revokedAt, credentialHandle).changes;
   }
 
   listCloudAuthorizations(scopeId?: string): CloudAuthorization[] {

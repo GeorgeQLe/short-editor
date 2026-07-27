@@ -2,6 +2,21 @@
 
 ## 2026-07-27
 
+- Completed PRO-04 with an OS-protected desktop credential vault backed by
+  Electron safeStorage (Windows DPAPI), opaque handles, atomic ciphertext-only
+  persistence, create/edit/remove UI, and locked-vault failure behavior.
+- Added a desktop-only authenticated core channel for credential-handle
+  synchronization and scoped cloud grant/list/revoke operations; credential
+  removal transactionally revokes every linked authorization.
+- Removed caller-controlled cloud authorization booleans from HTTP and MCP.
+  OpenAI queueing and claiming now verify a matching persisted project grant,
+  named operation class, and currently available protected credential handle.
+- Added explicit provider/data/network/cost disclosure controls and tests for
+  protected persistence, locked storage, mismatched scopes, forged booleans,
+  missing confirmation, revocation, and queued-job authorization races.
+- Hardened the final security boundary after adversarial review by revoking
+  grants before deleting protected credential bytes, clearing stale UI
+  selections, and surfacing credential-removal and grant-revocation failures.
 - Completed PRO-03 with configurable Ollama base URL/model selection,
   schema-constrained structured analysis, model capability discovery, typed
   provider provenance, and no silent provider fallback.
