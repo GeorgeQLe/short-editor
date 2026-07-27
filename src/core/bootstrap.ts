@@ -8,6 +8,7 @@ import { JobQueue, JobRunner } from "./jobs.js";
 import { CoreService } from "./service.js";
 import { ArtifactStore } from "./artifact-store.js";
 import { ensureLayout, prepareDataDirectory } from "./startup.js";
+import { WatchedFolderCoordinator } from "./watched-folders.js";
 
 export function createCore(databasePath?: string): CoreService {
   const selectedDatabasePath = databasePath ?? startupDatabasePath();
@@ -21,6 +22,7 @@ export function createCore(databasePath?: string): CoreService {
   const artifacts = new ArtifactStore(dataDirectory, repository);
   artifacts.reconcile();
   jobs.recover();
+  const watchedFolders = new WatchedFolderCoordinator(repository, media, jobs);
   const runner = new JobRunner(jobs, {
     probe: async (job) => {
       jobs.progress(job.id, 0.2, "probing media");
@@ -29,10 +31,13 @@ export function createCore(databasePath?: string): CoreService {
     hash: async (job) => {
       jobs.progress(job.id, 0.1, "hashing source");
       await media.hashEpisode(job.entityId!);
-    }
+    },
+    watched_folder_scan: async (job, payload) => watchedFolders.scan(job, payload),
+    source_reconcile: async (job) => watchedFolders.reconcile(job)
   });
   runner.start();
-  return new CoreService(repository, media, jobs, artifacts);
+  void watchedFolders.start();
+  return new CoreService(repository, media, jobs, artifacts, watchedFolders, () => runner.stop());
 }
 
 export function defaultDatabasePath(): string {

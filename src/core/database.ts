@@ -353,6 +353,34 @@ const migrations: readonly Migration[] = [
           AND output_path NOT LIKE 'artifacts/%';
       `);
     }
+  },
+  {
+    version: 5,
+    name: "source reconciliation and relinking",
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE episodes ADD COLUMN relink_restore_status TEXT
+          CHECK(relink_restore_status IN ('discovered','ready','indexing'));
+
+        CREATE TABLE relink_comparisons (
+          id TEXT PRIMARY KEY,
+          episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+          token_hash TEXT NOT NULL UNIQUE,
+          candidate_path TEXT NOT NULL,
+          canonical_path TEXT NOT NULL,
+          fingerprint TEXT NOT NULL,
+          content_hash TEXT NOT NULL,
+          file_size INTEGER NOT NULL,
+          modified_at_ms INTEGER NOT NULL,
+          probe_json TEXT NOT NULL,
+          expires_at TEXT NOT NULL,
+          consumed_at TEXT,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX relink_comparison_episode_idx
+          ON relink_comparisons(episode_id, expires_at);
+      `);
+    }
   }
 ];
 

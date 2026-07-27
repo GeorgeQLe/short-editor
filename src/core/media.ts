@@ -1,9 +1,9 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { open, realpath, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { spawn } from "node:child_process";
-import type { Episode, ImportRejectedResult } from "../shared/domain.js";
+import type { Episode, ImportRejectedResult, RelinkSourceResult } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
 import type { Repository } from "./repository.js";
 
@@ -20,10 +20,11 @@ export interface ProbeResult {
 export interface ImportResult {
   imported: Episode[];
   duplicates: Episode[];
+  relinked: Episode[];
   rejected: ImportRejectedResult[];
 }
 
-interface InspectedSource {
+export interface InspectedSource {
   submittedPath: string;
   sourcePath: string;
   canonicalPath: string;
@@ -52,17 +53,101 @@ export class MediaService {
       }
     }));
 
-    const response: ImportResult = { imported: [], duplicates: [], rejected: [] };
+    const response: ImportResult = { imported: [], duplicates: [], relinked: [], rejected: [] };
     for (const result of results) {
       if (result.kind === "imported") {
         response.imported.push(this.repository.getEpisode(result.value.id));
       } else if (result.kind === "duplicates") {
         response.duplicates.push(this.repository.getEpisode(result.value.id));
+      } else if (result.kind === "relinked") {
+        response.relinked.push(this.repository.getEpisode(result.value.id));
       } else {
         response.rejected.push(result.value);
       }
     }
     return response;
+  }
+
+  async relinkSource(
+    episodeId: string,
+    candidatePath: string
+  ): Promise<RelinkSourceResult> {
+    const episode = this.repository.getEpisode(episodeId);
+    if (episode.status !== "source_missing") {
+      throw new AppError("INVALID_STATE", "Only missing Episode sources can be relinked", 409);
+    }
+    const source = await this.inspectRelinkCandidate(candidatePath);
+    if (episode.contentHash) {
+      if (source.contentHash !== episode.contentHash) {
+        throw new AppError("SOURCE_IDENTITY_MISMATCH", "Candidate bytes do not match the original source", 409);
+      }
+      return {
+        status: "relinked",
+        episode: this.repository.commitEpisodeRelink(episodeId, relinkRecord(source))
+      };
+    }
+    if (
+      source.fingerprint !== episode.fingerprint ||
+      source.fileSize !== episode.fileSize ||
+      !sameProbe(source.probe, probeFromEpisode(episode))
+    ) {
+      throw new AppError(
+        "SOURCE_IDENTITY_MISMATCH",
+        "Candidate fingerprint, size, or media metadata does not match the original source",
+        409
+      );
+    }
+    const confirmationToken = randomBytes(32).toString("base64url");
+    const now = Date.now();
+    const expiresAt = new Date(now + 10 * 60_000).toISOString();
+    this.repository.saveRelinkComparison({
+      id: randomUUID(),
+      episodeId,
+      tokenHash: tokenHash(confirmationToken),
+      candidatePath: source.sourcePath,
+      canonicalPath: source.canonicalPath,
+      fingerprint: source.fingerprint,
+      contentHash: source.contentHash!,
+      fileSize: source.fileSize,
+      modifiedAtMs: source.modifiedAtMs,
+      probe: source.probe,
+      expiresAt,
+      consumedAt: null,
+      createdAt: new Date(now).toISOString()
+    });
+    return { status: "confirmation_required", confirmationToken, expiresAt };
+  }
+
+  async confirmRelink(episodeId: string, confirmationToken: string): Promise<{
+    status: "relinked";
+    episode: Episode;
+  }> {
+    const comparison = this.repository.findRelinkComparison(tokenHash(confirmationToken));
+    if (
+      !comparison ||
+      comparison.episodeId !== episodeId ||
+      comparison.consumedAt ||
+      Date.parse(comparison.expiresAt) <= Date.now()
+    ) {
+      throw new AppError("VALIDATION_ERROR", "Relink confirmation is expired or already used", 422);
+    }
+    const source = await this.inspectRelinkCandidate(comparison.candidatePath);
+    if (
+      source.canonicalPath !== comparison.canonicalPath ||
+      source.fingerprint !== comparison.fingerprint ||
+      source.contentHash !== comparison.contentHash ||
+      source.fileSize !== comparison.fileSize ||
+      source.modifiedAtMs !== comparison.modifiedAtMs ||
+      !sameProbe(source.probe, comparison.probe)
+    ) {
+      throw new AppError("SOURCE_IDENTITY_MISMATCH", "Candidate changed after it was compared", 409);
+    }
+    return {
+      status: "relinked",
+      episode: this.repository.commitEpisodeRelink(
+        episodeId, relinkRecord(source), true, comparison.id
+      )
+    };
   }
 
   async hashEpisode(episodeId: string): Promise<string> {
@@ -71,7 +156,7 @@ export class MediaService {
     try {
       before = await stat(episode.sourcePath);
     } catch {
-      this.repository.updateEpisodeMedia(episodeId, { missing: true, status: "source_missing" });
+      this.repository.markEpisodeSourceMissing(episodeId);
       throw new AppError("SOURCE_MISSING", "Source media is missing", 409);
     }
     const digest = await hashFile(episode.sourcePath);
@@ -88,7 +173,7 @@ export class MediaService {
     try {
       await stat(episode.sourcePath);
     } catch {
-      this.repository.updateEpisodeMedia(episodeId, { missing: true, status: "source_missing" });
+      this.repository.markEpisodeSourceMissing(episodeId);
       throw new AppError("SOURCE_MISSING", "Source media is missing", 409);
     }
     const probe = await this.probePath(episode.sourcePath);
@@ -96,7 +181,23 @@ export class MediaService {
     return probe;
   }
 
-  private async inspectSource(input: string): Promise<InspectedSource> {
+  async inspectRelinkCandidate(input: string): Promise<InspectedSource> {
+    let source: InspectedSource;
+    try {
+      source = await this.inspectSource(input, true);
+    } catch (error) {
+      if (error instanceof AppError && error.message.includes("does not exist")) {
+        throw new AppError("SOURCE_MISSING", "Candidate source is missing or inaccessible", 409);
+      }
+      throw error;
+    }
+    source.contentHash = await hashStableFile(
+      source.sourcePath, source.fileSize, source.modifiedAtMs
+    );
+    return source;
+  }
+
+  private async inspectSource(input: string, ignoreKnownPath = false): Promise<InspectedSource> {
     const sourcePath = resolve(input);
     let before;
     let canonicalPath: string;
@@ -108,7 +209,7 @@ export class MediaService {
     if (!before.isFile()) throw new AppError("VALIDATION_ERROR", "Path is not a file", 422);
     if (before.size === 0) throw new AppError("VALIDATION_ERROR", "File is empty", 422);
 
-    const byPath = this.repository.findEpisodeByCanonicalPath(canonicalPath);
+    const byPath = ignoreKnownPath ? undefined : this.repository.findEpisodeByCanonicalPath(canonicalPath);
     if (byPath) {
       return {
         submittedPath: input, sourcePath, canonicalPath, fileSize: before.size,
@@ -170,14 +271,39 @@ export class MediaService {
         ?? (source.contentHash
           ? this.repository.findEpisodeByContentHash(source.contentHash)
           : undefined);
-      if (duplicate) return { kind: "duplicates" as const, value: duplicate };
+      if (duplicate) {
+        if (duplicate.missing && source.contentHash && duplicate.contentHash === source.contentHash) {
+          return {
+            kind: "relinked" as const,
+            value: this.repository.commitEpisodeRelink(duplicate.id, relinkRecord(source))
+          };
+        }
+        return { kind: "duplicates" as const, value: duplicate };
+      }
+
+      const unresolved = candidates.find((candidate) =>
+        candidate.missing && candidate.contentHash === null &&
+        candidate.fileSize === source.fileSize &&
+        sameProbe(probeFromEpisode(candidate), source.probe)
+      );
+      if (unresolved) {
+        return {
+          kind: "rejected" as const,
+          value: {
+            path: source.submittedPath,
+            code: "VALIDATION_ERROR" as const,
+            reason: "A missing source may match this file; explicit relink confirmation is required"
+          }
+        };
+      }
 
       const now = new Date().toISOString();
       const episode = this.repository.insertEpisode({
         id: randomUUID(), sourcePath: source.sourcePath, canonicalPath: source.canonicalPath,
         fingerprint: source.fingerprint, contentHash: source.contentHash,
         fileSize: source.fileSize, modifiedAtMs: source.modifiedAtMs,
-        ...source.probe, status: "indexing", missing: false, createdAt: now, updatedAt: now
+        ...source.probe, status: "indexing", missing: false, relinkRestoreStatus: null,
+        createdAt: now, updatedAt: now
       });
       return { kind: "imported" as const, value: episode };
     });
@@ -225,6 +351,33 @@ export class MediaService {
       release();
     }
   }
+}
+
+function tokenHash(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function sameProbe(left: ProbeResult, right: ProbeResult): boolean {
+  return left.durationMs === right.durationMs &&
+    left.width === right.width &&
+    left.height === right.height &&
+    left.videoCodec === right.videoCodec &&
+    left.audioCodec === right.audioCodec;
+}
+
+function relinkRecord(source: InspectedSource & { contentHash: string | null }) {
+  if (!source.contentHash) {
+    throw new AppError("SOURCE_IDENTITY_MISMATCH", "Candidate has no verified content hash", 409);
+  }
+  return {
+    sourcePath: source.sourcePath,
+    canonicalPath: source.canonicalPath,
+    fingerprint: source.fingerprint,
+    contentHash: source.contentHash,
+    fileSize: source.fileSize,
+    modifiedAtMs: source.modifiedAtMs,
+    ...source.probe
+  };
 }
 
 export async function quickFingerprint(path: string, size: number): Promise<string> {

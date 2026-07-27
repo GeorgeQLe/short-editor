@@ -46,6 +46,7 @@ export const episodeSchema = z.strictObject({
   audioCodec: nullableNonempty,
   status: episodeStatusSchema,
   missing: z.boolean(),
+  relinkRestoreStatus: z.enum(["discovered", "ready", "indexing"]).nullable(),
   candidateCount: z.number().int().nonnegative(),
   renderedShortCount: z.number().int().nonnegative(),
   scheduledCount: z.number().int().nonnegative(),
@@ -69,6 +70,35 @@ export const watchedFolderSchema = z.strictObject({
   updatedAt: utcInstantSchema
 });
 export type WatchedFolder = z.infer<typeof watchedFolderSchema>;
+export const watchedFolderConfigurationInputSchema = z.discriminatedUnion("action", [
+  z.strictObject({
+    action: z.literal("create"),
+    path: z.string().min(1),
+    enabled: z.boolean().optional(),
+    recursive: z.boolean().optional(),
+    includePatterns: z.array(z.string().min(1)).optional()
+  }),
+  z.strictObject({
+    action: z.literal("update"),
+    folderId: idSchema,
+    path: z.string().min(1).optional(),
+    enabled: z.boolean().optional(),
+    recursive: z.boolean().optional(),
+    includePatterns: z.array(z.string().min(1)).optional()
+  }),
+  z.strictObject({ action: z.literal("rescan"), folderId: idSchema })
+]);
+export type WatchedFolderConfigurationInput =
+  z.infer<typeof watchedFolderConfigurationInputSchema>;
+export const relinkSourceResultSchema = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.literal("relinked"), episode: episodeSchema }),
+  z.strictObject({
+    status: z.literal("confirmation_required"),
+    confirmationToken: z.string().min(1),
+    expiresAt: utcInstantSchema
+  })
+]);
+export type RelinkSourceResult = z.infer<typeof relinkSourceResultSchema>;
 
 export const providerClasses = ["local", "network", "cloud"] as const;
 export const providerClassSchema = z.enum(providerClasses);
@@ -402,7 +432,10 @@ export const scheduleEntrySchema = z.strictObject({
 });
 export type ScheduleEntry = z.infer<typeof scheduleEntrySchema>;
 
-export const jobTypes = ["probe", "hash", "analyze", "candidates", "render"] as const;
+export const jobTypes = [
+  "probe", "hash", "analyze", "candidates", "render",
+  "watched_folder_scan", "source_reconcile"
+] as const;
 export const jobTypeSchema = z.enum(jobTypes);
 export const jobStates = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
 export const jobStateSchema = z.enum(jobStates);

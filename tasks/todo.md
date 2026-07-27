@@ -1,10 +1,11 @@
 # Current work
 
-- [ ] INV-02 — Add watched-folder reconciliation, missing-source detection, and
-  identity-safe relinking.
+- [ ] PRO-01 — Define and supervise the versioned Python worker protocol.
 
 ## Completed
 
+- [x] INV-02/INV-03 — Add watched-folder reconciliation, missing-source
+  detection, and identity-safe relinking.
 - [x] INV-01 — Make batch import identity-safe and format-aware.
 - [x] FND-03 — Enforce the artifact store and startup reconciliation.
 - [x] FND-02 — Add complete transactional persistence and migrations.

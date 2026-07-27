@@ -7,7 +7,8 @@ export function episode(overrides: Partial<Episode> = {}): Episode {
     id: randomUUID(), sourcePath: "/fixture/episode.mp4", canonicalPath: `/fixture/${randomUUID()}.mp4`,
     fingerprint: randomUUID(), contentHash: null, fileSize: 100, modifiedAtMs: 100,
     durationMs: 120_000, width: 1920, height: 1080, videoCodec: "h264", audioCodec: "aac",
-    status: "ready", missing: false, candidateCount: 0, renderedShortCount: 0, scheduledCount: 0,
+    status: "ready", missing: false, relinkRestoreStatus: null,
+    candidateCount: 0, renderedShortCount: 0, scheduledCount: 0,
     createdAt: now, updatedAt: now, ...overrides
   };
 }

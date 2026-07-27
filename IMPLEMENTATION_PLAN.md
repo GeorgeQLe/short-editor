@@ -233,6 +233,9 @@ absorb a downstream task.
 
 ### INV-02 — Persist and reconcile watched folders
 
+- **Status:** Implemented 2026-07-27 together with INV-03. Filesystem events are
+  debounced hints; durable startup, manual, and five-minute scans remain
+  authoritative.
 - **SPEC / gates:** 5.1, 6.1, 7.2; G1, G8.
 - **Prerequisites / unblocks:** FND-02 and INV-01; unblocks UI-01 and API-02.
 - **Behavior:** Configure multiple enabled/disabled watched folders, recursive
@@ -264,6 +267,9 @@ absorb a downstream task.
 
 ### INV-03 — Reconcile missing sources and relink safely
 
+- **Status:** Implemented 2026-07-27 as the combined INV-02 inventory milestone.
+  Packaged Windows watcher/network-drive/long-path validation remains in the
+  existing Windows release gate.
 - **SPEC / gates:** 5.2–5.3, 6.1, 7.2; G1, G8, G9.
 - **Prerequisites / unblocks:** INV-01 and INV-02; unblocks complete library UX.
 - **Behavior:** Detect missing sources without removing Episodes, transition to

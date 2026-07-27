@@ -17,7 +17,9 @@ describe("versioned job messages", () => {
       { apiVersion: "v1", type: "hash", episodeId },
       { apiVersion: "v1", type: "analyze", episodeId, provider: "local", transcriptRevision: 1 },
       { apiVersion: "v1", type: "candidates", episodeId, transcriptRevision: 1, count: 8 },
-      { apiVersion: "v1", type: "render", shortId: id(), projectRevision: 1 }
+      { apiVersion: "v1", type: "render", shortId: id(), projectRevision: 1 },
+      { apiVersion: "v1", type: "watched_folder_scan", folderId: id(), reason: "manual" },
+      { apiVersion: "v1", type: "source_reconcile", reason: "periodic" }
     ];
     expect(payloads.map((payload) => payload.type)).toEqual(jobMessageTypes);
     payloads.forEach((payload) => expect(jobPayloadSchema.safeParse(payload).success).toBe(true));
@@ -49,7 +51,12 @@ describe("versioned job messages", () => {
       {
         apiVersion: "v1", type: "render", shortId: id(), projectRevision: 1,
         renderId: id(), validation
-      }
+      },
+      {
+        apiVersion: "v1", type: "watched_folder_scan", folderId: id(),
+        discovered: 3, imported: 1, relinked: 1, rejected: 1
+      },
+      { apiVersion: "v1", type: "source_reconcile", checked: 3, missing: 1, restored: 1 }
     ];
     expect(results.map((result) => result.type)).toEqual(jobMessageTypes);
     results.forEach((result) => expect(jobResultSchema.safeParse(result).success).toBe(true));

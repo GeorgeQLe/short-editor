@@ -3,7 +3,14 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { z } from "zod";
 import { compositionSchema, scheduleRulesSchema, transcriptSegmentSchema } from "../shared/domain.js";
 import { errorEnvelope, normalizeError } from "../shared/errors.js";
-import { candidateGenerateInput, type CoreService, importPathsInput } from "./service.js";
+import {
+  candidateGenerateInput,
+  confirmRelinkInput,
+  type CoreService,
+  importPathsInput,
+  relinkSourceInput,
+  watchedFolderConfigurationInput
+} from "./service.js";
 
 const id = z.string().uuid();
 const revision = z.number().int().positive();
@@ -18,6 +25,19 @@ export function createApi(service: CoreService) {
   app.get("/v1/library/episodes", (req, res) => res.json(ok(service.listEpisodes(asString(req.query.search)))));
   app.get("/v1/library/episodes/:id", route((req) => service.getEpisode(id.parse(req.params.id))));
   app.post("/v1/library/import", route((req) => service.importPaths(importPathsInput.parse(req.body).paths)));
+  app.get("/v1/library/watched-folders", (_req, res) => res.json(ok(service.listWatchedFolders())));
+  app.post("/v1/library/watched-folders/configure", route((req) =>
+    service.configureWatchedFolder(watchedFolderConfigurationInput.parse(req.body))
+  ));
+  app.post("/v1/library/watched-folders/:id/rescan", route((req) =>
+    service.rescanWatchedFolder(id.parse(req.params.id))
+  ));
+  app.post("/v1/library/episodes/:id/relink", route((req) => service.relinkSource(
+    id.parse(req.params.id), relinkSourceInput.parse(req.body).candidatePath
+  )));
+  app.post("/v1/library/episodes/:id/relink/confirm", route((req) => service.confirmRelink(
+    id.parse(req.params.id), confirmRelinkInput.parse(req.body).confirmationToken
+  )));
   app.post("/v1/analysis/start", route((req) => {
     const input = z.object({
       episodeId: id, provider: z.enum(["local", "openai"]).default("local"),

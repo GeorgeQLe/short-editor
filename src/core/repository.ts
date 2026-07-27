@@ -38,6 +38,28 @@ export interface CloudAuthorization {
   revokedAt: string | null;
 }
 
+export interface RelinkComparison {
+  id: string;
+  episodeId: string;
+  tokenHash: string;
+  candidatePath: string;
+  canonicalPath: string;
+  fingerprint: string;
+  contentHash: string;
+  fileSize: number;
+  modifiedAtMs: number;
+  probe: {
+    durationMs: number;
+    width: number;
+    height: number;
+    videoCodec: string;
+    audioCodec: string | null;
+  };
+  expiresAt: string;
+  consumedAt: string | null;
+  createdAt: string;
+}
+
 export class Repository {
   constructor(readonly db: SqliteDatabase) {}
 
@@ -70,6 +92,31 @@ export class Repository {
     return (this.db.prepare(
       "SELECT * FROM watched_folders ORDER BY created_at"
     ).all() as Row[]).map(mapWatchedFolder);
+  }
+
+  getWatchedFolder(id: string): WatchedFolder {
+    const row = this.db.prepare("SELECT * FROM watched_folders WHERE id=?").get(id) as Row | undefined;
+    if (!row) throw new AppError("NOT_FOUND", "Watched folder not found", 404);
+    return mapWatchedFolder(row);
+  }
+
+  updateWatchedFolderScan(
+    id: string,
+    status: WatchedFolder["lastScanStatus"],
+    error: string | null = null
+  ): void {
+    this.db.prepare(`
+      UPDATE watched_folders SET last_scan_status=?,
+        last_scanned_at=CASE WHEN ?='scanning' THEN last_scanned_at ELSE ? END,
+        last_scan_error=?,updated_at=? WHERE id=?
+    `).run(
+      status,
+      status,
+      new Date().toISOString(),
+      error,
+      new Date().toISOString(),
+      id
+    );
   }
 
   listEpisodes(search?: string): Episode[] {
@@ -126,9 +173,11 @@ export class Repository {
     this.db.prepare(`
       INSERT INTO episodes(
         id,source_path,canonical_path,fingerprint,content_hash,file_size,modified_at_ms,
-        duration_ms,width,height,video_codec,audio_codec,status,missing,created_at,updated_at
+        duration_ms,width,height,video_codec,audio_codec,status,missing,relink_restore_status,
+        created_at,updated_at
       ) VALUES(@id,@sourcePath,@canonicalPath,@fingerprint,@contentHash,@fileSize,@modifiedAtMs,
-        @durationMs,@width,@height,@videoCodec,@audioCodec,@status,@missing,@createdAt,@updatedAt)
+        @durationMs,@width,@height,@videoCodec,@audioCodec,@status,@missing,@relinkRestoreStatus,
+        @createdAt,@updatedAt)
     `).run({ ...input, missing: input.missing ? 1 : 0 });
     return this.getEpisode(input.id);
   }
@@ -171,6 +220,112 @@ export class Repository {
       }
       return this.getEpisode(id);
     });
+  }
+
+  markEpisodeSourceMissing(id: string): Episode {
+    return this.transaction(() => {
+      const current = this.getEpisode(id);
+      if (current.status === "source_missing") return current;
+      assertEpisodeTransition(current.status, "source_missing");
+      const restoreStatus = current.status === "discovered" || current.status === "ready"
+        ? current.status
+        : "indexing";
+      this.db.prepare(`
+        UPDATE episodes SET status='source_missing',missing=1,
+          relink_restore_status=?,updated_at=? WHERE id=?
+      `).run(restoreStatus, new Date().toISOString(), id);
+      return this.getEpisode(id);
+    });
+  }
+
+  restoreEpisodeAtCurrentPath(id: string): Episode {
+    return this.transaction(() => {
+      const current = this.getEpisode(id);
+      if (current.status !== "source_missing") return current;
+      const status = current.relinkRestoreStatus ?? "indexing";
+      this.db.prepare(`
+        UPDATE episodes SET status=?,missing=0,relink_restore_status=NULL,updated_at=? WHERE id=?
+      `).run(status, new Date().toISOString(), id);
+      return this.getEpisode(id);
+    });
+  }
+
+  commitEpisodeRelink(
+    id: string,
+    source: {
+      sourcePath: string;
+      canonicalPath: string;
+      fingerprint: string;
+      contentHash: string;
+      fileSize: number;
+      modifiedAtMs: number;
+      durationMs: number;
+      width: number;
+      height: number;
+      videoCodec: string;
+      audioCodec: string | null;
+    },
+    forceIndexing = false,
+    comparisonId?: string
+  ): Episode {
+    return this.transaction(() => {
+      const current = this.getEpisode(id);
+      if (current.status !== "source_missing") {
+        throw new AppError("INVALID_STATE", "Only missing Episode sources can be relinked", 409);
+      }
+      if (comparisonId) {
+        const consumed = this.db.prepare(`
+          UPDATE relink_comparisons SET consumed_at=?
+          WHERE id=? AND episode_id=? AND consumed_at IS NULL AND expires_at>?
+        `).run(new Date().toISOString(), comparisonId, id, new Date().toISOString());
+        if (!consumed.changes) {
+          throw new AppError("VALIDATION_ERROR", "Relink confirmation is expired or already used", 422);
+        }
+      }
+      const status = forceIndexing ? "indexing" : (current.relinkRestoreStatus ?? "indexing");
+      try {
+        this.db.prepare(`
+          UPDATE episodes SET source_path=@sourcePath,canonical_path=@canonicalPath,
+            fingerprint=@fingerprint,content_hash=@contentHash,file_size=@fileSize,
+            modified_at_ms=@modifiedAtMs,duration_ms=@durationMs,width=@width,height=@height,
+            video_codec=@videoCodec,audio_codec=@audioCodec,status=@status,missing=0,
+            relink_restore_status=NULL,updated_at=@updatedAt WHERE id=@id
+        `).run({ ...source, status, updatedAt: new Date().toISOString(), id });
+      } catch {
+        throw new AppError("SOURCE_IDENTITY_MISMATCH", "Candidate path conflicts with another Episode", 409);
+      }
+      if (forceIndexing) {
+        const now = new Date().toISOString();
+        this.db.prepare(`
+          UPDATE renders SET state='stale',updated_at=?
+          WHERE state='succeeded' AND short_id IN (
+            SELECT id FROM short_projects WHERE episode_id=?
+          )
+        `).run(now, id);
+        this.db.prepare(`
+          UPDATE schedule_entries SET needs_rerender=1,revision=revision+1,updated_at=?
+          WHERE episode_id=? AND status<>'published'
+        `).run(now, id);
+      }
+      return this.getEpisode(id);
+    });
+  }
+
+  saveRelinkComparison(comparison: RelinkComparison): void {
+    this.db.prepare(`
+      INSERT INTO relink_comparisons(
+        id,episode_id,token_hash,candidate_path,canonical_path,fingerprint,content_hash,
+        file_size,modified_at_ms,probe_json,expires_at,consumed_at,created_at
+      ) VALUES(@id,@episodeId,@tokenHash,@candidatePath,@canonicalPath,@fingerprint,@contentHash,
+        @fileSize,@modifiedAtMs,@probe,@expiresAt,@consumedAt,@createdAt)
+    `).run({ ...comparison, probe: JSON.stringify(comparison.probe) });
+  }
+
+  findRelinkComparison(tokenHash: string): RelinkComparison | undefined {
+    const row = this.db.prepare(
+      "SELECT * FROM relink_comparisons WHERE token_hash=?"
+    ).get(tokenHash) as Row | undefined;
+    return row ? mapRelinkComparison(row) : undefined;
   }
 
   replaceTranscript(episodeId: string, segments: TranscriptSegment[]): void {
@@ -736,7 +891,7 @@ export class Repository {
         UPDATE jobs SET state='queued',stage='recovered',error_code=NULL,error_message=NULL,updated_at=?
         WHERE state='running' AND cancel_requested=0
           AND (
-            type IN ('probe','hash','candidates')
+            type IN ('probe','hash','candidates','watched_folder_scan','source_reconcile')
             OR (type='analyze' AND provider='local')
           )
       `).run(now).changes;
@@ -761,6 +916,9 @@ function mapEpisode(row: Row): Episode {
     videoCodec: row.video_codec == null ? null : String(row.video_codec),
     audioCodec: row.audio_codec == null ? null : String(row.audio_codec),
     status: row.status as Episode["status"], missing: bool(row.missing),
+    relinkRestoreStatus: row.relink_restore_status == null
+      ? null
+      : row.relink_restore_status as Episode["relinkRestoreStatus"],
     candidateCount: Number(row.candidate_count ?? 0),
     renderedShortCount: Number(row.rendered_short_count ?? 0),
     scheduledCount: Number(row.scheduled_count ?? 0),
@@ -830,6 +988,24 @@ function mapWatchedFolder(row: Row): WatchedFolder {
     lastScanError: row.last_scan_error ? String(row.last_scan_error) : null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at)
+  };
+}
+
+function mapRelinkComparison(row: Row): RelinkComparison {
+  return {
+    id: String(row.id),
+    episodeId: String(row.episode_id),
+    tokenHash: String(row.token_hash),
+    candidatePath: String(row.candidate_path),
+    canonicalPath: String(row.canonical_path),
+    fingerprint: String(row.fingerprint),
+    contentHash: String(row.content_hash),
+    fileSize: Number(row.file_size),
+    modifiedAtMs: Number(row.modified_at_ms),
+    probe: json<RelinkComparison["probe"]>(row.probe_json),
+    expiresAt: String(row.expires_at),
+    consumedAt: row.consumed_at ? String(row.consumed_at) : null,
+    createdAt: String(row.created_at)
   };
 }
 

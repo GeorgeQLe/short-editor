@@ -8,6 +8,11 @@ const server = createApi(service).listen(port, host, () => {
   console.log(`Short Editor core listening on http://${host}:${port}`);
 });
 
-const shutdown = () => server.close(() => process.exit(0));
+const shutdown = () => server.close(() => {
+  void (async () => {
+    await service.stop();
+    process.exit(0);
+  })();
+});
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

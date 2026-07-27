@@ -14,8 +14,15 @@ async function core(path: string, method: Method = "GET", body?: unknown): Promi
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
-  const payload = await response.json() as { data?: unknown; code?: string; message?: string };
-  if (!response.ok) throw new Error(`${payload.code ?? "CORE_ERROR"}: ${payload.message ?? "Core request failed"}`);
+  const payload = await response.json() as {
+    data?: unknown;
+    error?: { code?: string; message?: string };
+  };
+  if (!response.ok) {
+    throw new Error(
+      `${payload.error?.code ?? "CORE_ERROR"}: ${payload.error?.message ?? "Core request failed"}`
+    );
+  }
   return payload.data;
 }
 
@@ -45,6 +52,24 @@ register("library.get_episode", "Get one episode by stable ID.", { episodeId: uu
 register("library.import_paths", "Validate and reference video media in place; originals are not modified.", {
   paths: z.array(z.string()).min(1)
 }, ({ paths }) => core("/library/import", "POST", { paths }));
+register("library.list_watched_folders", "List configured watched folders and scan status.", {},
+  () => core("/library/watched-folders"));
+register("library.configure_watched_folder", "Create, update, enable, disable, or rescan a watched folder.", {
+  action: z.enum(["create", "update", "rescan"]),
+  folderId: uuid.optional(),
+  path: z.string().optional(),
+  enabled: z.boolean().optional(),
+  recursive: z.boolean().optional(),
+  includePatterns: z.array(z.string().min(1)).optional()
+}, (input) => core("/library/watched-folders/configure", "POST", input));
+register(
+  "library.relink_source",
+  "Relink a missing Episode. Hash-verified matches complete immediately; confirmation-required results must be completed through the HTTP API.",
+  { episodeId: uuid, candidatePath: z.string().min(1) },
+  ({ episodeId, candidatePath }) => core(
+    `/library/episodes/${episodeId}/relink`, "POST", { candidatePath }
+  )
+);
 
 register("analysis.start", "Queue episode analysis. OpenAI requires explicit cloud authorization.", {
   episodeId: uuid, provider: z.enum(["local", "openai"]).default("local"),

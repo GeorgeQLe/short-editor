@@ -2,6 +2,20 @@
 
 ## 2026-07-27
 
+- Completed the combined INV-02/INV-03 inventory milestone with persisted
+  watched-folder configuration, debounced chokidar events, durable startup,
+  manual, and five-minute scans, scan deduplication/progress/cancellation, and
+  safe recovery of interrupted reconciliation jobs.
+- Added canonical root validation, recursive/nonrecursive root-relative glob
+  discovery, no directory-symlink traversal, contained file-link support, and
+  identity-safe import/relink behavior for duplicate discoveries.
+- Added migration 5 Episode restore state and expiring one-use relink comparison
+  records; missing sources remain visible and restore to a safe lifecycle state.
+- Added automatic SHA-256 move repair and explicit no-hash comparison/
+  confirmation with candidate revalidation, transactional path/metadata/hash
+  updates, and render/schedule invalidation while preserving accepted work.
+- Added typed HTTP and MCP watched-folder/relink operations, lifecycle shutdown,
+  versioned scan/reconciliation job messages, and reconciliation/relink fixtures.
 - Completed INV-01 with FFprobe-gated, format-aware batch import that preserves
   independent imported, duplicate, and typed rejected results.
 - Added content-sampled quick fingerprints, SHA-256 resolution for ambiguous

@@ -2,7 +2,15 @@ import { randomUUID } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { z } from "zod";
-import type { Asset, Composition, ScheduleRules, ShortProject, TranscriptSegment } from "../shared/domain.js";
+import {
+  type Asset,
+  type Composition,
+  type ScheduleRules,
+  type ShortProject,
+  type TranscriptSegment,
+  type WatchedFolderConfigurationInput,
+  watchedFolderConfigurationInputSchema
+} from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
 import { starterTemplates, templateById } from "../shared/templates.js";
 import { generateCandidates } from "./candidates.js";
@@ -12,14 +20,23 @@ import type { JobQueue } from "./jobs.js";
 import { draftSchedule, type SchedulableShort } from "./scheduler.js";
 import { validateRender } from "./render.js";
 import type { ArtifactStore } from "./artifact-store.js";
+import { WatchedFolderCoordinator } from "./watched-folders.js";
 
 export class CoreService {
   constructor(
     readonly repository: Repository,
     readonly media: MediaService,
     readonly jobs: JobQueue,
-    readonly artifacts?: ArtifactStore
+    readonly artifacts?: ArtifactStore,
+    readonly watchedFolders?: WatchedFolderCoordinator,
+    private readonly stopWorker?: () => void | Promise<void>
   ) {}
+
+  async stop(): Promise<void> {
+    await this.watchedFolders?.stop();
+    await this.stopWorker?.();
+    if (this.repository.db.open) this.repository.db.close();
+  }
 
   listEpisodes(search?: string) { return this.repository.listEpisodes(search); }
   getEpisode(id: string) { return this.repository.getEpisode(id); }
@@ -32,6 +49,27 @@ export class CoreService {
   }
   listJobs() { return this.jobs.list(); }
   cancelJob(id: string) { return this.jobs.cancel(id); }
+  listWatchedFolders() {
+    return this.watchedFolders?.list() ?? this.repository.listWatchedFolders();
+  }
+  configureWatchedFolder(input: WatchedFolderConfigurationInput) {
+    if (!this.watchedFolders) {
+      throw new AppError("DEPENDENCY_UNAVAILABLE", "Watched-folder coordinator is unavailable", 503);
+    }
+    return this.watchedFolders.configure(input);
+  }
+  rescanWatchedFolder(folderId: string) {
+    if (!this.watchedFolders) {
+      throw new AppError("DEPENDENCY_UNAVAILABLE", "Watched-folder coordinator is unavailable", 503);
+    }
+    return this.watchedFolders.requestScan(folderId, "manual");
+  }
+  relinkSource(episodeId: string, candidatePath: string) {
+    return this.media.relinkSource(episodeId, candidatePath);
+  }
+  confirmRelink(episodeId: string, confirmationToken: string) {
+    return this.media.confirmRelink(episodeId, confirmationToken);
+  }
   startAnalysis(episodeId: string, provider: "local" | "openai", cloudAuthorized = false) {
     this.repository.getEpisode(episodeId);
     return this.jobs.enqueue({ type: "analyze", entityId: episodeId, provider, cloudAuthorized });
@@ -200,4 +238,11 @@ export class CoreService {
 }
 
 export const importPathsInput = z.object({ paths: z.array(z.string()).min(1) });
+export const watchedFolderConfigurationInput = watchedFolderConfigurationInputSchema;
+export const relinkSourceInput = z.strictObject({
+  candidatePath: z.string().min(1)
+});
+export const confirmRelinkInput = z.strictObject({
+  confirmationToken: z.string().min(1)
+});
 export const candidateGenerateInput = z.object({ episodeId: z.string().uuid(), count: z.number().int().min(5).max(10).optional() });

@@ -72,7 +72,8 @@ describe("SPEC 5.1 entity contracts", () => {
       id: episodeId, sourcePath: "/media/a.mp4", canonicalPath: "/media/a.mp4",
       fingerprint: "quick:1", contentHash: null, fileSize: 1, modifiedAtMs: 1,
       durationMs: 120_000, width: 1920, height: 1080, videoCodec: "h264", audioCodec: "aac",
-      status: "ready", missing: false, candidateCount: 0, renderedShortCount: 0, scheduledCount: 0,
+      status: "ready", missing: false, relinkRestoreStatus: null,
+      candidateCount: 0, renderedShortCount: 0, scheduledCount: 0,
       createdAt: now, updatedAt: now
     }],
     ["WatchedFolder", watchedFolderSchema, {

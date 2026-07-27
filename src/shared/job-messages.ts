@@ -33,12 +33,23 @@ export const renderJobPayloadSchema = z.strictObject({
   shortId: idSchema,
   projectRevision: positiveRevisionSchema
 });
+export const watchedFolderScanJobPayloadSchema = z.strictObject({
+  ...base("watched_folder_scan"),
+  folderId: idSchema,
+  reason: z.enum(["startup", "event", "periodic", "manual", "recovered"])
+});
+export const sourceReconcileJobPayloadSchema = z.strictObject({
+  ...base("source_reconcile"),
+  reason: z.enum(["startup", "periodic", "recovered"])
+});
 export const jobPayloadSchema = z.discriminatedUnion("type", [
   probeJobPayloadSchema,
   hashJobPayloadSchema,
   analyzeJobPayloadSchema,
   candidatesJobPayloadSchema,
-  renderJobPayloadSchema
+  renderJobPayloadSchema,
+  watchedFolderScanJobPayloadSchema,
+  sourceReconcileJobPayloadSchema
 ]);
 export type JobPayload = z.infer<typeof jobPayloadSchema>;
 
@@ -58,28 +69,50 @@ export const renderJobResultSchema = z.strictObject({
   ...base("render"), shortId: idSchema, projectRevision: positiveRevisionSchema,
   renderId: idSchema, validation: renderValidationResultSchema
 });
+export const watchedFolderScanJobResultSchema = z.strictObject({
+  ...base("watched_folder_scan"), folderId: idSchema,
+  discovered: z.number().int().nonnegative(),
+  imported: z.number().int().nonnegative(),
+  relinked: z.number().int().nonnegative(),
+  rejected: z.number().int().nonnegative()
+});
+export const sourceReconcileJobResultSchema = z.strictObject({
+  ...base("source_reconcile"),
+  checked: z.number().int().nonnegative(),
+  missing: z.number().int().nonnegative(),
+  restored: z.number().int().nonnegative()
+});
 export const jobResultSchema = z.discriminatedUnion("type", [
   probeJobResultSchema,
   hashJobResultSchema,
   analyzeJobResultSchema,
   candidatesJobResultSchema,
-  renderJobResultSchema
+  renderJobResultSchema,
+  watchedFolderScanJobResultSchema,
+  sourceReconcileJobResultSchema
 ]);
 export type JobResult = z.infer<typeof jobResultSchema>;
 
-export const jobMessageTypes = ["probe", "hash", "analyze", "candidates", "render"] as const;
+export const jobMessageTypes = [
+  "probe", "hash", "analyze", "candidates", "render",
+  "watched_folder_scan", "source_reconcile"
+] as const;
 export const JOB_MESSAGE_TYPES = jobMessageTypes;
 export const jobPayloadSchemas = {
   probe: probeJobPayloadSchema,
   hash: hashJobPayloadSchema,
   analyze: analyzeJobPayloadSchema,
   candidates: candidatesJobPayloadSchema,
-  render: renderJobPayloadSchema
+  render: renderJobPayloadSchema,
+  watched_folder_scan: watchedFolderScanJobPayloadSchema,
+  source_reconcile: sourceReconcileJobPayloadSchema
 } as const;
 export const jobResultSchemas = {
   probe: probeJobResultSchema,
   hash: hashJobResultSchema,
   analyze: analyzeJobResultSchema,
   candidates: candidatesJobResultSchema,
-  render: renderJobResultSchema
+  render: renderJobResultSchema,
+  watched_folder_scan: watchedFolderScanJobResultSchema,
+  source_reconcile: sourceReconcileJobResultSchema
 } as const;

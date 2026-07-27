@@ -34,6 +34,18 @@ export class JobQueue {
     return job;
   }
 
+  enqueueUnique(request: JobRequest): Job {
+    const existing = this.repository.db.prepare(`
+      SELECT id FROM jobs
+      WHERE type=? AND state IN ('queued','running')
+        AND ((entity_id IS NULL AND ? IS NULL) OR entity_id=?)
+      ORDER BY created_at LIMIT 1
+    `).get(request.type, request.entityId ?? null, request.entityId ?? null) as
+      { id: string } | undefined;
+    if (existing) return this.list().find((job) => job.id === existing.id)!;
+    return this.enqueue(request);
+  }
+
   list(): Job[] {
     return this.repository.listJobs();
   }
@@ -105,6 +117,8 @@ export class JobQueue {
 export class JobRunner {
   private timer?: NodeJS.Timeout;
   private working = false;
+  private stopping = false;
+  private idleWaiters: Array<() => void> = [];
 
   constructor(
     private readonly queue: JobQueue,
@@ -113,17 +127,22 @@ export class JobRunner {
 
   start(intervalMs = 300): void {
     if (this.timer) return;
+    this.stopping = false;
     this.timer = setInterval(() => void this.tick(), intervalMs);
     void this.tick();
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
+    this.stopping = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+    if (this.working) {
+      await new Promise<void>((resolvePromise) => this.idleWaiters.push(resolvePromise));
+    }
   }
 
   async tick(): Promise<void> {
-    if (this.working) return;
+    if (this.working || this.stopping) return;
     const claimed = this.queue.claimNext();
     if (!claimed) return;
     this.working = true;
@@ -142,7 +161,8 @@ export class JobRunner {
       this.queue.fail(claimed.job.id, error);
     } finally {
       this.working = false;
-      queueMicrotask(() => void this.tick());
+      this.idleWaiters.splice(0).forEach((resolvePromise) => resolvePromise());
+      if (!this.stopping) queueMicrotask(() => void this.tick());
     }
   }
 }
