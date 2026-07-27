@@ -33,7 +33,10 @@ app.on("before-quit", () => core?.kill());
 export async function selectMediaFiles(): Promise<string[]> {
   const result = await dialog.showOpenDialog({
     title: "Import episodes", properties: ["openFile", "multiSelections"],
-    filters: [{ name: "MP4 video", extensions: ["mp4"] }, { name: "All files", extensions: ["*"] }]
+    filters: [
+      { name: "Video media", extensions: ["mp4", "mov", "mkv", "webm", "avi", "m4v", "mpeg", "mpg"] },
+      { name: "All files", extensions: ["*"] }
+    ]
   });
   return result.canceled ? [] : result.filePaths;
 }

@@ -42,7 +42,7 @@ register("library.list_episodes", "List inventoried episodes and production cove
 }, ({ search }) => core(`/library/episodes?search=${encodeURIComponent(String(search ?? ""))}`));
 register("library.get_episode", "Get one episode by stable ID.", { episodeId: uuid },
   ({ episodeId }) => core(`/library/episodes/${episodeId}`));
-register("library.import_paths", "Reference MP4 source files in place; originals are not modified.", {
+register("library.import_paths", "Validate and reference video media in place; originals are not modified.", {
   paths: z.array(z.string()).min(1)
 }, ({ paths }) => core("/library/import", "POST", { paths }));
 

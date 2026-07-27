@@ -1,9 +1,11 @@
 # Current work
 
-- [ ] INV-01 — Make batch import identity-safe and format-aware.
+- [ ] INV-02 — Add watched-folder reconciliation, missing-source detection, and
+  identity-safe relinking.
 
 ## Completed
 
+- [x] INV-01 — Make batch import identity-safe and format-aware.
 - [x] FND-03 — Enforce the artifact store and startup reconciliation.
 - [x] FND-02 — Add complete transactional persistence and migrations.
 - [x] FND-01 — Complete domain schemas, provider classifications, versioned job

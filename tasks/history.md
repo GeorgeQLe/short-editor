@@ -2,6 +2,14 @@
 
 ## 2026-07-27
 
+- Completed INV-01 with FFprobe-gated, format-aware batch import that preserves
+  independent imported, duplicate, and typed rejected results.
+- Added content-sampled quick fingerprints, SHA-256 resolution for ambiguous
+  identity, serialized concurrent finalization, persisted probe metadata, and
+  safe handling for dependency failures and sources changed during inspection.
+- Updated the Electron picker, UI copy, HTTP/MCP boundary, and shared contracts
+  for readable video formats while retaining MP4 H.264/AAC as the guaranteed
+  input.
 - Completed FND-03 with contained application-owned paths, atomic validated
   finalization, hashes and byte counts, collision handling, and startup
   quarantine for temporary, corrupt, missing, and orphaned artifact state.

@@ -1,4 +1,4 @@
-import type { ApiResult, Episode, Job } from "../shared/domain";
+import type { ApiResult, Episode, ImportRejectedResult, Job } from "../shared/domain";
 
 const coreUrl = "http://127.0.0.1:43120/v1";
 
@@ -18,7 +18,7 @@ export const api = {
   importPaths: (paths: string[]) => request<{
     imported: Episode[];
     duplicates: Episode[];
-    rejected: { path: string; reason: string }[];
+    rejected: ImportRejectedResult[];
   }>("/library/import", { method: "POST", body: JSON.stringify({ paths }) }),
   startAnalysis: (episodeId: string) => request<Job>("/analysis/start", {
     method: "POST", body: JSON.stringify({ episodeId, provider: "local", cloudAuthorized: false })

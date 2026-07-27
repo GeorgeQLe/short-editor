@@ -105,9 +105,21 @@ export class Repository {
     return row ? mapEpisode({ ...row, candidate_count: 0, rendered_short_count: 0, scheduled_count: 0 }) : undefined;
   }
 
-  findEpisodeByFingerprint(fingerprint: string): Episode | undefined {
-    const row = this.db.prepare("SELECT * FROM episodes WHERE fingerprint=? LIMIT 1").get(fingerprint) as Row | undefined;
-    return row ? mapEpisode({ ...row, candidate_count: 0, rendered_short_count: 0, scheduled_count: 0 }) : undefined;
+  findEpisodesByFingerprint(fingerprint: string): Episode[] {
+    return (this.db.prepare(
+      "SELECT * FROM episodes WHERE fingerprint=? ORDER BY created_at,id"
+    ).all(fingerprint) as Row[]).map((row) => mapEpisode({
+      ...row, candidate_count: 0, rendered_short_count: 0, scheduled_count: 0
+    }));
+  }
+
+  findEpisodeByContentHash(contentHash: string): Episode | undefined {
+    const row = this.db.prepare(
+      "SELECT * FROM episodes WHERE content_hash=? ORDER BY created_at,id LIMIT 1"
+    ).get(contentHash) as Row | undefined;
+    return row ? mapEpisode({
+      ...row, candidate_count: 0, rendered_short_count: 0, scheduled_count: 0
+    }) : undefined;
   }
 
   insertEpisode(input: Omit<Episode, "candidateCount" | "renderedShortCount" | "scheduledCount">): Episode {

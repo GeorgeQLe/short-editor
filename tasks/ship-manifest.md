@@ -2,90 +2,98 @@
 
 ## User goal
 
-Complete FND-03: enforce the application artifact store and reconcile data,
-artifacts, and interrupted jobs at startup.
+Complete INV-01: make batch media import identity-safe and format-aware, then
+wrap up the session and ship the result.
 
 ## Changed files and per-file purpose
 
-- `src/core/artifact-path.ts` and `src/core/artifact-store.ts` enforce normalized
-  contained paths and atomic temp/validate/fsync/rename finalization with SHA-256,
-  byte counts, producer metadata, collision rejection, and quarantine.
-- `src/core/startup.ts` implements the four native/legacy population cases,
-  SQLite checkpoint and integrity checks, staged copy and hash verification,
-  atomic promotion, timestamped legacy backup, and failed-staging quarantine.
-- `src/core/bootstrap.ts`, `src/core/service.ts`, and `src/core/repository.ts`
-  wire reconciliation before job execution, expose the store to core producers,
-  constrain all owned paths, and apply safe per-job restart policies.
-- `src/core/database.ts` adds schema migration 4 to normalize existing
-  application-owned metadata below the `artifacts/` root.
-- `tests/artifact-store.test.ts`, `tests/startup.test.ts`, and updated
-  `tests/persistence.test.ts`, `tests/repository.test.ts`, and
-  `tests/migrations.test.ts` exercise the boundary, schema upgrade, and crash
-  cases.
-- `README.md` documents runtime layout and legacy migration behavior.
-- `SPEC.md` reconciles implementation evidence and deferred Windows gates.
-- `tasks/todo.md` records FND-03 completion and promotes INV-01 as the sole
-  executable current task.
-- `tasks/history.md` records the completed artifact, startup, and job recovery
-  work.
+- `src/core/media.ts` makes import asynchronous, validates media with FFprobe
+  before persistence, samples file content for quick fingerprints, resolves
+  ambiguous identity with stable SHA-256 hashes, serializes identity
+  finalization, persists probe metadata, and returns safe typed rejections.
+- `src/core/repository.ts` returns every quick-fingerprint candidate and supports
+  deterministic content-hash lookup.
+- `src/core/service.ts` awaits validated imports and queues hashing only when
+  identity resolution did not already produce a full hash.
+- `src/shared/contracts.ts` defines the typed per-input import rejection shape.
+- `src/electron/main.ts`, `src/ui/api.ts`, and `src/ui/App.tsx` expose readable
+  video selection, the typed result, and imported/duplicate/rejected counts.
+- `src/mcp/server.ts` describes the format-aware source-in-place behavior.
+- `tests/media.test.ts` covers mixed formats, malformed and unsupported media,
+  canonical/symlink/hard-link/content duplicates, sampled-fingerprint
+  collisions, concurrent imports, source mutation, unavailable FFprobe,
+  read-only sources, and hash-job scheduling.
+- `SPEC.md` reconciles the implementation matrix with the completed INV-01
+  boundary and leaves watched folders, missing-source reconciliation, and
+  relinking pending.
+- `tasks/todo.md` marks INV-01 complete and promotes INV-02 as the sole current
+  executable task.
+- `tasks/history.md` records the completed import work.
 - `tasks/ship-manifest.md` records this exact shipping proof.
+
+Generated `.agents/skillpacks/`, `.claude/skills/`, and `.codex/skills/` local
+artifacts are excluded from the commit. `.agents/project.json` is unchanged.
 
 ## User-goal mapping
 
-The artifact-path, artifact-store, startup, database, repository, service, and
-bootstrap changes implement the FND-03 runtime boundary. The tests prove the
-supported executable behavior, while the README, SPEC, and task documents
-reconcile the completed scope and route the next task. Generated local skill
-roots are deliberately excluded from the commit.
+The media and repository changes implement safe batch inspection and identity
+resolution. Service and shared-contract changes carry the result through the
+core boundary. Electron, UI, and MCP changes expose the broader readable-video
+contract. The media suite proves the failure modes and invariants, while SPEC
+and task documents reconcile the completed scope and route the next inventory
+task.
 
 ## Tests run
 
-- `npm test`: 13 test files and 64 tests passed.
-- `npm run build`: TypeScript checks, Vite production build, and Node build
-  passed.
+- `npm test`: 13 test files and 69 tests passed.
+- `npm run build`: TypeScript application checking, Vite production build, and
+  Node-target TypeScript build passed.
 - `git diff --check`: passed.
 
 ## Skipped tests
 
-- No lint script or lint/check target exists in the repository command surfaces;
-  TypeScript checking, the production build, and the full Vitest suite are the
-  available executable gates.
-- `npm run package:win` is deferred because this macOS host cannot establish the
-  Windows-native SQLite, Local AppData, long-path, or installer acceptance
-  evidence required by WIN-02/WIN-03.
-- UI/visual validation is not relevant because this boundary changes core
-  persistence and startup behavior without changing rendered UI.
+- No lint script or lint/check target exists in `package.json`, and there is no
+  Makefile, Justfile, Python, or Cargo validation surface. TypeScript checking,
+  the production build, and the full Vitest suite are the available executable
+  gates.
+- `npm run package:win` is deferred because this macOS development host cannot
+  establish Windows-native SQLite, long-path, picker, FFprobe packaging, or
+  installer evidence.
+- An interactive Electron smoke test was not run because the automated suite
+  directly covers import behavior and this environment does not provide the
+  representative Windows media corpus required for release acceptance.
 
 ## Adversarial review
 
-The suites cover atomic visibility, collisions, validation failure cleanup,
-path traversal, corrupt hash, missing file, temporary/orphan quarantine,
-fresh/native/legacy/both-populated startup, verified legacy promotion, legacy
-schema path upgrade, failed verification, stable artifact IDs, safe retry,
-unsafe cloud/render terminal failure, and recovered cancellation.
+A failure-oriented changed-file review traced canonical-path, symlink,
+hard-link, sampled-fingerprint, and content-hash identity; concurrent calls and
+batch ordering; transaction boundaries; source mutation; FFprobe spawn,
+non-zero, invalid-JSON, missing-video, missing-metadata, and diagnostic-redaction
+paths; hash-job duplication; and API/UI/MCP compatibility.
 
-The changed-file review additionally traced symbolic-link handling, database
-checkpoint order, staging rollback, metadata/file commit ordering, collision
-cleanup, and the exclusion of generated skill roots. No blocking finding
-remains.
+The full suite additionally exercises every added behavior. No blocking finding
+or warning remains.
 
 ## Residual risk
 
-- Windows Local AppData permissions, long-path behavior, packaged native SQLite,
-  and restart behavior still require WIN-02/WIN-03 execution on Windows 11.
-- FFmpeg/provider producers adopt the artifact-store service in their later
-  workflow tasks; FND-03 deliberately adds no composition or provider logic.
-- UI recovery presentation remains UI-03.
-- Filesystem containment is checked immediately before writes, but—as with
-  path-based synchronous filesystem APIs—a hostile process with direct write
-  access to the same data directory could race path-component replacement.
+- Windows long paths, native file-picker filters, packaged FFprobe discovery,
+  read-only permissions, and representative codecs still require the G1
+  Windows 11 acceptance run.
+- Stability checks use file size and modification time around reads. A source
+  rewritten in place while preserving both values could evade mutation
+  detection; content hashing still protects ambiguous duplicate merges, but a
+  unique import could retain probe metadata from the racing read.
+- Import serialization is scoped to the application `MediaService` instance.
+  The runtime creates one instance; a future multi-process importer would need a
+  database-level content-identity arbitration design.
 
 ## Rollback note
 
-Revert the FND-03 commit. Databases opened by this boundary are schema version
-4; an older binary requires the preserved pre-upgrade data backup rather than a
-source-only rollback.
+Revert the INV-01 commit. This change adds no database migration, so rollback
+does not require data restoration; episodes imported under the broader format
+contract may remain in an existing database and should be reviewed before
+running an older MP4-oriented build.
 
 ## Next command
 
-`$exec INV-01`
+`$exec INV-02`

@@ -23,11 +23,10 @@ export class CoreService {
 
   listEpisodes(search?: string) { return this.repository.listEpisodes(search); }
   getEpisode(id: string) { return this.repository.getEpisode(id); }
-  importPaths(paths: string[]) {
-    const result = this.media.importPaths(paths);
+  async importPaths(paths: string[]) {
+    const result = await this.media.importPaths(paths);
     for (const episode of result.imported) {
-      this.jobs.enqueue({ type: "probe", entityId: episode.id });
-      this.jobs.enqueue({ type: "hash", entityId: episode.id });
+      if (!episode.contentHash) this.jobs.enqueue({ type: "hash", entityId: episode.id });
     }
     return result;
   }

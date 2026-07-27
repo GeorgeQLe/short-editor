@@ -41,7 +41,11 @@ export function App() {
     setMessage("Importing media…");
     try {
       const result = await api.importPaths(selected);
-      setMessage(`Imported ${result.imported.length}; found ${result.duplicates.length} duplicate${result.duplicates.length === 1 ? "" : "s"}`);
+      setMessage(
+        `Imported ${result.imported.length}; found ${result.duplicates.length} duplicate${
+          result.duplicates.length === 1 ? "" : "s"
+        }; rejected ${result.rejected.length}`
+      );
       await refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Import failed"); }
   };
@@ -68,7 +72,7 @@ export function App() {
       <main>
         <header>
           <div><p className="eyebrow">Production workspace</p><h1>{view}</h1></div>
-          <button className="primary" onClick={importMedia} aria-label="Import MP4 episodes">＋ Import episodes</button>
+          <button className="primary" onClick={importMedia} aria-label="Import video episodes">＋ Import episodes</button>
         </header>
         <div className="status" role="status" aria-live="polite">{loading ? "Loading…" : message}</div>
         {view === "Library" ? (
@@ -121,9 +125,9 @@ function EmptyLibrary({ onImport }: { onImport(): void }) {
   return <div className="empty">
     <div className="empty-icon" aria-hidden="true">▶</div>
     <h2>Turn long episodes into focused Shorts</h2>
-    <p>Import an MP4 to create a local proxy, transcript, highlight candidates, and tracked vertical crops.</p>
-    <button className="primary" onClick={onImport}>Choose MP4 files</button>
-    <small>Guaranteed input: MP4 with H.264/AAC</small>
+    <p>Import readable video media to create a local proxy, transcript, highlight candidates, and tracked vertical crops.</p>
+    <button className="primary" onClick={onImport}>Choose video files</button>
+    <small>MP4 with H.264/AAC is guaranteed; other readable video formats are best effort.</small>
   </div>;
 }
 

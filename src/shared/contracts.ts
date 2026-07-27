@@ -13,6 +13,14 @@ import {
   wallTimeSchema
 } from "./validators.js";
 
+export type ImportRejectionCode = "VALIDATION_ERROR" | "DEPENDENCY_UNAVAILABLE";
+
+export interface ImportRejectedResult {
+  path: string;
+  code: ImportRejectionCode;
+  reason: string;
+}
+
 const nullableNonempty = z.string().min(1).nullable();
 const confidenceSchema = z.number().min(0).max(1);
 const jsonValueSchema: z.ZodType<unknown> = z.json();
