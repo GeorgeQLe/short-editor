@@ -2,10 +2,11 @@
 
 | Field | Value |
 | --- | --- |
-| Specification version | 1.0.0 |
-| Status | Active |
-| Last updated | 2026-07-26 |
+| Specification version | 1.1.0 |
+| Status | Active; owner review required before acceptance |
+| Last updated | 2026-07-27 |
 | Owners | Short Editor maintainers |
+| Normative review | Must be recorded by an owner in REL-01 evidence |
 | Release-acceptance platform | Windows 11 |
 
 This document is the authoritative engineering specification for Short Editor v1.
@@ -129,10 +130,20 @@ settings, and final publication.
   launching the application MUST NOT make a cloud request.
 - Sources MUST be referenced in place and MUST NOT be modified. Generated files
   MUST live in the application artifact store.
-- The application MUST display whether an operation is local or cloud before it
-  begins.
+- The application MUST display whether an operation is local, network, or cloud
+  before it begins.
 - Local transcription MUST support faster-whisper. Local language-model analysis
   MUST support Ollama.
+- An Ollama endpoint on an IP loopback address is a local operation. An endpoint
+  on an RFC1918 or otherwise private-LAN address is a network operation: the UI
+  MUST disclose the endpoint class, data sent, and network use before starting,
+  but project cloud authorization is not required. A public or non-private
+  endpoint is a cloud operation and MUST have persisted authorization for the
+  project or explicitly selected batch before any data is transmitted.
+- Provider redirects MUST be resolved and reclassified before transmitting
+  operation data. A redirect MUST NOT weaken the authorization required by the
+  originally selected endpoint; the effective requirement is the stricter of
+  the original and redirect-target classifications.
 - OpenAI MUST be an explicit opt-in provider. There MUST be no silent fallback
   from a local provider to OpenAI or from one cloud model to another.
 - Model IDs MUST be configurable. The specification MUST NOT freeze a provider's
@@ -621,6 +632,7 @@ providers.get_status
 
 shorts.update_timeline
 shorts.update_captions
+shorts.update_audio
 shorts.approve
 
 schedule.get_rules
@@ -635,6 +647,9 @@ renders.retry
 
 Names MAY gain aliases before v1 release, but the behavior above MUST remain
 discoverable and typed. Destructive deletion tools MUST NOT be added in v1.
+The explicit v1 inventory contains exactly 40 tools. `shorts.update_audio` MUST
+be non-destructive, require `expectedRevision`, and use concrete fields for
+source gain, source mute, cut-fade duration, optional bed-asset ID, and bed gain.
 
 ### 7.3 Cloud security gate
 
@@ -668,22 +683,23 @@ Queued job types without installed handlers are not complete functionality.
 | Capability | Status | Evidence and gap |
 | --- | --- | --- |
 | SQLite schema, foreign keys, migrations | Implemented | [`src/core/database.ts`](src/core/database.ts) defines ordered migrations, WAL, foreign keys, and core tables. Required watched-folder, artifact, transcript-revision, template-clone, provider, and authorization persistence remains to be added. |
-| Stable schemas and UUID validation | Partial | [`src/shared/domain.ts`](src/shared/domain.ts) defines UUID-backed Episode, Candidate, Short, Job, and schedule schemas. Several required v1 entities and error codes are absent. |
-| Source-in-place MP4 inventory | Partial | [`src/core/media.ts`](src/core/media.ts) and [`tests/media.test.ts`](tests/media.test.ts) preserve sources, reject non-MP4 inputs, and deduplicate canonical paths. Best-effort FFmpeg-readable import, batch identity hardening, watched folders, missing-source reconciliation, and relinking are pending. |
-| Probe and full hashing foundations | Partial | Probe/hash implementations exist in [`src/core/media.ts`](src/core/media.ts) and are installed in [`src/core/bootstrap.ts`](src/core/bootstrap.ts). Cross-file hash deduplication and broad fixtures are pending. |
+| Platform-aware application data path | Partial | [`src/core/bootstrap.ts`](src/core/bootstrap.ts), [`tests/bootstrap.test.ts`](tests/bootstrap.test.ts), and [`README.md`](README.md) resolve an explicit override plus Windows Local AppData, macOS Application Support, and Linux XDG defaults. The required artifact/log directory layout, packaged-process path integration, migration from earlier defaults, and Windows 11 validation are pending. |
+| Stable schemas and UUID validation | Implemented | [`src/shared/contracts.ts`](src/shared/contracts.ts), [`src/shared/validators.ts`](src/shared/validators.ts), [`src/shared/error-contracts.ts`](src/shared/error-contracts.ts), [`src/shared/job-messages.ts`](src/shared/job-messages.ts), and [`src/shared/episode-transitions.ts`](src/shared/episode-transitions.ts) define the complete v1 entity, lifecycle, provider-classification, job-message, and 15-code error inventories. Persistence and workflow adoption of the complete contracts continues under FND-02 and later tasks. |
+| Source-in-place MP4 inventory | Partial | [`src/core/media.ts`](src/core/media.ts) and [`tests/media.test.ts`](tests/media.test.ts) preserve tested source bytes, return per-input groups, reject non-MP4 inputs, and deduplicate canonical paths. The current quick fingerprint is only size plus modification time and is incorrectly treated as a conclusive duplicate, so distinct files can be collapsed without content verification. Best-effort FFmpeg-readable import, watched folders, missing-source reconciliation, and relinking are pending. |
+| Probe and full hashing foundations | Partial | Probe/hash implementations exist in [`src/core/media.ts`](src/core/media.ts) and are installed in [`src/core/bootstrap.ts`](src/core/bootstrap.ts). Hash results are stored, but ambiguous import identity is not resolved with full hashes, cross-file content deduplication is absent, and probe/hash fixtures are incomplete. |
 | Durable jobs and restart recovery | Partial | [`src/core/jobs.ts`](src/core/jobs.ts), [`src/core/repository.ts`](src/core/repository.ts), and [`tests/repository.test.ts`](tests/repository.test.ts) implement queueing, cancellation flags, claiming, progress, failure, and requeue of running jobs. Retry policy, artifact cleanup, subprocess cancellation, and bounded recovery are pending. |
-| Local/cloud request boundary | Partial | [`src/core/jobs.ts`](src/core/jobs.ts) rejects an OpenAI request when a request boolean is false. Persisted project authorization, UI credential management, provider provenance, and non-bypassable MCP enforcement are pending. |
+| Local/cloud request boundary | Pending | [`src/core/jobs.ts`](src/core/jobs.ts) rejects an OpenAI request only when a caller-supplied boolean is false, while [`src/mcp/server.ts`](src/mcp/server.ts) exposes that boolean directly. Because this is explicitly not proof of authorization under section 7.3, persisted project/batch authorization, desktop credential management, provider provenance, and non-bypassable core enforcement remain to be implemented. |
 | Transcription and vision workers | Pending | `analyze` is a job type, but [`src/core/bootstrap.ts`](src/core/bootstrap.ts) installs no analysis handler. No faster-whisper, Ollama, OpenAI, diarization, or vision worker is present. |
-| Transcript persistence and replacement | Partial | Transcript tables and replacement methods exist in [`src/core/database.ts`](src/core/database.ts) and [`src/core/repository.ts`](src/core/repository.ts); HTTP can set a transcript. Revision history, typed retrieval/update MCP, accepted/provider separation, and interactive editing are pending. |
-| Candidate generation and review | Partial | [`src/core/candidates.ts`](src/core/candidates.ts) and [`tests/candidates.test.ts`](tests/candidates.test.ts) implement bounded sentence-window scoring, ranking, overlap filtering, and 5–10 targeting. Provider/vision scoring, deterministic stable identity, insufficient-material diagnostics, and decision-preserving regeneration are pending. |
-| Revisioned Short projects and invalidation | Partial | [`src/core/repository.ts`](src/core/repository.ts) and [`tests/repository.test.ts`](tests/repository.test.ts) enforce expected revisions and stale render/schedule invalidation. Timeline, captions, audio, reapproval, and selective invalidation are pending. |
+| Transcript persistence and replacement | Partial | Transcript segment tables and replacement methods exist in [`src/core/database.ts`](src/core/database.ts) and [`src/core/repository.ts`](src/core/repository.ts), and HTTP can replace the current transcript. The operation has no transcript revision or `expectedRevision`; revision history, language/provenance/accepted state, typed retrieval/update MCP, render invalidation, and interactive editing are pending. |
+| Candidate generation and review | Partial | [`src/core/candidates.ts`](src/core/candidates.ts), [`src/core/repository.ts`](src/core/repository.ts), and [`tests/candidates.test.ts`](tests/candidates.test.ts) implement bounded segment-window scoring, ranking, overlap filtering, 5–10 targeting, and replacement of pending rows while retaining reviewed rows. Generation provenance, explicit insufficient-material diagnostics, representative quality fixtures, and tests proving deterministic ranking and decision-preserving regeneration are pending; regeneration also does not account for overlap with retained reviewed Candidates. |
+| Revisioned Short projects and invalidation | Partial | [`src/core/repository.ts`](src/core/repository.ts) and [`tests/repository.test.ts`](tests/repository.test.ts) enforce expected revisions and conservatively stale renders/schedules after the supported Short mutations. Render-affecting edits do not clear approval, invalidation also mutates published entries, and timeline, captions, audio, template, transcript, and selective copy-only invalidation paths are pending. |
 | Starter templates and composition schema | Partial | Three versioned starter layouts exist in [`src/shared/templates.ts`](src/shared/templates.ts), with normalized layers in [`src/shared/domain.ts`](src/shared/domain.ts). Clone/update, persisted lineage, and complete editor behavior are pending. |
 | Asset inventory foundation | Partial | [`src/core/service.ts`](src/core/service.ts) imports local image/video assets with provenance and reusable flags. Metadata probing, owned artifact paths, rights UX, and editor integration are pending. |
 | Crop tracking and overrides | Pending | Crop-keyframe schemas exist in [`src/shared/domain.ts`](src/shared/domain.ts), but detection, smoothing, tracking, and an interactive override workflow do not. |
 | Captions and audio editing | Pending | Caption layers exist in templates, but caption cue/style persistence, editor controls, audio settings, sidecars, and composition are absent. |
-| Render validation contract | Partial | [`src/core/render.ts`](src/core/render.ts) validates output existence, dimensions, codecs, streams, and 180-second ceiling. Validation fixtures, stored results, preflight, and retry are pending. |
+| Render validation contract | Partial | [`src/core/render.ts`](src/core/render.ts) probes an existing output and checks dimensions, codecs, audio/video presence, and the 180-second ceiling. It does not reject zero duration, persist validation or encoder provenance, transition a Render only after validation, or provide preflight/retry; deterministic media fixtures are also absent. |
 | FFmpeg composition renderer | Pending | `render` can be queued, but [`src/core/bootstrap.ts`](src/core/bootstrap.ts) installs no render handler and no composition filter graph exists. |
-| Deterministic scheduling | Partial | [`src/core/scheduler.ts`](src/core/scheduler.ts) and [`tests/scheduler.test.ts`](tests/scheduler.test.ts) cover priority, stable tie-breaking, blackouts, occupied slots, Episode spacing, and DST offsets. Rule persistence/API, ambiguous/nonexistent-time policy, complete collision validation, and UI are pending. |
+| Deterministic scheduling | Partial | [`src/core/scheduler.ts`](src/core/scheduler.ts) and [`tests/scheduler.test.ts`](tests/scheduler.test.ts) cover priority, stable tie-breaking, blackouts, occupied slots, Episode spacing, and ordinary offset changes across DST. Rule-set persistence/revisions/API, explicit ambiguous/nonexistent-time policy and warnings, move-time rule validation, publication URL edge cases, Content ID warnings, and UI are pending. |
 | Versioned localhost HTTP API | Partial | [`src/core/api.ts`](src/core/api.ts) exposes a loopback-oriented `/v1` service with success envelopes and validation. Errors lack the required v1 envelope/retryable field, and complete workflow endpoints are pending. |
 | Typed MCP adapter | Partial | [`src/mcp/server.ts`](src/mcp/server.ts) exposes the original tools over the core API. Several inputs are arbitrary records, structured errors are flattened, `apiVersion` is discarded, and the parity additions in section 7.2 are pending. |
 | Electron/React shell and library UI | Partial | [`src/electron/main.ts`](src/electron/main.ts), [`src/electron/preload.ts`](src/electron/preload.ts), and [`src/ui/App.tsx`](src/ui/App.tsx) provide a desktop shell, native MP4 import, searchable inventory, metrics, job polling, and local-analysis queue action. Candidate, editor, and calendar views are placeholders. |
@@ -711,6 +727,10 @@ supporting evidence, not release acceptance.
 
 - Run deterministic fixtures for faster-whisper and Ollama plus mocked success,
   timeout, rate-limit, malformed-output, and partial-output OpenAI responses.
+- Exercise loopback, private-LAN, and public/non-private Ollama endpoints plus
+  redirects across those classes; verify pre-operation labels/disclosure,
+  persisted authorization for cloud-class endpoints, reclassification before
+  data transmission, and the rule that redirects cannot weaken authorization.
 - Verify provider/model/schema provenance and cache keys.
 - Verify local mode generates no network traffic.
 - Verify OpenAI cannot run without persisted project authorization and that MCP
@@ -746,6 +766,9 @@ supporting evidence, not release acceptance.
 - Verify original speaker audio remains audible and synchronized, cuts have the
   configured fades, optional bed mixing is deterministic, and no rewrite becomes
   voiceover.
+- Exercise HTTP, MCP, and UI audio mutations for value parity, strict schema
+  rejection, revision conflicts, stale Render invalidation, `needsRerender` only
+  on dependent non-published schedule entries, and published-entry immutability.
 
 ### G6. Rendering
 
@@ -773,11 +796,15 @@ supporting evidence, not release acceptance.
 - Contract-test every HTTP operation and every tool in section 7.2 for success,
   schema rejection, not-found, invalid state, revision conflict, cancellation,
   and provider failure.
+- Verify MCP discovery contains exactly the 40 unique tools in section 7.2.
 - Verify success/error envelopes include `apiVersion`, IDs remain stable, jobs
   are durable, errors remain structured, and credentials never appear.
 - Run a UI-to-MCP parity inventory and prove every primary persisted UI
   transition has a typed MCP equivalent or is the documented user-only cloud
   security gate.
+- Verify `shorts.update_audio` matches the HTTP operation for values, errors,
+  revision conflicts, Render invalidation, non-published schedule rerender flags,
+  and published-entry immutability.
 - Verify no destructive deletion operation is discoverable.
 
 ### G9. Accessibility and recovery
@@ -801,6 +828,19 @@ supporting evidence, not release acceptance.
 
 ## 10. Changelog
 
+### 1.1.0 — 2026-07-27
+
+- Added typed, non-destructive `shorts.update_audio` parity and increased the
+  explicit MCP inventory from 39 to 40 tools.
+- Classified loopback Ollama endpoints as local, private-LAN endpoints as
+  disclosed network operations, and public/non-private endpoints as authorized
+  cloud operations; redirects are reclassified before transmission and cannot
+  weaken the original authorization requirement.
+- Retained the existing accepted-transcript revision and render/schedule
+  invalidation requirements; this change adds no transcript tool or lifecycle.
+- Requires owner review of this backwards-compatible normative addition, with
+  the approval record closed by REL-01.
+
 ### 1.0.0 — 2026-07-26
 
 - Established the original complete product plan as a normative RFC-style
@@ -815,4 +855,3 @@ supporting evidence, not release acceptance.
   ID warning.
 - Adopted configurable provider model IDs and official OpenAI transcription,
   diarization, and structured-output capability references.
-
