@@ -1,0 +1,8 @@
+{
+  "project_type": "devtool",
+  "enabled_packs": [],
+  "skill_pack_version": 1,
+  "enabled_skills": {
+    "ship-end": "exec-loop"
+  }
+}
