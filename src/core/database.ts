@@ -334,6 +334,25 @@ const migrations: readonly Migration[] = [
         });
       }
     }
+  },
+  {
+    version: 4,
+    name: "artifact store paths",
+    up: (db) => {
+      db.exec(`
+        UPDATE artifact_records
+        SET relative_path='artifacts/' || relative_path
+        WHERE relative_path NOT LIKE 'artifacts/%';
+        UPDATE assets
+        SET owned_artifact_path='artifacts/' || owned_artifact_path
+        WHERE owned_artifact_path IS NOT NULL
+          AND owned_artifact_path NOT LIKE 'artifacts/%';
+        UPDATE renders
+        SET output_path='artifacts/' || output_path
+        WHERE output_path IS NOT NULL
+          AND output_path NOT LIKE 'artifacts/%';
+      `);
+    }
   }
 ];
 

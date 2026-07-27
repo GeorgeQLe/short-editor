@@ -67,13 +67,51 @@ describe("repository revisions and recovery", () => {
   it("requeues interrupted work after restart", () => {
     const repository = setup();
     const now = new Date().toISOString();
+    const analyzeId = crypto.randomUUID();
     repository.insertJob({
-      id: crypto.randomUUID(), type: "analyze", entityId: null, state: "running",
-      progress: .3, provider: null, stage: "transcribing", attempts: 1,
+      id: analyzeId, type: "analyze", entityId: null, state: "running",
+      progress: .3, provider: "local", stage: "transcribing", attempts: 1,
       cancelRequested: false, errorCode: null, errorMessage: null, payloadReference: null,
       createdAt: now, updatedAt: now
     }, {});
-    expect(repository.recoverJobs()).toBe(1);
-    expect(repository.listJobs()[0]).toMatchObject({ state: "queued", stage: "recovered", progress: .3 });
+    const renderId = crypto.randomUUID();
+    repository.insertJob({
+      id: renderId, type: "render", entityId: null, state: "running",
+      progress: .7, provider: null, stage: "encoding", attempts: 1,
+      cancelRequested: false, errorCode: null, errorMessage: null, payloadReference: null,
+      createdAt: now, updatedAt: now
+    }, {});
+    const cancelledId = crypto.randomUUID();
+    repository.insertJob({
+      id: cancelledId, type: "hash", entityId: null, state: "running",
+      progress: .5, provider: null, stage: "hashing", attempts: 1,
+      cancelRequested: true, errorCode: null, errorMessage: null, payloadReference: null,
+      createdAt: now, updatedAt: now
+    }, {});
+    const cloudAnalyzeId = crypto.randomUUID();
+    repository.insertJob({
+      id: cloudAnalyzeId, type: "analyze", entityId: null, state: "running",
+      progress: .4, provider: "openai", stage: "requesting", attempts: 1,
+      cancelRequested: false, errorCode: null, errorMessage: null, payloadReference: null,
+      createdAt: now, updatedAt: now
+    }, {});
+
+    expect(repository.recoverJobs()).toBe(4);
+    const recovered = new Map(repository.listJobs().map((job) => [job.id, job]));
+    expect(recovered.get(analyzeId)).toMatchObject({
+      state: "queued", stage: "recovered", progress: .3
+    });
+    expect(recovered.get(renderId)).toMatchObject({
+      state: "failed",
+      stage: "recovery_required",
+      errorCode: "INTERNAL_ERROR",
+      errorMessage: "Interrupted work is not safe to retry automatically"
+    });
+    expect(recovered.get(cancelledId)).toMatchObject({
+      state: "cancelled", stage: "cancelled", errorCode: "JOB_CANCELLED"
+    });
+    expect(recovered.get(cloudAnalyzeId)).toMatchObject({
+      state: "failed", stage: "recovery_required", errorCode: "INTERNAL_ERROR"
+    });
   });
 });

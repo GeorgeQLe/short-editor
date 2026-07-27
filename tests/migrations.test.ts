@@ -23,7 +23,8 @@ describe("database migrations", () => {
     expect(db.pragma("busy_timeout", { simple: true })).toBe(5000);
     expect((db.prepare(
       "SELECT version FROM schema_migrations ORDER BY version"
-    ).all() as { version: number }[]).map((row) => row.version)).toEqual([1, 2, 3]);
+    ).all() as { version: number }[]).map((row) => row.version))
+      .toEqual(Array.from({ length: CURRENT_SCHEMA_VERSION }, (_, index) => index + 1));
     expect((db.prepare(
       "SELECT applied_at FROM schema_migrations"
     ).all() as { applied_at: string }[]).every((row) => row.applied_at.endsWith("Z"))).toBe(true);

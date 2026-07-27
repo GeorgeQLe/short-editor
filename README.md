@@ -48,6 +48,14 @@ During macOS development, Short Editor stores its database at
 `SHORT_EDITOR_FFMPEG` to override the FFmpeg executable, or
 `SHORT_EDITOR_FFPROBE` to override the ffprobe executable.
 
+On startup the core also creates `artifacts/` and `logs/` below that data
+directory. Application-generated media is finalized through the artifact store;
+source media remains in place. Development data found at the earlier
+`~/AppData/Local/ShortEditor` default is verified and migrated to the native
+location with a timestamped backup. If both locations contain data, startup
+stops without opening or changing either database so the conflict can be
+resolved explicitly.
+
 Install Node dependencies independently on each operating system so native
 packages such as `better-sqlite3` are built or downloaded for the current host;
 do not copy `node_modules` between macOS and Windows. macOS development checks

@@ -78,7 +78,7 @@ describe("complete transactional persistence", () => {
     const asset = {
       id: randomUUID(),
       sourcePath: null,
-      ownedArtifactPath: `episodes/${source.id}/thumbnail.png`,
+      ownedArtifactPath: `artifacts/episodes/${source.id}/thumbnail.png`,
       kind: "image" as const,
       provenance: "generated locally",
       reusable: false,

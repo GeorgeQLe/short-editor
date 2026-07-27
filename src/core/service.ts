@@ -11,12 +11,14 @@ import type { MediaService } from "./media.js";
 import type { JobQueue } from "./jobs.js";
 import { draftSchedule, type SchedulableShort } from "./scheduler.js";
 import { validateRender } from "./render.js";
+import type { ArtifactStore } from "./artifact-store.js";
 
 export class CoreService {
   constructor(
     readonly repository: Repository,
     readonly media: MediaService,
-    readonly jobs: JobQueue
+    readonly jobs: JobQueue,
+    readonly artifacts?: ArtifactStore
   ) {}
 
   listEpisodes(search?: string) { return this.repository.listEpisodes(search); }

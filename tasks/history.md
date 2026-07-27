@@ -2,6 +2,15 @@
 
 ## 2026-07-27
 
+- Completed FND-03 with contained application-owned paths, atomic validated
+  finalization, hashes and byte counts, collision handling, and startup
+  quarantine for temporary, corrupt, missing, and orphaned artifact state.
+- Added deterministic native/legacy startup selection, verified staged database
+  and artifact migration, timestamped legacy backup, failed-copy quarantine,
+  and no-write recovery when both locations are populated.
+- Added per-job restart policy: idempotent local work is requeued, recovered
+  cancellation is terminally cancelled, and unsafe interrupted cloud-analysis
+  or render work fails with an actionable recovery stage.
 - Completed FND-02 with ordered transactional schema upgrades, legacy v1/v2
   compatibility, complete entity storage, artifact metadata, and scoped
   authorization records that contain no credential secrets.

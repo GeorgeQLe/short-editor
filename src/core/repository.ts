@@ -7,6 +7,7 @@ import type {
 import { AppError } from "../shared/errors.js";
 import { assertEpisodeTransition, type RelinkContext } from "../shared/episode-transitions.js";
 import { randomUUID } from "node:crypto";
+import { validateOwnedRelativePath } from "./artifact-path.js";
 
 type Row = Record<string, unknown>;
 const bool = (value: unknown) => value === 1;
@@ -456,6 +457,12 @@ export class Repository {
   }
 
   saveAsset(asset: Asset): Asset {
+    if (asset.ownedArtifactPath !== null) {
+      asset = {
+        ...asset,
+        ownedArtifactPath: validateOwnedRelativePath(asset.ownedArtifactPath)
+      };
+    }
     this.db.prepare(`
       INSERT INTO assets(
         id,source_path,owned_artifact_path,kind,provenance,reusable,tags_json,
@@ -480,6 +487,9 @@ export class Repository {
   }
 
   insertRender(render: Render, attempt = 1): Render {
+    if (render.outputPath !== null) {
+      render = { ...render, outputPath: validateOwnedRelativePath(render.outputPath) };
+    }
     this.db.prepare(`
       INSERT INTO renders(
         id,short_id,project_revision,output_path,encoder_json,validation_json,state,
@@ -615,9 +625,7 @@ export class Repository {
   }
 
   saveArtifactRecord(artifact: StoredArtifact): StoredArtifact {
-    if (artifact.relativePath.startsWith("/") || /^[A-Za-z]:[\\/]/.test(artifact.relativePath)) {
-      throw new AppError("VALIDATION_ERROR", "Owned artifact paths must be relative", 422);
-    }
+    artifact = { ...artifact, relativePath: validateOwnedRelativePath(artifact.relativePath) };
     this.db.prepare(`
       INSERT INTO artifact_records(
         id,kind,owner_type,owner_id,owner_revision,relative_path,content_hash,
@@ -635,6 +643,12 @@ export class Repository {
       ).all(ownerId)
       : this.db.prepare("SELECT * FROM artifact_records ORDER BY created_at").all();
     return (rows as Row[]).map(mapStoredArtifact);
+  }
+
+  markArtifactCorrupt(id: string): void {
+    this.db.prepare(
+      "UPDATE artifact_records SET state='corrupt' WHERE id=? AND state IN ('temporary','complete')"
+    ).run(id);
   }
 
   grantCloudAuthorization(authorization: CloudAuthorization): CloudAuthorization {
@@ -684,10 +698,14 @@ export class Repository {
   insertJob(job: Job, payload: unknown): void {
     this.db.prepare(`
       INSERT INTO jobs(id,type,entity_id,state,progress,stage,payload_json,attempts,
-        error_code,error_message,created_at,updated_at,provider,payload_reference)
+        error_code,error_message,cancel_requested,created_at,updated_at,provider,payload_reference)
       VALUES(@id,@type,@entityId,@state,@progress,@stage,@payload,@attempts,
-        @errorCode,@errorMessage,@createdAt,@updatedAt,@provider,@payloadReference)
-    `).run({ ...job, payload: JSON.stringify(payload) });
+        @errorCode,@errorMessage,@cancelRequested,@createdAt,@updatedAt,@provider,@payloadReference)
+    `).run({
+      ...job,
+      cancelRequested: job.cancelRequested ? 1 : 0,
+      payload: JSON.stringify(payload)
+    });
   }
 
   listJobs(): Job[] {
@@ -696,10 +714,28 @@ export class Repository {
 
   recoverJobs(): number {
     const now = new Date().toISOString();
-    return Number(this.db.prepare(`
-      UPDATE jobs SET state='queued',stage='recovered',updated_at=?
-      WHERE state='running'
-    `).run(now).changes);
+    return this.transaction(() => {
+      const cancelled = this.db.prepare(`
+        UPDATE jobs SET state='cancelled',stage='cancelled',error_code='JOB_CANCELLED',
+          error_message='Cancellation was recovered after restart',updated_at=?
+        WHERE state='running' AND cancel_requested=1
+      `).run(now).changes;
+      const retried = this.db.prepare(`
+        UPDATE jobs SET state='queued',stage='recovered',error_code=NULL,error_message=NULL,updated_at=?
+        WHERE state='running' AND cancel_requested=0
+          AND (
+            type IN ('probe','hash','candidates')
+            OR (type='analyze' AND provider='local')
+          )
+      `).run(now).changes;
+      const failed = this.db.prepare(`
+        UPDATE jobs SET state='failed',stage='recovery_required',
+          error_code='INTERNAL_ERROR',
+          error_message='Interrupted work is not safe to retry automatically',updated_at=?
+        WHERE state='running' AND cancel_requested=0
+      `).run(now).changes;
+      return Number(cancelled + retried + failed);
+    });
   }
 }
 
