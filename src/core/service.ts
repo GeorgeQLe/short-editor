@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { z } from "zod";
-import type { Composition, ScheduleRules, ShortProject, TranscriptSegment } from "../shared/domain.js";
+import type { Asset, Composition, ScheduleRules, ShortProject, TranscriptSegment } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
 import { starterTemplates, templateById } from "../shared/templates.js";
 import { generateCandidates } from "./candidates.js";
@@ -37,10 +37,25 @@ export class CoreService {
   }
 
   setTranscript(episodeId: string, segments: TranscriptSegment[]) {
-    this.repository.getEpisode(episodeId);
-    this.repository.replaceTranscript(episodeId, segments);
-    this.repository.updateEpisodeMedia(episodeId, { status: "ready" });
-    return segments;
+    return this.repository.transaction(() => {
+      let episode = this.repository.getEpisode(episodeId);
+      if (episode.status === "source_missing") {
+        throw new AppError("INVALID_STATE", "Cannot transcribe an Episode with missing source media", 409);
+      }
+      if (episode.status === "ready") {
+        episode = this.repository.updateEpisodeStatus(episodeId, "analyzing");
+      } else {
+        if (episode.status === "discovered" || episode.status === "error") {
+          episode = this.repository.updateEpisodeStatus(episodeId, "indexing");
+        }
+        if (episode.status !== "analyzing") {
+          episode = this.repository.updateEpisodeStatus(episodeId, "analyzing");
+        }
+      }
+      this.repository.replaceTranscript(episodeId, segments);
+      this.repository.updateEpisodeStatus(episodeId, "ready");
+      return segments;
+    });
   }
 
   generateCandidates(episodeId: string, count?: number) {
@@ -97,9 +112,9 @@ export class CoreService {
     return this.repository.updateShort(id, expectedRevision, { approved: true });
   }
 
-  listTemplates() { return starterTemplates; }
+  listTemplates() { return this.repository.listTemplates(); }
   listAssets() {
-    return this.repository.db.prepare("SELECT * FROM assets ORDER BY created_at DESC").all();
+    return this.repository.listAssets();
   }
   importAsset(path: string, provenance: string, reusable: boolean) {
     const sourcePath = resolve(path);
@@ -107,25 +122,18 @@ export class CoreService {
       throw new AppError("NOT_FOUND", "Asset file does not exist", 404);
     }
     const extension = extname(sourcePath).toLowerCase();
-    const kind = [".png", ".jpg", ".jpeg", ".webp"].includes(extension) ? "image"
+    const kind: Asset["kind"] | null = [".png", ".jpg", ".jpeg", ".webp"].includes(extension) ? "image"
       : [".mp4", ".mov", ".webm"].includes(extension) ? "video" : null;
     if (!kind) throw new AppError("VALIDATION_ERROR", "Unsupported asset type", 422);
     const now = new Date().toISOString();
     const asset = {
-      id: randomUUID(), source_path: sourcePath, kind, provenance, reusable: reusable ? 1 : 0,
-      tags_json: "[]", width: null, height: null, duration_ms: null, created_at: now, updated_at: now
+      id: randomUUID(), sourcePath, ownedArtifactPath: null, kind, provenance, reusable,
+      tags: [], width: null, height: null, durationMs: null, createdAt: now, updatedAt: now
     };
-    this.repository.db.prepare(`
-      INSERT INTO assets(id,source_path,kind,provenance,reusable,tags_json,width,height,duration_ms,created_at,updated_at)
-      VALUES(@id,@source_path,@kind,@provenance,@reusable,@tags_json,@width,@height,@duration_ms,@created_at,@updated_at)
-    `).run(asset);
-    return asset;
+    return this.repository.saveAsset(asset);
   }
   listRenders(shortId?: string) {
-    const rows = shortId
-      ? this.repository.db.prepare("SELECT * FROM renders WHERE short_id=? ORDER BY created_at DESC").all(shortId)
-      : this.repository.db.prepare("SELECT * FROM renders ORDER BY created_at DESC").all();
-    return rows;
+    return this.repository.listRenders(shortId);
   }
   startRender(shortId: string, expectedRevision: number) {
     const project = this.repository.getShort(shortId);

@@ -2,88 +2,85 @@
 
 ## User goal
 
-Ship the current Short Editor session cleanly: complete the active FND-01
-contract work, preserve the platform-path work, validate the exact boundary,
-update project tracking, commit it, and push it to the primary branch.
+Ship the current Short Editor session cleanly: complete FND-02 transactional
+persistence and migrations, validate the exact boundary, update project
+tracking, commit it, and push it to the primary branch.
 
 ## Changed files and per-file purpose
 
-- `README.md`: documents supported macOS development paths and the Windows
-  release-acceptance boundary.
-- `SPEC.md`: records the reviewed normative additions and reconciles current
-  implementation evidence.
-- `IMPLEMENTATION_PLAN.md`: defines the issue-ready v1 dependency spine, records
-  the validated FND-01 baseline, and routes FND-02 next.
-- `.agents/project.json`: commits the project designation required by the
-  installed shipping workflow.
-- `src/core/api.ts`: emits the structured v1 error envelope.
-- `src/core/bootstrap.ts`: resolves platform-appropriate application data paths.
-- `src/core/candidates.ts`, `src/core/jobs.ts`, `src/core/repository.ts`,
-  `src/core/service.ts`, and `src/shared/templates.ts`: adapt existing runtime
-  objects to the expanded canonical contracts without adding downstream
-  persistence workflows.
-- `src/shared/domain.ts`: retains the compatibility import surface while
-  re-exporting the split contracts.
-- `src/shared/contracts.ts`, `src/shared/validators.ts`,
-  `src/shared/error-contracts.ts`, `src/shared/job-messages.ts`, and
-  `src/shared/episode-transitions.ts`: implement the complete strict FND-01
-  entity, validation, lifecycle, provider-classification, job-message, and
-  error inventories.
-- `src/shared/errors.ts`: normalizes known failures and redacts unknown failures.
-- `tests/bootstrap.test.ts`, `tests/domain-contracts.test.ts`,
-  `tests/episode-transitions.test.ts`, `tests/errors.test.ts`, and
-  `tests/job-messages.test.ts`: cover the new behavior and contract inventories.
-- `tests/factories.ts` and `tests/repository.test.ts`: keep existing fixtures on
-  the canonical contracts.
-- `tasks/todo.md` and `tasks/history.md`: record completion and the next
-  executable task.
-- `tasks/ship-manifest.md`: records this shipping proof.
+- `SPEC.md`: reconciles implementation evidence for migrations, complete entity
+  persistence, revision guards, invalidation, and authorization metadata.
+- `src/core/database.ts`: defines ordered transactional schema migrations,
+  legacy-data upgrades, complete persistence tables, starter-template seeding,
+  and migration failure reporting.
+- `src/core/repository.ts`: persists and maps the complete domain fields,
+  provides transaction and compare-and-swap operations, and enforces
+  invalidation and forbidden-state rules.
+- `src/core/service.ts`: writes the expanded Asset and Short fields through the
+  complete repository contracts.
+- `tests/migrations.test.ts`: verifies fresh and every-version upgrades,
+  migration rollback, foreign keys, settings, and accepted-record retention.
+- `tests/persistence.test.ts`: verifies large and complete round trips,
+  provenance, revision conflicts, forbidden states, transaction rollback,
+  artifact metadata, and scoped authorization records.
+- `tasks/todo.md`: records FND-02 completion and promotes FND-03 as the sole
+  executable current task.
+- `tasks/history.md`: records the completed persistence, migration, and test
+  work.
+- `tasks/ship-manifest.md`: records this exact shipping proof.
 
 ## User-goal mapping
 
-The shared schema and runtime changes satisfy FND-01; the bootstrap and README
-changes preserve the platform-path work already in the session; SPEC, plan, and
-task documents make the completed boundary and next task explicit.
+The database, repository, service, and test changes implement and prove FND-02.
+The SPEC and task documents reconcile the completed boundary and route the next
+artifact-store task. This manifest limits the commit to those goal-owned files;
+untracked generated skill-pack roots remain local and uncommitted.
 
 ## Tests run
 
-- `npm test`: 9 files and 34 tests passed before the adversarial-review fix.
-- `git diff --check`: passed before task-document updates.
-- `npm test`: final post-fix run passed all 9 files and 35 tests.
-- `npm run build`: passed TypeScript typechecking, the Vite production build,
-  and the Node TypeScript build without warnings.
-- `git diff --check`: final post-fix run passed.
+- `npm test`: all 11 test files and 46 tests passed, including the new migration
+  and persistence suites.
+- `npm run build`: TypeScript typechecking, the Vite production build, and the
+  Node TypeScript build passed without warnings.
+- `git diff --check`: passed.
+- Targeted secret-pattern scan over the shipping boundary: no matches.
 
 ## Skipped tests
 
-- Windows packaging and Windows release scenarios are unavailable on this macOS
-  host and remain release-gate work, not substitutes for local executable
-  checks.
-- UI/visual validation is deferred by the FND-01 plan to UI-03 and WIN-03.9;
-  this boundary changes contracts and bootstrap behavior but no rendered UI.
-- Production/provider integration is outside FND-01 and no provider request path
-  was implemented here.
+- No separate lint command exists in `package.json` or another project command
+  surface; TypeScript checking and the full test/build commands provide the
+  available executable verification.
+- `npm run package:win` was not run because this macOS host cannot prove the
+  Windows-native SQLite and installer acceptance gate.
+- UI/visual validation is not relevant because this boundary changes
+  persistence and service wiring without changing rendered UI.
+- Production/provider integration is outside FND-02; the boundary persists only
+  scoped authorization metadata and does not add a provider request workflow.
 
 ## Adversarial review
 
-A changed-file, acceptance-criteria, and privacy review compared the exact diff
-against SPEC sections 5 and 7 and the FND-01 exit criteria. It found that
-provider provenance omitted the required private-network classification and
-that SPEC evidence still described the completed contract inventory as partial.
-Both findings were fixed and covered by a contract test.
+A failure-oriented changed-file review traced the exact diff through migration
+atomicity, legacy upgrades, foreign keys, large transcript fixtures,
+compare-and-swap conflicts, multi-row rollback, Short/render/schedule
+invalidation, built-in template immutability, and authorization-secret
+boundaries. The executable suites cover each of those risks and produced no
+blocking findings. The review confirmed that generated `.claude/` and
+`.codex/` skill roots are untracked and excluded from the commit.
 
 ## Residual risk
 
-The expanded contract fields are currently adapted over the legacy database
-schema with compatibility defaults. FND-02 must persist those fields and prove
-fresh/upgrade/interrupted migration behavior. Windows-native SQLite and
-packaging behavior also remain unverified until the Windows gates.
+Native SQLite and packaging behavior remain unverified on Windows and are still
+release-gate work. Artifact metadata rejects absolute paths, but root
+containment, filesystem writes, startup reconciliation, and cleanup are
+deliberately deferred to the active FND-03 task; until then, callers must not
+treat a stored metadata row as proof that an artifact is present or contained.
 
 ## Rollback note
 
-Revert the session commit on `master`. No database migration or destructive
-data operation is included in this boundary.
+Revert the FND-02 session commit on `master`. For databases already upgraded to
+schema version 3, restore a pre-upgrade database backup before running the
+reverted application; source reversion alone does not downgrade SQLite data.
 
 ## Next command
 
-`$exec FND-02`
+`$exec FND-03`

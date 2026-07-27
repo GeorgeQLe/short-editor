@@ -1,188 +1,477 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-
-const migrations = [
-  `
-  CREATE TABLE IF NOT EXISTS schema_migrations (
-    version INTEGER PRIMARY KEY,
-    applied_at TEXT NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS episodes (
-    id TEXT PRIMARY KEY,
-    source_path TEXT NOT NULL,
-    canonical_path TEXT NOT NULL UNIQUE,
-    fingerprint TEXT NOT NULL,
-    content_hash TEXT,
-    file_size INTEGER NOT NULL,
-    modified_at_ms INTEGER NOT NULL,
-    duration_ms INTEGER,
-    width INTEGER,
-    height INTEGER,
-    video_codec TEXT,
-    audio_codec TEXT,
-    status TEXT NOT NULL,
-    missing INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS episodes_fingerprint_idx ON episodes(fingerprint);
-  CREATE INDEX IF NOT EXISTS episodes_content_hash_idx ON episodes(content_hash);
-
-  CREATE TABLE IF NOT EXISTS transcript_segments (
-    id TEXT PRIMARY KEY,
-    episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
-    start_ms INTEGER NOT NULL,
-    end_ms INTEGER NOT NULL,
-    text TEXT NOT NULL,
-    words_json TEXT NOT NULL,
-    speaker TEXT,
-    confidence REAL
-  );
-  CREATE INDEX IF NOT EXISTS transcript_episode_time_idx
-    ON transcript_segments(episode_id, start_ms);
-
-  CREATE TABLE IF NOT EXISTS candidates (
-    id TEXT PRIMARY KEY,
-    episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
-    start_ms INTEGER NOT NULL,
-    end_ms INTEGER NOT NULL,
-    transcript TEXT NOT NULL,
-    topic TEXT NOT NULL,
-    hook TEXT NOT NULL,
-    reason TEXT NOT NULL,
-    score REAL NOT NULL,
-    scores_json TEXT NOT NULL,
-    duplicate_group TEXT,
-    review_status TEXT NOT NULL,
-    created_at TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS short_projects (
-    id TEXT PRIMARY KEY,
-    episode_id TEXT NOT NULL REFERENCES episodes(id),
-    candidate_id TEXT REFERENCES candidates(id),
-    title TEXT NOT NULL,
-    source_ranges_json TEXT NOT NULL,
-    template_id TEXT NOT NULL,
-    composition_json TEXT NOT NULL,
-    copy_json TEXT NOT NULL,
-    approved INTEGER NOT NULL DEFAULT 0,
-    revision INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS renders (
-    id TEXT PRIMARY KEY,
-    short_id TEXT NOT NULL REFERENCES short_projects(id),
-    project_revision INTEGER NOT NULL,
-    output_path TEXT,
-    encoder_json TEXT NOT NULL,
-    validation_json TEXT,
-    state TEXT NOT NULL,
-    error_code TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS schedule_entries (
-    id TEXT PRIMARY KEY,
-    short_id TEXT NOT NULL REFERENCES short_projects(id),
-    render_id TEXT NOT NULL REFERENCES renders(id),
-    episode_id TEXT NOT NULL REFERENCES episodes(id),
-    publish_at TEXT NOT NULL,
-    timezone TEXT NOT NULL,
-    status TEXT NOT NULL,
-    priority INTEGER NOT NULL DEFAULT 0,
-    rationale TEXT NOT NULL,
-    locked INTEGER NOT NULL DEFAULT 0,
-    youtube_url TEXT,
-    needs_rerender INTEGER NOT NULL DEFAULT 0,
-    revision INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-  CREATE UNIQUE INDEX IF NOT EXISTS schedule_publish_slot_idx ON schedule_entries(publish_at);
-
-  CREATE TABLE IF NOT EXISTS jobs (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL,
-    entity_id TEXT,
-    state TEXT NOT NULL,
-    progress REAL NOT NULL DEFAULT 0,
-    stage TEXT NOT NULL,
-    payload_json TEXT NOT NULL,
-    attempts INTEGER NOT NULL DEFAULT 0,
-    error_code TEXT,
-    error_message TEXT,
-    cancel_requested INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS jobs_state_created_idx ON jobs(state, created_at);
-
-  CREATE TABLE IF NOT EXISTS ai_artifacts (
-    id TEXT PRIMARY KEY,
-    entity_id TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    provider TEXT NOT NULL,
-    model TEXT NOT NULL,
-    inputs_hash TEXT NOT NULL,
-    output_json TEXT NOT NULL,
-    accepted_json TEXT,
-    created_at TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value_json TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-  `,
-  `
-  CREATE TABLE IF NOT EXISTS assets (
-    id TEXT PRIMARY KEY,
-    source_path TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    provenance TEXT NOT NULL,
-    reusable INTEGER NOT NULL DEFAULT 1,
-    tags_json TEXT NOT NULL DEFAULT '[]',
-    width INTEGER,
-    height INTEGER,
-    duration_ms INTEGER,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-  `
-];
+import { createHash } from "node:crypto";
+import { starterTemplates } from "../shared/templates.js";
 
 export type SqliteDatabase = Database.Database;
+export type Migration = {
+  version: number;
+  name: string;
+  up: (db: SqliteDatabase) => void;
+};
 
-export function openDatabase(path: string): SqliteDatabase {
-  if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-  const db = new Database(path);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  db.pragma("busy_timeout = 5000");
+const initialSchema = `
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version INTEGER PRIMARY KEY,
+  applied_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS episodes (
+  id TEXT PRIMARY KEY,
+  source_path TEXT NOT NULL,
+  canonical_path TEXT NOT NULL UNIQUE,
+  fingerprint TEXT NOT NULL,
+  content_hash TEXT,
+  file_size INTEGER NOT NULL,
+  modified_at_ms INTEGER NOT NULL,
+  duration_ms INTEGER,
+  width INTEGER,
+  height INTEGER,
+  video_codec TEXT,
+  audio_codec TEXT,
+  status TEXT NOT NULL,
+  missing INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS episodes_fingerprint_idx ON episodes(fingerprint);
+CREATE INDEX IF NOT EXISTS episodes_content_hash_idx ON episodes(content_hash);
+
+CREATE TABLE IF NOT EXISTS transcript_segments (
+  id TEXT PRIMARY KEY,
+  episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+  start_ms INTEGER NOT NULL,
+  end_ms INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  words_json TEXT NOT NULL,
+  speaker TEXT,
+  confidence REAL
+);
+CREATE INDEX IF NOT EXISTS transcript_episode_time_idx
+  ON transcript_segments(episode_id, start_ms);
+
+CREATE TABLE IF NOT EXISTS candidates (
+  id TEXT PRIMARY KEY,
+  episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+  start_ms INTEGER NOT NULL,
+  end_ms INTEGER NOT NULL,
+  transcript TEXT NOT NULL,
+  topic TEXT NOT NULL,
+  hook TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  score REAL NOT NULL,
+  scores_json TEXT NOT NULL,
+  duplicate_group TEXT,
+  review_status TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS short_projects (
+  id TEXT PRIMARY KEY,
+  episode_id TEXT NOT NULL REFERENCES episodes(id),
+  candidate_id TEXT REFERENCES candidates(id),
+  title TEXT NOT NULL,
+  source_ranges_json TEXT NOT NULL,
+  template_id TEXT NOT NULL,
+  composition_json TEXT NOT NULL,
+  copy_json TEXT NOT NULL,
+  approved INTEGER NOT NULL DEFAULT 0,
+  revision INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS renders (
+  id TEXT PRIMARY KEY,
+  short_id TEXT NOT NULL REFERENCES short_projects(id),
+  project_revision INTEGER NOT NULL,
+  output_path TEXT,
+  encoder_json TEXT NOT NULL,
+  validation_json TEXT,
+  state TEXT NOT NULL,
+  error_code TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS schedule_entries (
+  id TEXT PRIMARY KEY,
+  short_id TEXT NOT NULL REFERENCES short_projects(id),
+  render_id TEXT NOT NULL REFERENCES renders(id),
+  episode_id TEXT NOT NULL REFERENCES episodes(id),
+  publish_at TEXT NOT NULL,
+  timezone TEXT NOT NULL,
+  status TEXT NOT NULL,
+  priority INTEGER NOT NULL DEFAULT 0,
+  rationale TEXT NOT NULL,
+  locked INTEGER NOT NULL DEFAULT 0,
+  youtube_url TEXT,
+  needs_rerender INTEGER NOT NULL DEFAULT 0,
+  revision INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS schedule_publish_slot_idx ON schedule_entries(publish_at);
+
+CREATE TABLE IF NOT EXISTS jobs (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  entity_id TEXT,
+  state TEXT NOT NULL,
+  progress REAL NOT NULL DEFAULT 0,
+  stage TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  error_code TEXT,
+  error_message TEXT,
+  cancel_requested INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS jobs_state_created_idx ON jobs(state, created_at);
+
+CREATE TABLE IF NOT EXISTS ai_artifacts (
+  id TEXT PRIMARY KEY,
+  entity_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  inputs_hash TEXT NOT NULL,
+  output_json TEXT NOT NULL,
+  accepted_json TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`;
+
+const completePersistenceSchema = `
+CREATE TABLE watched_folders (
+  id TEXT PRIMARY KEY,
+  canonical_path TEXT NOT NULL UNIQUE,
+  enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
+  recursive INTEGER NOT NULL CHECK(recursive IN (0,1)),
+  include_patterns_json TEXT NOT NULL,
+  last_scan_status TEXT NOT NULL,
+  last_scanned_at TEXT,
+  last_scan_error TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE transcript_revisions (
+  id TEXT PRIMARY KEY,
+  episode_id TEXT NOT NULL REFERENCES episodes(id),
+  revision INTEGER NOT NULL CHECK(revision > 0),
+  language TEXT NOT NULL,
+  segments_json TEXT NOT NULL,
+  provenance_json TEXT NOT NULL,
+  accepted_state TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(episode_id, revision)
+);
+CREATE UNIQUE INDEX transcript_one_accepted_idx
+  ON transcript_revisions(episode_id) WHERE accepted_state='accepted';
+
+CREATE TABLE analysis_artifacts (
+  id TEXT PRIMARY KEY,
+  entity_id TEXT NOT NULL,
+  owner_type TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  state TEXT NOT NULL,
+  provenance_json TEXT NOT NULL,
+  input_hash TEXT NOT NULL,
+  raw_output_json TEXT NOT NULL,
+  accepted_projection_json TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX analysis_artifact_cache_idx
+  ON analysis_artifacts(entity_id, kind, input_hash, state);
+
+CREATE TABLE templates (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  version INTEGER NOT NULL CHECK(version > 0),
+  revision INTEGER NOT NULL CHECK(revision > 0),
+  parent_template_id TEXT REFERENCES templates(id),
+  built_in INTEGER NOT NULL CHECK(built_in IN (0,1)),
+  composition_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE artifact_records (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  owner_type TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  owner_revision INTEGER,
+  relative_path TEXT NOT NULL UNIQUE,
+  content_hash TEXT NOT NULL,
+  byte_length INTEGER NOT NULL CHECK(byte_length >= 0),
+  producer_version TEXT NOT NULL,
+  state TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE schedule_rule_sets (
+  id TEXT PRIMARY KEY,
+  revision INTEGER NOT NULL CHECK(revision > 0),
+  start_date TEXT NOT NULL,
+  timezone TEXT NOT NULL,
+  allowed_weekdays_json TEXT NOT NULL,
+  times_json TEXT NOT NULL,
+  max_per_day INTEGER NOT NULL CHECK(max_per_day > 0),
+  blackout_dates_json TEXT NOT NULL,
+  minimum_same_episode_spacing_hours INTEGER NOT NULL CHECK(minimum_same_episode_spacing_hours >= 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE cloud_authorizations (
+  id TEXT PRIMARY KEY,
+  scope_type TEXT NOT NULL CHECK(scope_type IN ('project','batch')),
+  scope_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  operation_classes_json TEXT NOT NULL,
+  credential_handle TEXT,
+  granted_at TEXT NOT NULL,
+  revoked_at TEXT,
+  UNIQUE(scope_type, scope_id, provider)
+);
+`;
+
+const migrations: readonly Migration[] = [
+  { version: 1, name: "initial schema", up: (db) => db.exec(initialSchema) },
+  {
+    version: 2,
+    name: "asset library",
+    up: (db) => db.exec(`
+      CREATE TABLE IF NOT EXISTS assets (
+        id TEXT PRIMARY KEY,
+        source_path TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        provenance TEXT NOT NULL,
+        reusable INTEGER NOT NULL DEFAULT 1,
+        tags_json TEXT NOT NULL DEFAULT '[]',
+        width INTEGER,
+        height INTEGER,
+        duration_ms INTEGER,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `)
+  },
+  {
+    version: 3,
+    name: "complete domain persistence",
+    up: (db) => {
+      db.exec(completePersistenceSchema);
+      db.exec(`
+        ALTER TABLE candidates ADD COLUMN generation_artifact_id TEXT;
+        ALTER TABLE candidates ADD COLUMN transcript_revision INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE candidates ADD COLUMN generation_version TEXT NOT NULL DEFAULT 'legacy-v1';
+        ALTER TABLE candidates ADD COLUMN provider_provenance_json TEXT;
+
+        ALTER TABLE short_projects ADD COLUMN template_lineage_json TEXT
+          NOT NULL DEFAULT '{"templateVersion":1,"parentTemplateId":null}';
+        ALTER TABLE short_projects ADD COLUMN captions_json TEXT
+          NOT NULL DEFAULT '{"enabled":true,"segments":[],"style":{"fontFamily":"Arial","fontSize":64,"color":"#ffffff","highlightColor":"#ffdc5e"}}';
+        ALTER TABLE short_projects ADD COLUMN audio_json TEXT
+          NOT NULL DEFAULT '{"sourceGainDb":0,"muted":false,"fadeInMs":0,"fadeOutMs":0,"bedAssetId":null,"bedGainDb":null,"normalizeLoudness":false}';
+
+        ALTER TABLE renders ADD COLUMN error_message TEXT;
+        ALTER TABLE renders ADD COLUMN content_hash TEXT;
+        ALTER TABLE renders ADD COLUMN decision_hash TEXT;
+        ALTER TABLE renders ADD COLUMN attempt INTEGER NOT NULL DEFAULT 1;
+
+        ALTER TABLE jobs ADD COLUMN provider TEXT;
+        ALTER TABLE jobs ADD COLUMN payload_reference TEXT;
+      `);
+      db.exec(`
+        CREATE TABLE assets_v3 (
+          id TEXT PRIMARY KEY,
+          source_path TEXT,
+          owned_artifact_path TEXT,
+          kind TEXT NOT NULL,
+          provenance TEXT NOT NULL,
+          reusable INTEGER NOT NULL CHECK(reusable IN (0,1)),
+          tags_json TEXT NOT NULL,
+          width INTEGER,
+          height INTEGER,
+          duration_ms INTEGER,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          CHECK((source_path IS NULL) <> (owned_artifact_path IS NULL))
+        );
+        INSERT INTO assets_v3
+          (id,source_path,owned_artifact_path,kind,provenance,reusable,tags_json,
+           width,height,duration_ms,created_at,updated_at)
+          SELECT id,source_path,NULL,kind,provenance,reusable,tags_json,
+            width,height,duration_ms,created_at,updated_at FROM assets;
+        DROP TABLE assets;
+        ALTER TABLE assets_v3 RENAME TO assets;
+      `);
+      migrateLegacyTranscripts(db);
+      migrateLegacyAnalysisArtifacts(db);
+      const insertTemplate = db.prepare(`
+        INSERT INTO templates(
+          id,name,description,version,revision,parent_template_id,built_in,
+          composition_json,created_at,updated_at
+        ) VALUES(@id,@name,@description,@version,@revision,@parentTemplateId,1,
+          @composition,@createdAt,@updatedAt)
+      `);
+      for (const template of starterTemplates) {
+        insertTemplate.run({
+          ...template,
+          composition: JSON.stringify(template.composition)
+        });
+      }
+    }
+  }
+];
+
+export const databaseMigrations = migrations;
+export const CURRENT_SCHEMA_VERSION = migrations.at(-1)!.version;
+
+export class MigrationError extends Error {
+  constructor(
+    readonly version: number,
+    readonly migrationName: string,
+    readonly cause: unknown
+  ) {
+    super(`Database migration ${version} (${migrationName}) failed; no changes from this migration were applied`);
+    this.name = "MigrationError";
+  }
+}
+
+export function migrateDatabase(
+  db: SqliteDatabase,
+  availableMigrations: readonly Migration[] = migrations
+): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,
       applied_at TEXT NOT NULL
     )
   `);
-  const applied = new Set(
-    db.prepare("SELECT version FROM schema_migrations").all()
-      .map((row) => (row as { version: number }).version)
-  );
-  migrations.forEach((sql, index) => {
-    const version = index + 1;
-    if (applied.has(version)) return;
-    db.transaction(() => {
-      db.exec(sql);
-      db.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)")
-        .run(version, new Date().toISOString());
-    })();
+  const ordered = [...availableMigrations].sort((left, right) => left.version - right.version);
+  ordered.forEach((migration, index) => {
+    if (migration.version !== index + 1) {
+      throw new Error(`Database migrations must be contiguous; found version ${migration.version} at position ${index + 1}`);
+    }
   });
-  return db;
+  const appliedRows = db.prepare(
+    "SELECT version FROM schema_migrations ORDER BY version"
+  ).all() as { version: number }[];
+  const knownVersions = new Set(ordered.map((migration) => migration.version));
+  const unknown = appliedRows.find((row) => !knownVersions.has(row.version));
+  if (unknown) {
+    throw new Error(`Database schema version ${unknown.version} is newer than this application supports`);
+  }
+  const applied = new Set(appliedRows.map((row) => row.version));
+  for (const migration of ordered) {
+    if (applied.has(migration.version)) continue;
+    try {
+      db.transaction(() => {
+        migration.up(db);
+        db.prepare(
+          "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)"
+        ).run(migration.version, new Date().toISOString());
+      })();
+    } catch (error) {
+      throw new MigrationError(migration.version, migration.name, error);
+    }
+  }
+}
+
+export function openDatabase(path: string): SqliteDatabase {
+  if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
+  const db = new Database(path);
+  try {
+    db.pragma("journal_mode = WAL");
+    db.pragma("foreign_keys = ON");
+    db.pragma("busy_timeout = 5000");
+    migrateDatabase(db);
+    return db;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+function migrateLegacyTranscripts(db: SqliteDatabase): void {
+  const episodes = db.prepare(`
+    SELECT DISTINCT episode_id FROM transcript_segments
+    WHERE NOT EXISTS (
+      SELECT 1 FROM transcript_revisions tr WHERE tr.episode_id=transcript_segments.episode_id
+    )
+  `).all() as { episode_id: string }[];
+  const read = db.prepare(
+    "SELECT * FROM transcript_segments WHERE episode_id=? ORDER BY start_ms"
+  );
+  const insert = db.prepare(`
+    INSERT INTO transcript_revisions(
+      id,episode_id,revision,language,segments_json,provenance_json,accepted_state,created_at,updated_at
+    ) VALUES(?,?,?,?,?,?, 'accepted', ?,?)
+  `);
+  for (const episode of episodes) {
+    const rows = read.all(episode.episode_id) as Record<string, unknown>[];
+    const segments = rows.map((row) => ({
+      id: String(row.id),
+      startMs: Number(row.start_ms),
+      endMs: Number(row.end_ms),
+      text: String(row.text),
+      words: JSON.parse(String(row.words_json)),
+      speaker: row.speaker == null ? null : String(row.speaker),
+      confidence: row.confidence == null ? null : Number(row.confidence)
+    }));
+    const timestamp = (db.prepare("SELECT updated_at FROM episodes WHERE id=?")
+      .get(episode.episode_id) as { updated_at: string }).updated_at;
+    insert.run(
+      legacyUuid(`transcript:${episode.episode_id}`),
+      episode.episode_id,
+      1,
+      "und",
+      JSON.stringify(segments),
+      JSON.stringify({
+        provider: "legacy",
+        providerClass: "local",
+        modelId: "legacy",
+        providerVersion: "1",
+        optionsVersion: "1",
+        createdAt: timestamp
+      }),
+      timestamp,
+      timestamp
+    );
+  }
+}
+
+function migrateLegacyAnalysisArtifacts(db: SqliteDatabase): void {
+  db.exec(`
+    INSERT INTO analysis_artifacts(
+      id,entity_id,owner_type,kind,state,provenance_json,input_hash,
+      raw_output_json,accepted_projection_json,created_at
+    )
+    SELECT id,entity_id,'episode',kind,
+      CASE WHEN accepted_json IS NULL THEN 'proposed' ELSE 'accepted' END,
+      json_object(
+        'provider',provider,'providerClass','local','modelId',model,
+        'providerVersion','legacy','optionsVersion','legacy','createdAt',created_at
+      ),
+      inputs_hash,output_json,accepted_json,created_at
+    FROM ai_artifacts
+  `);
+}
+
+function legacyUuid(seed: string): string {
+  const hash = createHash("sha256").update(seed).digest("hex");
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
 }
