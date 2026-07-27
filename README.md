@@ -37,6 +37,22 @@ The core listens on `127.0.0.1:43120` by default. Set `SHORT_EDITOR_DATA_DIR`,
 For packaged Windows builds, place licensed FFmpeg binaries under `resources/bin`
 and run `npm run package:win`.
 
+### macOS development
+
+macOS is supported as a development host only. Windows 11 remains the sole
+release-acceptance platform, so every release must still be validated on Windows.
+
+During macOS development, Short Editor stores its database at
+`~/Library/Application Support/ShortEditor/short-editor.db`. Set
+`SHORT_EDITOR_DATA_DIR` to override the containing data directory,
+`SHORT_EDITOR_FFMPEG` to override the FFmpeg executable, or
+`SHORT_EDITOR_FFPROBE` to override the ffprobe executable.
+
+Install Node dependencies independently on each operating system so native
+packages such as `better-sqlite3` are built or downloaded for the current host;
+do not copy `node_modules` between macOS and Windows. macOS development checks
+do not replace the required Windows release build and validation.
+
 ## Safety and privacy
 
 Sources are referenced in place and never modified. Local mode makes no cloud

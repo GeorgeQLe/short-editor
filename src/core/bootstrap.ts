@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, posix, win32 } from "node:path";
 import { homedir } from "node:os";
 import { openDatabase } from "./database.js";
 import { Repository } from "./repository.js";
@@ -26,7 +26,38 @@ export function createCore(databasePath = defaultDatabasePath()): CoreService {
 }
 
 export function defaultDatabasePath(): string {
-  const dataDir = process.env.SHORT_EDITOR_DATA_DIR
-    ?? join(homedir(), "AppData", "Local", "ShortEditor");
-  return join(dataDir, "short-editor.db");
+  return join(
+    resolveDataDirectory(process.platform, process.env, homedir()),
+    "short-editor.db"
+  );
+}
+
+type DataDirectoryEnvironment = {
+  SHORT_EDITOR_DATA_DIR?: string;
+  LOCALAPPDATA?: string;
+  XDG_DATA_HOME?: string;
+};
+
+export function resolveDataDirectory(
+  platform: NodeJS.Platform,
+  environment: DataDirectoryEnvironment,
+  homeDirectory: string
+): string {
+  if (environment.SHORT_EDITOR_DATA_DIR) {
+    return environment.SHORT_EDITOR_DATA_DIR;
+  }
+
+  if (platform === "win32") {
+    return environment.LOCALAPPDATA
+      ? win32.join(environment.LOCALAPPDATA, "ShortEditor")
+      : win32.join(homeDirectory, "AppData", "Local", "ShortEditor");
+  }
+
+  if (platform === "darwin") {
+    return posix.join(homeDirectory, "Library", "Application Support", "ShortEditor");
+  }
+
+  return environment.XDG_DATA_HOME
+    ? posix.join(environment.XDG_DATA_HOME, "ShortEditor")
+    : posix.join(homeDirectory, ".local", "share", "ShortEditor");
 }
