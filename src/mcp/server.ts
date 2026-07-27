@@ -1,0 +1,108 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+const coreUrl = process.env.SHORT_EDITOR_CORE_URL ?? "http://127.0.0.1:43120/v1";
+const server = new McpServer({ name: "short-editor", version: "1.0.0" });
+const uuid = z.string().uuid();
+const expectedRevision = z.number().int().positive();
+
+type Method = "GET" | "POST" | "PUT";
+async function core(path: string, method: Method = "GET", body?: unknown): Promise<unknown> {
+  const response = await fetch(`${coreUrl}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  const payload = await response.json() as { data?: unknown; code?: string; message?: string };
+  if (!response.ok) throw new Error(`${payload.code ?? "CORE_ERROR"}: ${payload.message ?? "Core request failed"}`);
+  return payload.data;
+}
+
+const result = (value: unknown) => ({
+  content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }]
+});
+const register = (
+  name: string,
+  description: string,
+  inputSchema: Record<string, z.ZodType>,
+  run: (input: Record<string, unknown>) => Promise<unknown>
+) => server.registerTool(name, { description, inputSchema }, async (input) => {
+  try { return result(await run(input)); }
+  catch (error) {
+    return {
+      isError: true,
+      content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }]
+    };
+  }
+});
+
+register("library.list_episodes", "List inventoried episodes and production coverage.", {
+  search: z.string().optional()
+}, ({ search }) => core(`/library/episodes?search=${encodeURIComponent(String(search ?? ""))}`));
+register("library.get_episode", "Get one episode by stable ID.", { episodeId: uuid },
+  ({ episodeId }) => core(`/library/episodes/${episodeId}`));
+register("library.import_paths", "Reference MP4 source files in place; originals are not modified.", {
+  paths: z.array(z.string()).min(1)
+}, ({ paths }) => core("/library/import", "POST", { paths }));
+
+register("analysis.start", "Queue episode analysis. OpenAI requires explicit cloud authorization.", {
+  episodeId: uuid, provider: z.enum(["local", "openai"]).default("local"),
+  cloudAuthorized: z.boolean().default(false)
+}, (input) => core("/analysis/start", "POST", input));
+register("jobs.list", "List durable jobs, progress, stages, and errors.", {},
+  () => core("/jobs"));
+register("jobs.cancel", "Request cancellation of a queued or running job.", { jobId: uuid },
+  ({ jobId }) => core(`/jobs/${jobId}/cancel`, "POST"));
+
+register("candidates.list", "List ranked highlight candidates for an episode.", { episodeId: uuid },
+  ({ episodeId }) => core(`/candidates?episodeId=${episodeId}`));
+register("candidates.generate", "Generate 5–10 sentence-aligned, deduplicated candidates.", {
+  episodeId: uuid, count: z.number().int().min(5).max(10).optional()
+}, (input) => core("/candidates/generate", "POST", input));
+register("candidates.review", "Approve or reject a candidate.", {
+  candidateId: uuid, status: z.enum(["approved", "rejected"])
+}, ({ candidateId, status }) => core(`/candidates/${candidateId}/review`, "POST", { status }));
+
+register("shorts.create", "Create a non-destructive Short project from an approved candidate.", {
+  candidateId: uuid, templateId: z.string().optional()
+}, (input) => core("/shorts", "POST", input));
+register("shorts.get", "Get a Short project and its current revision.", { shortId: uuid },
+  ({ shortId }) => core(`/shorts/${shortId}`));
+register("shorts.update_composition", "Update composition using optimistic revision control.", {
+  shortId: uuid, expectedRevision, composition: z.record(z.string(), z.unknown())
+}, ({ shortId, ...input }) => core(`/shorts/${shortId}/composition`, "PUT", input));
+register("shorts.update_copy", "Update accepted copy without overwriting other fields.", {
+  shortId: uuid, expectedRevision, copy: z.record(z.string(), z.unknown())
+}, ({ shortId, ...input }) => core(`/shorts/${shortId}/copy`, "PUT", input));
+
+register("renders.start", "Queue a render for an approved, current Short revision.", {
+  shortId: uuid, expectedRevision
+}, (input) => core("/renders/start", "POST", input));
+register("renders.validate", "Probe and validate a final 1080×1920 H.264/AAC MP4.", {
+  path: z.string()
+}, (input) => core("/renders/validate", "POST", input));
+register("renders.list", "List render records, optionally for one Short.", {
+  shortId: uuid.optional()
+}, ({ shortId }) => core(`/renders${shortId ? `?shortId=${shortId}` : ""}`));
+
+register("schedule.get", "Get launch calendar entries.", {},
+  () => core("/schedule"));
+register("schedule.draft", "Draft deterministic legal slots from approved validated renders.", {
+  shorts: z.array(z.record(z.string(), z.unknown())),
+  rules: z.record(z.string(), z.unknown())
+}, (input) => core("/schedule/draft", "POST", input));
+register("schedule.move", "Move an unlocked entry to a legal, collision-free slot.", {
+  entryId: uuid, expectedRevision, publishAt: z.string().datetime()
+}, ({ entryId, ...input }) => core(`/schedule/${entryId}/move`, "POST", input));
+register("schedule.mark_published", "Mark an entry published and optionally attach its YouTube URL.", {
+  entryId: uuid, expectedRevision, youtubeUrl: z.string().url().optional()
+}, ({ entryId, ...input }) => core(`/schedule/${entryId}/published`, "POST", input));
+
+register("templates.list", "List versioned composition templates.", {}, () => core("/templates"));
+register("assets.list", "List reusable and per-Short assets.", {}, () => core("/assets"));
+register("assets.import", "Import an image/video asset with a provenance note.", {
+  path: z.string(), provenance: z.string().min(1), reusable: z.boolean().default(true)
+}, (input) => core("/assets/import", "POST", input));
+
+await server.connect(new StdioServerTransport());
