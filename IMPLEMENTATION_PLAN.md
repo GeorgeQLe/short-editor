@@ -331,6 +331,11 @@ absorb a downstream task.
 
 ### PRO-02 — Implement local faster-whisper transcription
 
+- **Status:** Implemented 2026-07-27. The local-only faster-whisper adapter,
+  normalized segment/word timing, explicit no-diarization result, installed
+  model status, durable job progress/cancellation, accepted transcript
+  persistence, and deterministic provider fixtures are complete. Frozen worker
+  assembly and representative Windows CPU/GPU validation remain WIN-02/WIN-03.
 - **SPEC / gates:** 3.2–3.3, 6.2; G2, G3, G9, G10.
 - **Prerequisites / unblocks:** PRO-01 and FND-03; unblocks TRC-01 and local
   end-to-end release flow.

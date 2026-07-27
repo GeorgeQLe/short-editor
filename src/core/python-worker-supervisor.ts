@@ -474,7 +474,7 @@ export function developmentPythonWorkerLaunch(
 ): PythonWorkerLaunch {
   return {
     command: pythonCommand,
-    args: ["-u", join(repositoryRoot, "resources", "worker", "worker.py")]
+    args: ["-u", "-B", join(repositoryRoot, "resources", "worker", "worker.py")]
   };
 }
 
@@ -506,7 +506,7 @@ function workerError(event: Extract<PythonWorkerEvent, { type: "error" }>): AppE
     JOB_CANCELLED: "Worker job cancelled",
     INTERNAL_ERROR: "The worker failed unexpectedly"
   } as const;
-  return new AppError(event.code, messages[event.code]);
+  return new AppError(event.code, messages[event.code], undefined, undefined, event.retryable);
 }
 
 function invalidOutput(message: string): AppError {

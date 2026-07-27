@@ -41,10 +41,18 @@ export function createApi(service: CoreService) {
   app.post("/v1/analysis/start", route((req) => {
     const input = z.object({
       episodeId: id, provider: z.enum(["local", "openai"]).default("local"),
-      cloudAuthorized: z.boolean().default(false)
+      cloudAuthorized: z.boolean().default(false),
+      modelId: z.string().min(1).optional(),
+      wordTimestamps: z.boolean().optional()
     }).parse(req.body);
-    return service.startAnalysis(input.episodeId, input.provider, input.cloudAuthorized);
+    return service.startAnalysis(input.episodeId, input.provider, input.cloudAuthorized, {
+      modelId: input.modelId,
+      wordTimestamps: input.wordTimestamps
+    });
   }));
+  app.get("/v1/analysis/local-transcription/status", route(() =>
+    service.transcriptionStatus()
+  ));
   app.put("/v1/analysis/:episodeId/transcript", route((req) => service.setTranscript(
     id.parse(req.params.episodeId), z.array(transcriptSegmentSchema).parse(req.body.segments)
   )));

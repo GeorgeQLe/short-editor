@@ -9,6 +9,15 @@ import { CoreService } from "./service.js";
 import { ArtifactStore } from "./artifact-store.js";
 import { ensureLayout, prepareDataDirectory } from "./startup.js";
 import { WatchedFolderCoordinator } from "./watched-folders.js";
+import {
+  PythonWorkerSupervisor,
+  developmentPythonWorkerLaunch
+} from "./python-worker-supervisor.js";
+import {
+  LocalTranscriptionProvider,
+  localTranscriptionOptionsSchema
+} from "./local-transcription.js";
+import { AppError } from "../shared/errors.js";
 
 export function createCore(databasePath?: string): CoreService {
   const selectedDatabasePath = databasePath ?? startupDatabasePath();
@@ -23,10 +32,54 @@ export function createCore(databasePath?: string): CoreService {
   artifacts.reconcile();
   jobs.recover();
   const watchedFolders = new WatchedFolderCoordinator(repository, media, jobs);
+  const worker = new PythonWorkerSupervisor({
+    launch: developmentPythonWorkerLaunch(process.cwd()),
+    coreVersion: "0.1.0"
+  });
+  const localTranscription = new LocalTranscriptionProvider(worker);
+  let service!: CoreService;
   const runner = new JobRunner(jobs, {
     probe: async (job) => {
       jobs.progress(job.id, 0.2, "probing media");
       await media.probeEpisode(job.entityId!);
+    },
+    analyze: async (job, payload) => {
+      if (job.provider !== "local") {
+        throw new AppError(
+          "DEPENDENCY_UNAVAILABLE",
+          "OpenAI transcription is not installed and local fallback is disabled",
+          503
+        );
+      }
+      const episode = repository.getEpisode(job.entityId!);
+      const options = localTranscriptionOptionsSchema.parse(payload);
+      const cancellation = setInterval(() => {
+        if (jobs.cancellationRequested(job.id)) void worker.cancel(job.id);
+      }, 100);
+      try {
+        const result = await localTranscription.transcribe(
+          job.id,
+          episode.sourcePath,
+          options,
+          (progress, stage) => jobs.progress(job.id, progress, stage)
+        );
+        if (jobs.cancellationRequested(job.id)) return;
+        service.storeGeneratedTranscript(
+          episode.id,
+          result.language,
+          result.segments,
+          result.provenance
+        );
+      } catch (error) {
+        if (
+          error instanceof AppError &&
+          error.code === "JOB_CANCELLED" &&
+          jobs.cancellationRequested(job.id)
+        ) return;
+        throw error;
+      } finally {
+        clearInterval(cancellation);
+      }
     },
     hash: async (job) => {
       jobs.progress(job.id, 0.1, "hashing source");
@@ -35,9 +88,21 @@ export function createCore(databasePath?: string): CoreService {
     watched_folder_scan: async (job, payload) => watchedFolders.scan(job, payload),
     source_reconcile: async (job) => watchedFolders.reconcile(job)
   });
+  service = new CoreService(
+    repository,
+    media,
+    jobs,
+    artifacts,
+    watchedFolders,
+    async () => {
+      await runner.stop();
+      await worker.stop();
+    },
+    localTranscription
+  );
   runner.start();
   void watchedFolders.start();
-  return new CoreService(repository, media, jobs, artifacts, watchedFolders, () => runner.stop());
+  return service;
 }
 
 export function defaultDatabasePath(): string {

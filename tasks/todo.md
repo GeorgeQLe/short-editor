@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] PRO-02 — Implement local faster-whisper transcription.
+- [ ] PRO-03 — Implement Ollama analysis and local visual sampling.
 
 ## Completed
 
+- [x] PRO-02 — Implement local faster-whisper transcription.
 - [x] PRO-01 — Define and supervise the versioned Python worker protocol.
 - [x] INV-02/INV-03 — Add watched-folder reconciliation, missing-source
   detection, and identity-safe relinking.

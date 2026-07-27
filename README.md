@@ -15,13 +15,15 @@ The current vertical slice includes:
 - revision-safe Short projects and invalidation of stale renders/schedules;
 - a versioned, supervised Python worker host with strict framing, capability
   reporting, bounded cancellation/restart, and typed provider-operation results;
+- installed-model-only faster-whisper English transcription with normalized
+  segment/word timing, explicit absent diarization, and local provenance;
 - versioned starter composition templates;
 - render preflight/output validation through `ffprobe`;
 - a timezone-aware, rules-based launch scheduler;
 - a versioned HTTP API, React dashboard, Electron shell, and typed MCP adapter.
 
-Concrete transcription/analysis providers, production crop tracking, and the
-complete FFmpeg filter graph are intentionally behind interfaces for later phases.
+Ollama/OpenAI analysis providers, production crop tracking, and the complete
+FFmpeg filter graph are intentionally behind interfaces for later phases.
 
 ## Development
 
@@ -35,6 +37,35 @@ npm run dev
 
 The core listens on `127.0.0.1:43120` by default. Set `SHORT_EDITOR_DATA_DIR`,
 `SHORT_EDITOR_FFMPEG`, or `SHORT_EDITOR_FFPROBE` to override local paths.
+
+### Local transcription setup
+
+Install the worker dependency independently from the Node dependencies:
+
+```bash
+python3 -m pip install -r resources/worker/requirements.txt
+```
+
+Short Editor deliberately does not download models while transcribing. Put a
+faster-whisper/CTranslate2 model containing `model.bin` below a dedicated model
+directory, then identify the selectable local models:
+
+```bash
+export SHORT_EDITOR_WHISPER_MODEL_DIR=/path/to/short-editor-models
+hf download Systran/faster-whisper-small.en \
+  --local-dir "$SHORT_EDITOR_WHISPER_MODEL_DIR/small.en"
+export SHORT_EDITOR_WHISPER_MODEL_IDS=small.en
+export SHORT_EDITOR_WHISPER_MODEL=small.en
+```
+
+`SHORT_EDITOR_WHISPER_MODEL_IDS` is a comma-separated inventory; missing entries
+remain visible as not installed. The selected `SHORT_EDITOR_WHISPER_MODEL` must
+be installed before a job starts. Optional
+`SHORT_EDITOR_WHISPER_DEVICE`/`SHORT_EDITOR_WHISPER_COMPUTE_TYPE` values are
+passed to faster-whisper for host-specific CPU/GPU configuration. The worker
+resolves the selected ID to an existing local directory and uses
+`local_files_only=True`; it never silently downloads, switches models, invokes
+OpenAI, or falls back to another provider.
 
 For packaged Windows builds, place licensed FFmpeg binaries under `resources/bin`
 and run `npm run package:win`.

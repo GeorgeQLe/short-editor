@@ -73,8 +73,16 @@ register(
 
 register("analysis.start", "Queue episode analysis. OpenAI requires explicit cloud authorization.", {
   episodeId: uuid, provider: z.enum(["local", "openai"]).default("local"),
-  cloudAuthorized: z.boolean().default(false)
+  cloudAuthorized: z.boolean().default(false),
+  modelId: z.string().min(1).optional(),
+  wordTimestamps: z.boolean().optional()
 }, (input) => core("/analysis/start", "POST", input));
+register(
+  "analysis.local_transcription_status",
+  "Report installed faster-whisper models and local transcription capabilities.",
+  {},
+  () => core("/analysis/local-transcription/status")
+);
 register("jobs.list", "List durable jobs, progress, stages, and errors.", {},
   () => core("/jobs"));
 register("jobs.cancel", "Request cancellation of a queued or running job.", { jobId: uuid },

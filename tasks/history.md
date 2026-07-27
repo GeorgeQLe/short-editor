@@ -2,6 +2,20 @@
 
 ## 2026-07-27
 
+- Completed PRO-02 with installed-model-only faster-whisper English
+  transcription, normalized timed segments and optional words, explicit absent
+  diarization, typed local provenance, progress, and bounded cancellation.
+- Added local model inventory/status and an explicit external download handoff;
+  the worker resolves an existing model directory and uses local-only loading
+  without model switching, OpenAI fallback, or network clients.
+- Installed local `analyze` job handling through the supervised worker and core
+  transaction so successful results become accepted transcript revisions with
+  provider/model/version provenance.
+- Added deterministic provider and core fixtures for timing normalization,
+  optional words, silence, unsupported audio, missing models, cancellation,
+  local-only loading, inventory, and persistence.
+- Preserved worker-provided retryability through the supervisor so missing
+  installed models remain explicit, non-retryable setup failures.
 - Completed PRO-01 with a strict versioned Python worker protocol covering
   transcription, diarization, visual sampling, and provider calls, plus typed
   capability, dependency, progress, result, cancellation, and status messages.

@@ -2,114 +2,144 @@
 
 ## User goal
 
-Complete PRO-01 by defining and supervising the versioned Python worker
-protocol, then wrap up the session and ship the result.
+Complete PRO-02 by implementing installed-model-only faster-whisper
+transcription through the supervised local worker, then wrap up and ship the
+session.
 
 ## Changed files and per-file purpose
 
-- `src/shared/python-worker-protocol.ts` defines strict v1 NDJSON commands,
-  events, operation inputs, typed results, provenance, runtime status,
-  capabilities, dependency state, progress, cancellation, and framing limits.
-- `src/shared/domain.ts` exports the worker protocol through the shared domain
-  surface.
-- `src/core/python-worker-supervisor.ts` launches development or packaged worker
-  targets, validates every frame, bounds startup/heartbeat/job/cancellation/
-  shutdown behavior, maps failures to typed errors, redacts stderr, and limits
-  crash restarts.
-- `resources/worker/worker.py` provides the SQLite-free development host and
-  reports intentionally unavailable provider capabilities until PRO-02/03/05.
-- `tests/fixtures/python-worker-fixture.mjs` supplies deterministic normal,
-  malformed, partial, mismatched, oversized, hung, crashing, restart, and stderr
-  behaviors.
-- `tests/python-worker-protocol.test.ts` proves strict versioning, required
-  fields, operation coverage, and rejection of credential-shaped inputs.
-- `tests/python-worker-supervisor.test.ts` proves lifecycle, status, capability,
-  progress, typed results, framing limits, timeouts, cancellation, restart
-  bounds, missing-runtime mapping, SQLite isolation, and diagnostic redaction.
-- `tests/python-worker-host.test.ts` starts the real development host, checks its
-  degraded dependency state, exercises a typed unavailable result, and shuts it
-  down.
-- `package.json` includes worker resources in the Electron packaging boundary.
-- `README.md` describes the supervised worker slice and clarifies that concrete
-  providers remain future work.
-- `IMPLEMENTATION_PLAN.md` records PRO-01 implementation evidence and preserves
-  frozen-runtime and Windows acceptance work in WIN-02/WIN-03.
-- `tasks/todo.md` marks PRO-01 complete and promotes PRO-02 as the sole current
+- `resources/worker/requirements.txt` declares the independently installed
+  faster-whisper worker dependency.
+- `resources/worker/worker.py` discovers configured local models, reports
+  dependency and capability status, performs English transcription without
+  downloads or network clients, normalizes segments and optional words, emits
+  progress and provenance, and honors cancellation.
+- `src/core/local-transcription.ts` validates provider model identifiers, maps
+  typed worker output into transcript segments, exposes model inventory, and
+  rejects silence rather than inventing transcript content.
+- `src/core/bootstrap.ts` installs the local transcription provider as the
+  durable `analyze` job handler, polls durable cancellation, persists successful
+  transcripts, and shuts the worker down with the job runner.
+- `src/core/service.ts` validates transcription options, rejects missing source
+  media, exposes local status, and stores accepted generated revisions with
+  provider provenance in the Episode lifecycle transaction.
+- `src/core/repository.ts` adds transactional transcript replacement with
+  caller-supplied language and provenance while preserving manual replacement.
+- `src/core/api.ts` adds model and word-timestamp inputs plus the local
+  transcription status endpoint.
+- `src/mcp/server.ts` exposes the same inputs and status operation over MCP.
+- `src/core/python-worker-supervisor.ts` disables Python bytecode artifacts in
+  development and preserves the worker event's retryability decision.
+- `src/shared/errors.ts` permits a validated worker error to override the
+  registry retryability default without changing existing callers.
+- `tests/fixtures/python/faster_whisper.py` provides deterministic normal,
+  silent, unsupported, slow, timed-word, and no-word provider behavior.
+- `tests/fixtures/python/sitecustomize.py` denies socket connections during the
+  real worker-host tests.
+- `tests/python-worker-host.test.ts` exercises the real host's local-only model
+  loading, capabilities, timing normalization, provenance, silence, unsupported
+  input, cancellation, dependency failures, retryability, and SQLite/network
+  isolation.
+- `tests/local-transcription.test.ts` covers model-ID validation, result mapping,
+  inventory, silence handling, and accepted provenance persistence.
+- `README.md` documents dependency installation, explicit model download
+  handoff, model inventory, and local-only runtime configuration.
+- `SPEC.md` reconciles durable cancellation and the implemented transcription
+  slice while retaining pending provider and Windows work.
+- `IMPLEMENTATION_PLAN.md` records PRO-02 implementation evidence and leaves
+  frozen worker and representative Windows validation to WIN-02/WIN-03.
+- `tasks/todo.md` marks PRO-02 complete and promotes PRO-03 as the sole current
   executable task.
-- `tasks/history.md` records the completed protocol, supervisor, host, and fault
-  fixtures.
+- `tasks/history.md` records the provider, core integration, fixtures, and the
+  retryability review fix.
 - `tasks/ship-manifest.md` records this exact shipping proof.
 
 Generated `.agents/skillpacks/`, `.claude/skills/`, and `.codex/skills/` local
 artifacts are excluded from the commit. `.agents/project.json` is unchanged.
+There are no unrelated tracked changes or unpushed commits in the boundary.
 
 ## User-goal mapping
 
-The shared schemas define the compatibility and data-safety boundary. The
-supervisor enforces that boundary across process lifecycle and failures. The
-development host establishes the provider-independent runtime contract, while
-the fixtures and three focused suites prove protocol, supervisor, and real-host
-behavior. Packaging configuration, project documentation, and task records
-reconcile the completed PRO-01 scope and route the first concrete provider.
+The Python host and dependency file implement the local faster-whisper runtime.
+The provider, bootstrap, service, repository, HTTP, and MCP changes connect that
+runtime to durable jobs and accepted transcript revisions without weakening the
+worker protocol or local/cloud boundary. The deterministic fixtures and focused
+tests prove the provider behavior, while the project and task documents
+reconcile PRO-02 completion and route PRO-03.
 
 ## Tests run
 
-- `npm test`: 17 test files and 91 tests passed, including 15 worker-specific
-  protocol, supervisor, and development-host tests.
+Executable verification against the final code diff:
+
+- `npm test`: 18 test files and 99 tests passed, including the real Python
+  worker-host and local-transcription suites.
 - `npm run build`: TypeScript application checking, Vite production build, and
   Node-target TypeScript build passed.
 - `git diff --check`: passed.
-- A targeted secret-signature scan over the shipping paths found no credential
-  material. Credential-looking fixture text is deliberately synthetic and
-  covered by redaction assertions.
+- A targeted secret-signature scan over all shipping paths found no credential
+  material.
+
+Documentation/task verification:
+
+- `scripts/audit-task-docs.mjs` is absent, so no repository task-doc audit
+  command exists.
+- `tasks/todo.md` has one current executable item, PRO-03, and PRO-02 appears
+  once under completed work.
 
 ## Skipped tests
 
 - No lint script or lint/check target exists in `package.json`, and there is no
-  Makefile, Justfile, Python, or Cargo validation surface. The full Vitest suite,
-  TypeScript checks, production web build, and Node build are the available
-  executable gates.
+  Makefile, Justfile, Python-project, or Cargo validation surface. The full
+  Vitest suite and production build are the available executable gates.
 - `npm run package:win` is deferred because frozen/embedded worker assembly is
   explicitly owned by WIN-02 and this macOS host cannot provide Windows-native
   packaged startup/shutdown evidence.
-- Interactive Electron validation is deferred to UI-03/WIN-03 because PRO-01
-  does not yet connect provider controls to the UI; the real development-host
-  lifecycle is exercised directly by `tests/python-worker-host.test.ts`.
+- A live transcription against the real faster-whisper package and a production
+  model was not run because neither is committed test data; the real worker
+  process instead runs against an API-compatible deterministic provider under a
+  socket deny. Representative CPU/GPU and packaged-host proof remains WIN-03.
+- Interactive Electron validation is not applicable to this slice because it
+  adds no UI control; HTTP/MCP contracts and worker behavior are covered by
+  executable tests.
 
 ## Adversarial review
 
-An explicitly justified failure-oriented review was used as the quality-sweep
-equivalent because no standalone `quality-sweep` or `expert-review` command is
-installed. The review traced mismatched and partial startup frames; unexpected
-response types and IDs; frame overflow before parse/storage; invalid result
-kinds; missing runtime; job, heartbeat, cancellation, and shutdown deadlines;
-crash-loop bounds; duplicate jobs; restart/stop races; credential-shaped
-arguments/options; stderr disclosure; direct SQLite access; development versus
-packaged launch paths; and task/document scope.
+An explicitly justified failure-oriented review was used as the
+quality-sweep equivalent because no standalone `quality-sweep` or
+`expert-review` command is installed. The review traced model-ID traversal and
+local-directory resolution, absent dependencies and models, socket denial,
+provider import/load/decode failures, silence, overlapping or invalid timing,
+optional words, missing sources, cloud-provider isolation, durable job
+cancellation, worker shutdown, transcript revision transactions, status
+inventory, HTTP/MCP validation, SQLite isolation, and generated artifact scope.
 
-The focused worker suites and full regression suite exercise the applicable
-failure paths. No blocking finding or warning remains.
+The review found that `PythonWorkerSupervisor` discarded the protocol event's
+explicit `retryable` value. That made a missing installed model inherit the
+registry's retryable dependency default. The supervisor now preserves the
+worker decision through `AppError`, and the real-host test asserts
+`retryable: false`. The full test and build gates passed after the fix. No
+blocking finding or warning remains.
 
 ## Residual risk
 
-- The packaged launcher expects a frozen `short-editor-worker` executable while
-  this slice ships the development Python host source. WIN-02 owns frozen
-  runtime assembly and WIN-03 owns clean Windows startup/shutdown evidence, so
-  packaged execution is not claimed by PRO-01.
-- The placeholder host reports all provider operations unavailable by design.
-  PRO-02/03/05 must add concrete adapters without weakening strict framing,
-  typed provenance, credential isolation, or cancellation behavior.
-- The stdio lifecycle is covered under Node and the local Python runtime on
-  macOS. Windows process signaling, path handling, antivirus interaction, and
-  installer resource placement remain acceptance risks until WIN-02/WIN-03.
+- The tests run the real Python worker process but substitute the
+  faster-whisper package and model. Native CTranslate2 loading, representative
+  CPU/GPU performance, codec behavior, and Windows process/resource placement
+  remain unproven until WIN-02/WIN-03.
+- Model selection is configuration-driven and deliberately refuses downloads
+  or fallback. A user with a missing or incompatible model receives an
+  actionable terminal setup failure and must install or select a valid model.
+- Cancellation is cooperative between generated segments; a native provider
+  call that blocks before yielding may require the supervisor's bounded
+  cancellation timeout and worker termination.
 
 ## Rollback note
 
-Revert the PRO-01 commit. This change adds no database migration and the
-placeholder worker writes no application data, so rollback requires no data
-restoration. Remove any separately assembled worker executable when reverting a
-future packaged build.
+Revert the PRO-02 commit. The feature adds no database migration; generated
+transcripts use the existing revision schema. After rollback, remove the
+separately installed Python dependency or model directories only if they are no
+longer needed.
 
 ## Next command
 
-`$exec PRO-02`
+`$exec PRO-03`

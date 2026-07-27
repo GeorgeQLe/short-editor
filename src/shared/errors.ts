@@ -14,13 +14,14 @@ export class AppError extends Error {
     public readonly code: ApiErrorCode,
     message: string,
     status?: number,
-    details?: unknown
+    details?: unknown,
+    retryable?: boolean
   ) {
     super(message);
     this.name = "AppError";
     this.status = status ?? errorRegistry[code].status;
     this.details = details;
-    this.retryable = errorRegistry[code].retryable;
+    this.retryable = retryable ?? errorRegistry[code].retryable;
   }
 }
 

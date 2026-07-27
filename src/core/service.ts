@@ -8,6 +8,7 @@ import {
   type ScheduleRules,
   type ShortProject,
   type TranscriptSegment,
+  type ProviderProvenance,
   type WatchedFolderConfigurationInput,
   watchedFolderConfigurationInputSchema
 } from "../shared/domain.js";
@@ -21,6 +22,10 @@ import { draftSchedule, type SchedulableShort } from "./scheduler.js";
 import { validateRender } from "./render.js";
 import type { ArtifactStore } from "./artifact-store.js";
 import { WatchedFolderCoordinator } from "./watched-folders.js";
+import {
+  localTranscriptionOptionsSchema,
+  type LocalTranscriptionProvider
+} from "./local-transcription.js";
 
 export class CoreService {
   constructor(
@@ -29,7 +34,8 @@ export class CoreService {
     readonly jobs: JobQueue,
     readonly artifacts?: ArtifactStore,
     readonly watchedFolders?: WatchedFolderCoordinator,
-    private readonly stopWorker?: () => void | Promise<void>
+    private readonly stopWorker?: () => void | Promise<void>,
+    readonly localTranscription?: LocalTranscriptionProvider
   ) {}
 
   async stop(): Promise<void> {
@@ -70,12 +76,55 @@ export class CoreService {
   confirmRelink(episodeId: string, confirmationToken: string) {
     return this.media.confirmRelink(episodeId, confirmationToken);
   }
-  startAnalysis(episodeId: string, provider: "local" | "openai", cloudAuthorized = false) {
-    this.repository.getEpisode(episodeId);
-    return this.jobs.enqueue({ type: "analyze", entityId: episodeId, provider, cloudAuthorized });
+  startAnalysis(
+    episodeId: string,
+    provider: "local" | "openai",
+    cloudAuthorized = false,
+    options: { modelId?: string; wordTimestamps?: boolean } = {}
+  ) {
+    const episode = this.repository.getEpisode(episodeId);
+    if (episode.missing) {
+      throw new AppError("SOURCE_MISSING", "Cannot transcribe an Episode with missing source media", 409);
+    }
+    const transcription = localTranscriptionOptionsSchema.parse({
+      modelId: options.modelId ?? process.env.SHORT_EDITOR_WHISPER_MODEL ?? "small.en",
+      wordTimestamps: options.wordTimestamps ?? true
+    });
+    return this.jobs.enqueue({
+      type: "analyze",
+      entityId: episodeId,
+      provider,
+      cloudAuthorized,
+      payload: transcription
+    });
+  }
+
+  transcriptionStatus() {
+    if (!this.localTranscription) {
+      throw new AppError("DEPENDENCY_UNAVAILABLE", "Local transcription is unavailable", 503);
+    }
+    return this.localTranscription.status();
   }
 
   setTranscript(episodeId: string, segments: TranscriptSegment[]) {
+    return this.storeTranscript(episodeId, segments);
+  }
+
+  storeGeneratedTranscript(
+    episodeId: string,
+    language: string,
+    segments: TranscriptSegment[],
+    provenance: ProviderProvenance
+  ) {
+    return this.storeTranscript(episodeId, segments, language, provenance);
+  }
+
+  private storeTranscript(
+    episodeId: string,
+    segments: TranscriptSegment[],
+    language?: string,
+    provenance?: ProviderProvenance
+  ) {
     return this.repository.transaction(() => {
       let episode = this.repository.getEpisode(episodeId);
       if (episode.status === "source_missing") {
@@ -91,9 +140,13 @@ export class CoreService {
           episode = this.repository.updateEpisodeStatus(episodeId, "analyzing");
         }
       }
-      this.repository.replaceTranscript(episodeId, segments);
+      const revision = language && provenance
+        ? this.repository.replaceTranscriptWithProvenance(
+          episodeId, segments, language, provenance
+        )
+        : (this.repository.replaceTranscript(episodeId, segments), undefined);
       this.repository.updateEpisodeStatus(episodeId, "ready");
-      return segments;
+      return revision ?? segments;
     });
   }
 

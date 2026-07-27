@@ -1,7 +1,7 @@
 import type { SqliteDatabase } from "./database.js";
 import type {
   AnalysisArtifact, Asset, ClipCandidate, Composition, Episode, Job, Render,
-  ScheduleEntry, ScheduleRuleSet, ShortProject, Template, TranscriptRevision,
+  ProviderProvenance, ScheduleEntry, ScheduleRuleSet, ShortProject, Template, TranscriptRevision,
   TranscriptSegment, WatchedFolder
 } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
@@ -329,8 +329,28 @@ export class Repository {
   }
 
   replaceTranscript(episodeId: string, segments: TranscriptSegment[]): void {
-    this.db.transaction(() => {
+    const now = new Date().toISOString();
+    this.replaceTranscriptWithProvenance(episodeId, segments, "und", {
+      provider: "manual",
+      providerClass: "local",
+      modelId: "manual",
+      providerVersion: "1",
+      optionsVersion: "1",
+      createdAt: now
+    });
+  }
+
+  replaceTranscriptWithProvenance(
+    episodeId: string,
+    segments: TranscriptSegment[],
+    language: string,
+    provenance: ProviderProvenance
+  ): TranscriptRevision {
+    return this.db.transaction(() => {
       const episode = this.getEpisode(episodeId);
+      if (episode.status === "source_missing") {
+        throw new AppError("INVALID_STATE", "Cannot replace a transcript while its source is missing", 409);
+      }
       this.db.prepare("DELETE FROM transcript_segments WHERE episode_id=?").run(episodeId);
       const insert = this.db.prepare(`
         INSERT INTO transcript_segments(id,episode_id,start_ms,end_ms,text,words_json,speaker,confidence)
@@ -343,27 +363,19 @@ export class Repository {
         "SELECT COALESCE(MAX(revision),0) revision FROM transcript_revisions WHERE episode_id=?"
       ).get(episodeId) as { revision: number };
       const now = new Date().toISOString();
-      this.saveTranscriptRevision({
+      const revision: TranscriptRevision = {
         id: randomUUID(),
         episodeId,
         revision: latest.revision + 1,
-        language: "und",
+        language,
         segments,
-        provenance: {
-          provider: "manual",
-          providerClass: "local",
-          modelId: "manual",
-          providerVersion: "1",
-          optionsVersion: "1",
-          createdAt: now
-        },
+        provenance,
         acceptedState: "accepted",
         createdAt: now,
         updatedAt: now
-      }, latest.revision);
-      if (episode.status === "source_missing") {
-        throw new AppError("INVALID_STATE", "Cannot replace a transcript while its source is missing", 409);
-      }
+      };
+      this.saveTranscriptRevision(revision, latest.revision);
+      return revision;
     })();
   }
 
