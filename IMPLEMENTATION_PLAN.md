@@ -796,6 +796,20 @@ preflight integration remain RND-01/RND-02.
 
 ### EDT-05 — Implement deterministic source and bed audio decisions
 
+Completed 2026-07-28. Migration 11 replaces the placeholder audio state with
+bounded source gain/mute, one deterministic cut-fade duration, an invariant
+optional audio-bed binding, and derived typed warnings. The pure
+`audio-decisions-v1` engine retains only Episode source-audio routes, remaps
+disjoint ranges contiguously, caps both edge fades at half-range duration, and
+models a zero-offset continuous bed with exact loop/trim segments. Exact-CAS
+service, repository, HTTP, and typed MCP mutations validate bound asset kinds,
+increment once, clear approval, stale successful Renders, flag only
+non-published schedules, and preserve published rows byte-for-byte. Engine,
+schema, migration, lifecycle, and transport coverage is in
+`tests/audio.test.ts`, `tests/migrations.test.ts`, and
+`tests/short-lifecycle.test.ts`. FFmpeg composition and preflight consumption
+remain RND-01/RND-02; interactive controls remain UI-01.3.
+
 - **SPEC / gates:** 2.3, 3.2, 5.3, 6.8; G5, G6.
 - **Prerequisites / unblocks:** EDT-01 and EDT-02; unblocks RND-01 and RND-02.
 - **Behavior:** Always retain synchronized source speaker audio across ranges;

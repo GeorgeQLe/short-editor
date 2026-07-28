@@ -532,6 +532,11 @@ const migrations: readonly Migration[] = [
     version: 10,
     name: "editable captions and sidecar references",
     up: (db) => migrateCaptionState(db)
+  },
+  {
+    version: 11,
+    name: "deterministic source and bed audio",
+    up: (db) => migrateAudioState(db)
   }
 ];
 
@@ -701,6 +706,73 @@ function migrateCaptionState(db: SqliteDatabase): void {
     };
     update.run(JSON.stringify(migrated), row.id);
   }
+}
+
+function migrateAudioState(db: SqliteDatabase): void {
+  const rows = db.prepare(
+    "SELECT id,audio_json FROM short_projects"
+  ).all() as Array<{ id: string; audio_json: string }>;
+  const assetKind = db.prepare("SELECT kind FROM assets WHERE id=?");
+  const update = db.prepare("UPDATE short_projects SET audio_json=? WHERE id=?");
+  for (const row of rows) {
+    let legacy: Record<string, unknown>;
+    try {
+      legacy = JSON.parse(row.audio_json) as Record<string, unknown>;
+    } catch {
+      legacy = {};
+    }
+    const sourceGainDb = clampFinite(legacy.sourceGainDb, -60, 12, 0);
+    const sourceMuted = typeof legacy.sourceMuted === "boolean"
+      ? legacy.sourceMuted
+      : legacy.muted === true;
+    const cutFadeMs = clampInteger(
+      Math.max(finiteOr(legacy.cutFadeMs, 0), finiteOr(legacy.fadeInMs, 0), finiteOr(legacy.fadeOutMs, 0)),
+      0,
+      500
+    );
+    const requestedBedId = typeof legacy.bedAssetId === "string" ? legacy.bedAssetId : null;
+    const boundAsset = requestedBedId
+      ? assetKind.get(requestedBedId) as { kind: string } | undefined
+      : undefined;
+    const bedAssetId = boundAsset?.kind === "audio" ? requestedBedId : null;
+    const bedGainDb = bedAssetId === null
+      ? null
+      : clampFinite(legacy.bedGainDb, -60, 0, -18);
+    const warnings = bedAssetId !== null && bedGainDb !== null
+      && (sourceMuted || sourceGainDb - bedGainDb < 12)
+      ? [{
+          code: "AUDIO_SPEECH_BACKGROUND_RATIO",
+          message: sourceMuted
+            ? "Background audio is enabled while the Episode source is muted"
+            : "Background audio is less than 12 dB below the Episode source"
+        }]
+      : [];
+    update.run(JSON.stringify({
+      sourceGainDb,
+      sourceMuted,
+      cutFadeMs,
+      bedAssetId,
+      bedGainDb,
+      warnings
+    }), row.id);
+  }
+}
+
+function finiteOr(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function clampFinite(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  fallback: number
+): number {
+  return Math.min(maximum, Math.max(minimum, finiteOr(value, fallback)));
+}
+
+function clampInteger(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, Math.trunc(value)));
 }
 
 function migrateCompositionCropTracks(

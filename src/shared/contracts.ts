@@ -683,15 +683,81 @@ export const captionUpdateInputSchema = z.strictObject({
   style: captionStyleSchema
 });
 export type CaptionUpdateInput = z.infer<typeof captionUpdateInputSchema>;
-export const audioStateSchema = z.strictObject({
-  sourceGainDb: z.number(),
-  muted: z.boolean(),
-  fadeInMs: z.number().int().nonnegative(),
-  fadeOutMs: z.number().int().nonnegative(),
-  bedAssetId: idSchema.nullable(),
-  bedGainDb: z.number().nullable(),
-  normalizeLoudness: z.boolean()
+export const audioWarningCodes = ["AUDIO_SPEECH_BACKGROUND_RATIO"] as const;
+export const audioWarningCodeSchema = z.enum(audioWarningCodes);
+export type AudioWarningCode = z.infer<typeof audioWarningCodeSchema>;
+export const audioWarningSchema = z.strictObject({
+  code: audioWarningCodeSchema,
+  message: z.string().min(1)
 });
+export type AudioWarning = z.infer<typeof audioWarningSchema>;
+
+const sourceGainDbSchema = z.number().finite().min(-60).max(12);
+const bedGainDbSchema = z.number().finite().min(-60).max(0);
+const cutFadeMsSchema = z.number().int().min(0).max(500);
+const audioSettingsShape = {
+  sourceGainDb: sourceGainDbSchema,
+  sourceMuted: z.boolean(),
+  cutFadeMs: cutFadeMsSchema,
+  bedAssetId: idSchema.nullable(),
+  bedGainDb: bedGainDbSchema.nullable()
+};
+const validateBedPair = (
+  audio: { bedAssetId: string | null; bedGainDb: number | null },
+  context: z.RefinementCtx
+) => {
+  if ((audio.bedAssetId === null) !== (audio.bedGainDb === null)) {
+    context.addIssue({
+      code: "custom",
+      path: [audio.bedAssetId === null ? "bedAssetId" : "bedGainDb"],
+      message: "bedAssetId and bedGainDb must both be null or both be set"
+    });
+  }
+};
+export const audioStateSchema = z.strictObject({
+  ...audioSettingsShape,
+  warnings: z.array(audioWarningSchema)
+}).superRefine(validateBedPair);
+export type AudioState = z.infer<typeof audioStateSchema>;
+export const audioUpdateInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  ...audioSettingsShape
+}).superRefine(validateBedPair);
+export type AudioUpdateInput = z.infer<typeof audioUpdateInputSchema>;
+
+export const sourceAudioDecisionSchema = z.strictObject({
+  source: z.literal("episode"),
+  episodeId: idSchema,
+  sourceStartMs: z.number().int().nonnegative(),
+  sourceEndMs: z.number().int().positive(),
+  outputStartMs: z.number().int().nonnegative(),
+  outputEndMs: z.number().int().positive(),
+  gainDb: sourceGainDbSchema,
+  muted: z.boolean(),
+  fadeInMs: cutFadeMsSchema,
+  fadeOutMs: cutFadeMsSchema
+});
+export const bedPlaybackSegmentSchema = z.strictObject({
+  outputStartMs: z.number().int().nonnegative(),
+  outputEndMs: z.number().int().positive(),
+  assetStartMs: z.number().int().nonnegative(),
+  assetEndMs: z.number().int().positive()
+});
+export const bedAudioDecisionSchema = z.strictObject({
+  assetId: idSchema,
+  gainDb: bedGainDbSchema,
+  startsAtAssetTimeMs: z.literal(0),
+  loops: z.boolean(),
+  playback: z.array(bedPlaybackSegmentSchema)
+});
+export const audioDecisionSchema = z.strictObject({
+  version: z.literal("audio-decisions-v1"),
+  outputDurationMs: z.number().int().positive(),
+  source: z.array(sourceAudioDecisionSchema).min(1),
+  bed: bedAudioDecisionSchema.nullable(),
+  warnings: z.array(audioWarningSchema)
+});
+export type AudioDecision = z.infer<typeof audioDecisionSchema>;
 export const templateLineageSchema = z.strictObject({
   templateId: z.string().min(1),
   templateVersion: positiveRevisionSchema,
@@ -749,6 +815,12 @@ export const captionUpdateResultSchema = z.strictObject({
   sidecars: captionSidecarsSchema
 });
 export type CaptionUpdateResult = z.infer<typeof captionUpdateResultSchema>;
+
+export const audioUpdateResultSchema = z.strictObject({
+  short: shortProjectSchema,
+  warnings: z.array(audioWarningSchema)
+});
+export type AudioUpdateResult = z.infer<typeof audioUpdateResultSchema>;
 
 export const shortTimelineUpdateInputSchema = z.strictObject({
   expectedRevision: positiveRevisionSchema,

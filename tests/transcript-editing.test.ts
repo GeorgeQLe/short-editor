@@ -69,12 +69,11 @@ function shortProject(episodeId: string): ShortProject {
     captions: captionState(),
     audio: {
       sourceGainDb: 0,
-      muted: false,
-      fadeInMs: 0,
-      fadeOutMs: 0,
+      sourceMuted: false,
+      cutFadeMs: 0,
       bedAssetId: null,
       bedGainDb: null,
-      normalizeLoudness: false
+      warnings: []
     },
     copy: {
       cleanedTranscript: "Old transcript",

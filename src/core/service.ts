@@ -20,8 +20,11 @@ import {
   type ManualCropRemoveInput,
   type CaptionUpdateInput,
   type CaptionUpdateResult,
+  type AudioUpdateInput,
+  type AudioUpdateResult,
   compositionSchema,
   captionUpdateInputSchema,
+  audioUpdateInputSchema,
   watchedFolderConfigurationInputSchema
 } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
@@ -66,6 +69,7 @@ import {
   DEFAULT_CAPTION_STYLE,
   generateCaptionSidecars
 } from "./captions.js";
+import { deriveAudioWarnings } from "./audio.js";
 
 export class CoreService {
   constructor(
@@ -741,8 +745,12 @@ export class CoreService {
         sidecars: { srt: null, webvtt: null }
       },
       audio: {
-        sourceGainDb: 0, muted: false, fadeInMs: 0, fadeOutMs: 0,
-        bedAssetId: null, bedGainDb: null, normalizeLoudness: false
+        sourceGainDb: 0,
+        sourceMuted: false,
+        cutFadeMs: 0,
+        bedAssetId: null,
+        bedGainDb: null,
+        warnings: []
       },
       copy,
       copyState: candidateCopy.accepted ? "accepted" : "proposed",
@@ -847,6 +855,49 @@ export class CoreService {
       return { short, warnings: analysis.warnings, sidecars };
     });
     return finalized.value;
+  }
+  updateAudio(id: string, input: AudioUpdateInput): AudioUpdateResult {
+    const parsed = audioUpdateInputSchema.parse(input);
+    const current = this.repository.getShort(id);
+    if (current.revision !== parsed.expectedRevision) {
+      throw new AppError("REVISION_CONFLICT", "Short was edited by another client", 409, {
+        expectedRevision: parsed.expectedRevision,
+        actualRevision: current.revision
+      });
+    }
+    if (parsed.bedAssetId !== null) {
+      let asset;
+      try {
+        asset = this.repository.getAsset(parsed.bedAssetId);
+      } catch (error) {
+        if (error instanceof AppError && error.code === "NOT_FOUND") {
+          throw new AppError("VALIDATION_ERROR", "Audio bed asset does not exist", 422, [{
+            path: ["bedAssetId"],
+            message: "Select an existing audio asset"
+          }]);
+        }
+        throw error;
+      }
+      if (asset.kind !== "audio") {
+        throw new AppError("VALIDATION_ERROR", "Audio bed must reference an audio asset", 422, [{
+          path: ["bedAssetId"],
+          message: "Asset kind must be audio"
+        }]);
+      }
+    }
+    const settings = {
+      sourceGainDb: parsed.sourceGainDb,
+      sourceMuted: parsed.sourceMuted,
+      cutFadeMs: parsed.cutFadeMs,
+      bedAssetId: parsed.bedAssetId,
+      bedGainDb: parsed.bedGainDb
+    };
+    const warnings = deriveAudioWarnings(settings);
+    const short = this.repository.updateShortAudio(id, parsed.expectedRevision, {
+      ...settings,
+      warnings
+    });
+    return { short, warnings };
   }
   approveShort(id: string, expectedRevision: number) {
     return this.repository.approveShort(id, expectedRevision);

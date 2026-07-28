@@ -159,12 +159,11 @@ describe("complete transactional persistence", () => {
       }))),
       audio: {
         sourceGainDb: -2,
-        muted: false,
-        fadeInMs: 100,
-        fadeOutMs: 200,
+        sourceMuted: false,
+        cutFadeMs: 200,
         bedAssetId: null,
-        bedGainDb: -18,
-        normalizeLoudness: true
+        bedGainDb: null,
+        warnings: []
       },
       copy: {
         cleanedTranscript: "clean",

@@ -4,6 +4,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { z } from "zod";
 import {
   assetImportInputSchema,
+  audioUpdateInputSchema,
   candidateContentPackageAcceptInputSchema,
   captionUpdateInputSchema,
   compositionSchema,
@@ -173,6 +174,12 @@ export function createApi(service: CoreService, desktopToken?: string) {
     service.updateCaptions(
       id.parse(req.params.id),
       captionUpdateInputSchema.parse(req.body)
+    )
+  ));
+  app.put("/v1/shorts/:id/audio", route((req) =>
+    service.updateAudio(
+      id.parse(req.params.id),
+      audioUpdateInputSchema.parse(req.body)
     )
   ));
   app.put("/v1/shorts/:id/copy", route((req) => {

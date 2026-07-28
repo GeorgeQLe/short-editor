@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import {
   assetImportInputSchema,
+  audioUpdateInputSchema,
   captionUpdateInputSchema,
   compositionSchema,
   contentPackageSchema,
@@ -190,6 +191,15 @@ register("shorts.update_captions", "Update independent captions and generate rev
   cues: captionUpdateInputSchema.shape.cues,
   style: captionUpdateInputSchema.shape.style
 }, ({ shortId, ...input }) => core(`/shorts/${shortId}/captions`, "PUT", input));
+register("shorts.update_audio", "Update synchronized Episode audio and an optional continuous audio bed.", {
+  shortId: uuid,
+  expectedRevision: audioUpdateInputSchema.shape.expectedRevision,
+  sourceGainDb: audioUpdateInputSchema.shape.sourceGainDb,
+  sourceMuted: audioUpdateInputSchema.shape.sourceMuted,
+  cutFadeMs: audioUpdateInputSchema.shape.cutFadeMs,
+  bedAssetId: audioUpdateInputSchema.shape.bedAssetId,
+  bedGainDb: audioUpdateInputSchema.shape.bedGainDb
+}, ({ shortId, ...input }) => core(`/shorts/${shortId}/audio`, "PUT", input));
 register("shorts.update_copy", "Update accepted copy without overwriting other fields.", {
   shortId: uuid, expectedRevision, copy: contentPackageSchema
 }, ({ shortId, ...input }) => core(`/shorts/${shortId}/copy`, "PUT", input));

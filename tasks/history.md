@@ -2,6 +2,76 @@
 
 ## 2026-07-28
 
+- Completed EDT-05 with migration 11 strict source/bed audio state, bounded gain
+  and cut fades, nullable-pair asset binding, deterministic derived warnings,
+  and removal of legacy loudness normalization.
+- Added the pure revisioned audio decision engine: every ordered Episode range
+  retains its synchronized source route at contiguous output timestamps, all
+  entrances/exits receive half-range-capped fades, and optional beds start at
+  zero, remain continuous across cuts, loop when short, and trim exactly.
+- Added exact-CAS audio updates over service, HTTP, and typed MCP with one Short
+  revision increment, approval clearing, successful-Render staleness,
+  non-published-only rerender flags, and byte-preserved published schedules.
+  Engine, threshold, strict-schema, migration, lifecycle, asset, and parity
+  tests pass. Full verification passes 34 test files and 234 tests plus the
+  production build/typecheck and diff hygiene. FFmpeg composition/preflight
+  remain RND-01/RND-02, and UI controls remain UI-01.3. Promoted RND-01 as
+  current work.
+
+### EDT-05 ship manifest
+
+- **User goal:** Implement the strict revisioned audio model and deterministic
+  source/bed decision engine with migration, lifecycle invalidation, HTTP, and
+  MCP parity while leaving FFmpeg mixing to RND-02.
+- **Changed files:** `IMPLEMENTATION_PLAN.md`, `SPEC.md`, `tasks/todo.md`,
+  `tasks/history.md`, `src/shared/contracts.ts`, `src/core/audio.ts`,
+  `src/core/database.ts`, `src/core/repository.ts`, `src/core/service.ts`,
+  `src/core/api.ts`, `src/mcp/server.ts`, `tests/audio.test.ts`,
+  `tests/migrations.test.ts`, `tests/short-lifecycle.test.ts`,
+  `tests/caption-service.test.ts`, `tests/crop-service.test.ts`,
+  `tests/domain-contracts.test.ts`, `tests/persistence.test.ts`,
+  `tests/repository.test.ts`, and `tests/transcript-editing.test.ts`.
+- **Per-file purpose:** `src/shared/contracts.ts` defines strict audio settings,
+  warnings, decisions, and transport results; `src/core/audio.ts` implements
+  warning derivation and deterministic source/bed decisions;
+  `src/core/database.ts` upgrades legacy audio state in migration 11;
+  `src/core/repository.ts` provides transactional CAS persistence and
+  invalidation; `src/core/service.ts` validates asset bindings and coordinates
+  updates; `src/core/api.ts` and `src/mcp/server.ts` expose matching mutation
+  surfaces. `tests/audio.test.ts`, `tests/migrations.test.ts`, and
+  `tests/short-lifecycle.test.ts` cover the new engine, migration, lifecycle,
+  HTTP, and MCP behavior; the remaining test files update existing typed
+  fixtures to the new schema. `SPEC.md` and `IMPLEMENTATION_PLAN.md` record the
+  implemented boundary, while `tasks/todo.md` and `tasks/history.md` close
+  EDT-05 and route RND-01.
+- **User-goal mapping:** The contracts, engine, migration, repository, service,
+  and transport files implement the accepted EDT-05 behavior end to end. The
+  focused tests prove each promised boundary, fixture changes preserve
+  regression coverage under the new state shape, and the planning/task docs
+  distinguish completed deterministic decisions from deferred preflight,
+  FFmpeg mixing, and interactive controls.
+- **Tests run:** `npm test` passed 34 files and 234 tests; `npm run build` and
+  `git diff --check` passed.
+- **Skipped tests:** Windows NSIS packaging was skipped because this core,
+  schema, and transport change does not alter packaging and the current host is
+  macOS. Manual UI/visual testing was skipped because EDT-05 adds no UI or
+  rendered artifact; FFmpeg output verification belongs to the explicitly
+  deferred RND-02 renderer.
+- **Adversarial review:** A failure-oriented changed-file review scanned for
+  stale legacy audio fields, invalid nullable bed pairs, non-finite/out-of-range
+  gains and fades, discontinuous range/bed boundaries, threshold errors, stale
+  CAS writes, incorrect asset kinds, and accidental published-row mutation.
+  The targeted tests exercise those cases, a repository-wide scan found legacy
+  fields only in migration fixtures/defaults, and no unresolved finding
+  remained.
+- **Residual risk:** The decision model is executable and fully covered, but no
+  rendered media consumes it yet. RND-01 must snapshot and validate the typed
+  decision, and RND-02 must prove FFmpeg gain/fade/loop behavior against media
+  fixtures before users can rely on audible output.
+- **Rollback note:** Revert the EDT-05 feature commit before deploying migration
+  11. After migration, restore a pre-migration backup instead of down-migrating.
+- **Next command:** `$exec` for RND-01 immutable-revision typed preflight.
+
 - Completed EDT-04 with migration 10 independent caption cues/words, complete
   approved Inter Regular/Bold styles, persisted typed warnings and sidecar
   references, and official OFL-licensed Inter 4.1 resources included in

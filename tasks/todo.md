@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] EDT-05 — Implement deterministic source and bed audio decisions.
+- [ ] RND-01 — Build typed preflight from an immutable revision snapshot.
 
 ## Completed
 
+- [x] EDT-05 — Implement deterministic source and bed audio decisions.
 - [x] EDT-04 — Implement caption data, editing, layout checks, and sidecars.
 - [x] EDT-03 — Add independent automatic and manual crop tracks.
 - [x] EDT-02 — Persist template clones, materialized lineage, and complete

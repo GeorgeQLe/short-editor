@@ -390,6 +390,143 @@ describe("database migrations", () => {
     expect(row.revision).toBe(3);
   });
 
+  it("migrates legacy audio settings, bindings, bounds, and warnings deterministically", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "short-editor-audio-migration-")), "fixture.db");
+    const legacy = new Database(path);
+    migrateDatabase(legacy, databaseMigrations.slice(0, 10));
+    const episodeId = randomUUID();
+    const audioId = randomUUID();
+    const imageId = randomUUID();
+    const now = "2026-07-28T12:00:00.000Z";
+    legacy.prepare(`
+      INSERT INTO episodes(
+        id,source_path,canonical_path,fingerprint,file_size,modified_at_ms,status,
+        missing,created_at,updated_at
+      ) VALUES(?,?,?,?,?,?,?,0,?,?)
+    `).run(episodeId, "/original.mp4", "/canonical.mp4", "fingerprint", 10, 20, "ready", now, now);
+    const insertAsset = legacy.prepare(`
+      INSERT INTO assets(
+        id,source_path,owned_artifact_path,kind,provenance,reusable,tags_json,
+        width,height,duration_ms,created_at,updated_at
+      ) VALUES(?, ?, NULL, ?, 'fixture', 1, '[]', ?, ?, ?, ?, ?)
+    `);
+    insertAsset.run(audioId, "/bed.mp3", "audio", null, null, 1_000, now, now);
+    insertAsset.run(imageId, "/still.png", "image", 100, 100, null, now, now);
+    const insertShort = legacy.prepare(`
+      INSERT INTO short_projects(
+        id,episode_id,candidate_id,title,source_ranges_json,template_id,
+        composition_json,copy_json,approved,revision,created_at,updated_at,
+        template_lineage_json,captions_json,audio_json,copy_state,copy_source
+      ) VALUES(?,?,NULL,?,'[{"startMs":0,"endMs":2000}]',
+        'fullscreen-speaker-v1',?,'{}',0,7,?,?,?,?,?,'accepted','legacy_accepted')
+    `);
+    const cases = [
+      {
+        title: "defaults",
+        legacy: {},
+        expected: {
+          sourceGainDb: 0, sourceMuted: false, cutFadeMs: 0,
+          bedAssetId: null, bedGainDb: null, warnings: []
+        }
+      },
+      {
+        title: "valid missing gain",
+        legacy: {
+          sourceGainDb: 99,
+          muted: true,
+          fadeInMs: 20,
+          fadeOutMs: 900,
+          bedAssetId: audioId,
+          normalizeLoudness: true
+        },
+        expected: {
+          sourceGainDb: 12, sourceMuted: true, cutFadeMs: 500,
+          bedAssetId: audioId, bedGainDb: -18,
+          warnings: [{
+            code: "AUDIO_SPEECH_BACKGROUND_RATIO",
+            message: "Background audio is enabled while the Episode source is muted"
+          }]
+        }
+      },
+      {
+        title: "clamped gain",
+        legacy: {
+          sourceGainDb: -100,
+          muted: false,
+          fadeInMs: 101,
+          fadeOutMs: 202,
+          bedAssetId: audioId,
+          bedGainDb: -100
+        },
+        expected: {
+          sourceGainDb: -60, sourceMuted: false, cutFadeMs: 202,
+          bedAssetId: audioId, bedGainDb: -60,
+          warnings: [{
+            code: "AUDIO_SPEECH_BACKGROUND_RATIO",
+            message: "Background audio is less than 12 dB below the Episode source"
+          }]
+        }
+      },
+      {
+        title: "invalid binding",
+        legacy: {
+          sourceGainDb: 0,
+          muted: false,
+          bedAssetId: imageId,
+          bedGainDb: -3
+        },
+        expected: {
+          sourceGainDb: 0, sourceMuted: false, cutFadeMs: 0,
+          bedAssetId: null, bedGainDb: null, warnings: []
+        }
+      }
+    ];
+    const ids = new Map<string, string>();
+    for (const value of cases) {
+      const shortId = randomUUID();
+      ids.set(value.title, shortId);
+      insertShort.run(
+        shortId,
+        episodeId,
+        value.title,
+        JSON.stringify(starterTemplates[0]!.composition),
+        now,
+        now,
+        JSON.stringify({
+          templateId: "fullscreen-speaker-v1",
+          templateVersion: 1,
+          parentTemplateId: null
+        }),
+        JSON.stringify({
+          enabled: true,
+          cues: [],
+          style: {
+            fontFamily: "Inter", fontWeight: 400, fontSizePx: 64,
+            position: { x: 0.5, y: 0.78 }, maxWidth: 0.82,
+            textColor: "#ffffff", highlightColor: "#ffdc5e",
+            outline: { color: "#000000", widthPx: 4 },
+            background: { color: "#00000000", paddingPx: 12, cornerRadiusPx: 8 }
+          },
+          warnings: [],
+          sidecars: { srt: null, webvtt: null }
+        }),
+        JSON.stringify(value.legacy)
+      );
+    }
+    legacy.close();
+
+    const upgraded = openDatabase(path);
+    databases.push(upgraded);
+    for (const value of cases) {
+      const row = upgraded.prepare(
+        "SELECT audio_json,revision FROM short_projects WHERE id=?"
+      ).get(ids.get(value.title)) as { audio_json: string; revision: number };
+      expect(JSON.parse(row.audio_json), value.title).toEqual(value.expected);
+      expect(row.revision, value.title).toBe(7);
+      expect(row.audio_json, value.title).not.toContain("normalizeLoudness");
+    }
+  });
+
   it("keeps foreign-key enforcement active", () => {
     const db = openDatabase(":memory:");
     databases.push(db);

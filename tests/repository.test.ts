@@ -31,8 +31,8 @@ describe("repository revisions and recovery", () => {
       composition: structuredClone(starterTemplates[1]!.composition),
       captions: captionState(),
       audio: {
-        sourceGainDb: 0, muted: false, fadeInMs: 0, fadeOutMs: 0,
-        bedAssetId: null, bedGainDb: null, normalizeLoudness: false
+        sourceGainDb: 0, sourceMuted: false, cutFadeMs: 0,
+        bedAssetId: null, bedGainDb: null, warnings: []
       },
       copy: { cleanedTranscript: "", rewrite: "", hookVariants: [], titles: [], description: "", hashtags: [], thumbnailText: "" },
       copyState: "accepted", copySource: "legacy_accepted",

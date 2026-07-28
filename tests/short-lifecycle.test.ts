@@ -10,6 +10,7 @@ import { JobQueue } from "../src/core/jobs";
 import { Repository } from "../src/core/repository";
 import { CoreService } from "../src/core/service";
 import {
+  audioUpdateInputSchema,
   shortApprovalInputSchema,
   shortTimelineUpdateInputSchema,
   type ProviderProvenance,
@@ -105,6 +106,134 @@ describe("Short mutation contracts", () => {
       expect(shortTimelineUpdateInputSchema.safeParse(input).success).toBe(false);
     }
     expect(shortApprovalInputSchema.safeParse({ expectedRevision: 1, extra: true }).success).toBe(false);
+  });
+
+  it("uses a strict complete audio update input", () => {
+    const valid = {
+      expectedRevision: 1,
+      sourceGainDb: 0,
+      sourceMuted: false,
+      cutFadeMs: 100,
+      bedAssetId: null,
+      bedGainDb: null
+    };
+    expect(audioUpdateInputSchema.parse(valid)).toEqual(valid);
+    expect(audioUpdateInputSchema.safeParse({ ...valid, extra: true }).success).toBe(false);
+  });
+});
+
+describe("audio CAS and invalidation", () => {
+  it("increments once, derives warnings, clears approval, and preserves published rows byte-for-byte", () => {
+    const context = setup();
+    let project = createAcceptedShort(context);
+    project = context.service.approveShort(project.id, project.revision);
+    const renderId = insertRenderAndSchedules(context.repository, project);
+    const publishedBefore = context.repository.db.prepare(
+      "SELECT * FROM schedule_entries WHERE short_id=? AND status='published'"
+    ).get(project.id);
+    const bedId = randomUUID();
+    context.repository.saveAsset({
+      id: bedId,
+      sourcePath: "/fixture/bed.mp3",
+      ownedArtifactPath: null,
+      kind: "audio",
+      provenance: "fixture",
+      reusable: true,
+      tags: [],
+      width: null,
+      height: null,
+      durationMs: 10_000,
+      createdAt: now,
+      updatedAt: now
+    });
+
+    const result = context.service.updateAudio(project.id, {
+      expectedRevision: project.revision,
+      sourceGainDb: 0,
+      sourceMuted: false,
+      cutFadeMs: 125,
+      bedAssetId: bedId,
+      bedGainDb: -11.99
+    });
+    expect(result.short).toMatchObject({
+      approved: false,
+      revision: project.revision + 1,
+      audio: {
+        sourceGainDb: 0,
+        sourceMuted: false,
+        cutFadeMs: 125,
+        bedAssetId: bedId,
+        bedGainDb: -11.99
+      }
+    });
+    expect(result.warnings).toEqual(result.short.audio.warnings);
+    expect(result.warnings[0]?.code).toBe("AUDIO_SPEECH_BACKGROUND_RATIO");
+    expect(context.repository.db.prepare("SELECT state FROM renders WHERE id=?").get(renderId))
+      .toEqual({ state: "stale" });
+    expect(context.repository.db.prepare(
+      "SELECT needs_rerender,revision FROM schedule_entries WHERE short_id=? AND status='draft'"
+    ).get(project.id)).toEqual({ needs_rerender: 1, revision: 2 });
+    expect(context.repository.db.prepare(
+      "SELECT * FROM schedule_entries WHERE short_id=? AND status='published'"
+    ).get(project.id)).toEqual(publishedBefore);
+  });
+
+  it("rejects missing/non-audio beds and stale revisions without mutation", () => {
+    const context = setup();
+    const project = createAcceptedShort(context);
+    const base = {
+      expectedRevision: project.revision,
+      sourceGainDb: 0,
+      sourceMuted: false,
+      cutFadeMs: 0,
+      bedGainDb: -18
+    };
+    expect(() => context.service.updateAudio(project.id, {
+      ...base,
+      bedAssetId: randomUUID()
+    })).toThrow(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+    const imageId = randomUUID();
+    context.repository.saveAsset({
+      id: imageId,
+      sourcePath: "/fixture/still.png",
+      ownedArtifactPath: null,
+      kind: "image",
+      provenance: "fixture",
+      reusable: true,
+      tags: [],
+      width: 100,
+      height: 100,
+      durationMs: null,
+      createdAt: now,
+      updatedAt: now
+    });
+    expect(() => context.service.updateAudio(project.id, {
+      ...base,
+      bedAssetId: imageId
+    })).toThrow(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+    const updated = context.service.updateAudio(project.id, {
+      expectedRevision: project.revision,
+      sourceGainDb: -3,
+      sourceMuted: false,
+      cutFadeMs: 0,
+      bedAssetId: null,
+      bedGainDb: null
+    });
+    expect(() => context.service.updateAudio(project.id, {
+      expectedRevision: project.revision,
+      sourceGainDb: -6,
+      sourceMuted: false,
+      cutFadeMs: 0,
+      bedAssetId: null,
+      bedGainDb: null
+    })).toThrow(expect.objectContaining({
+      code: "REVISION_CONFLICT",
+      details: {
+        expectedRevision: project.revision,
+        actualRevision: updated.short.revision
+      }
+    }));
+    expect(context.service.getShort(project.id)).toEqual(updated.short);
   });
 });
 
@@ -310,6 +439,104 @@ describe("timeline CAS, approval, and invalidation", () => {
 });
 
 describe("Short HTTP and MCP parity", () => {
+  it("returns identical audio values, warnings, strict failures, and conflicts", async () => {
+    const context = setup();
+    const project = createAcceptedShort(context);
+    const bedId = randomUUID();
+    context.repository.saveAsset({
+      id: bedId,
+      sourcePath: "/fixture/bed.wav",
+      ownedArtifactPath: null,
+      kind: "audio",
+      provenance: "fixture",
+      reusable: true,
+      tags: [],
+      width: null,
+      height: null,
+      durationMs: 5_000,
+      createdAt: now,
+      updatedAt: now
+    });
+    const server = createApi(context.service).listen(0, "127.0.0.1");
+    servers.push(server);
+    await new Promise<void>((resolve) => server.once("listening", resolve));
+    const port = (server.address() as AddressInfo).port;
+    const base = `http://127.0.0.1:${port}/v1`;
+    const body = {
+      expectedRevision: project.revision,
+      sourceGainDb: 0,
+      sourceMuted: false,
+      cutFadeMs: 200,
+      bedAssetId: bedId,
+      bedGainDb: -11.99
+    };
+    const response = await fetch(`${base}/shorts/${project.id}/audio`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    expect(response.status).toBe(200);
+    const http = await response.json() as {
+      data: { short: ShortProject; warnings: Array<{ code: string }> };
+    };
+    expect(http.data.short.audio).toMatchObject({
+      sourceGainDb: 0,
+      sourceMuted: false,
+      cutFadeMs: 200,
+      bedAssetId: bedId,
+      bedGainDb: -11.99
+    });
+    expect(http.data.warnings).toEqual(http.data.short.audio.warnings);
+
+    const unknown = await fetch(`${base}/shorts/${project.id}/audio`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...body, expectedRevision: 2, unknown: true })
+    });
+    expect(unknown.status).toBe(422);
+    expect(await unknown.json()).toMatchObject({
+      error: { code: "VALIDATION_ERROR", retryable: false }
+    });
+
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: ["node_modules/tsx/dist/cli.mjs", "src/mcp/server.ts"],
+      cwd: process.cwd(),
+      env: { ...process.env, SHORT_EDITOR_CORE_URL: base }
+    });
+    const client = new Client({ name: "audio-parity-test", version: "1.0.0" });
+    await client.connect(transport);
+    clients.push(client);
+    const mcp = await client.callTool({
+      name: "shorts.update_audio",
+      arguments: {
+        ...body,
+        shortId: project.id,
+        expectedRevision: 2,
+        sourceGainDb: 12,
+        sourceMuted: true,
+        bedGainDb: -60
+      }
+    });
+    expect(mcp.isError).not.toBe(true);
+    const mcpText = JSON.stringify(mcp.content);
+    expect(mcpText).toContain("AUDIO_SPEECH_BACKGROUND_RATIO");
+    expect(mcpText).toContain("\\\"sourceMuted\\\": true");
+    expect(context.service.getShort(project.id).audio).toMatchObject({
+      sourceGainDb: 12,
+      sourceMuted: true,
+      bedGainDb: -60
+    });
+
+    const conflict = await client.callTool({
+      name: "shorts.update_audio",
+      arguments: { ...body, shortId: project.id, expectedRevision: 2 }
+    });
+    expect(conflict.isError).toBe(true);
+    expect(JSON.stringify(conflict.content)).toContain("REVISION_CONFLICT");
+    expect(JSON.stringify(conflict.content)).toContain("\\\"actualRevision\\\":3");
+  });
+
   it("exposes successful timeline/approval mutations and structured failures through both surfaces", async () => {
     const context = setup();
     let project = createAcceptedShort(context);

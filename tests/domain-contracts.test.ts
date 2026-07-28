@@ -126,8 +126,8 @@ describe("SPEC 5.1 entity contracts", () => {
         words: segment.words.map(({ startMs, endMs, text }) => ({ startMs, endMs, text }))
       }]),
       audio: {
-        sourceGainDb: 0, muted: false, fadeInMs: 50, fadeOutMs: 50,
-        bedAssetId: null, bedGainDb: null, normalizeLoudness: false
+        sourceGainDb: 0, sourceMuted: false, cutFadeMs: 50,
+        bedAssetId: null, bedGainDb: null, warnings: []
       },
       copy: {
         cleanedTranscript: "Complete thought.", rewrite: "", hookVariants: ["Hook"],
