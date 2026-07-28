@@ -4,6 +4,9 @@ import { starterTemplates } from "../src/shared/templates";
 import {
   analysisArtifactSchema,
   assetSchema,
+  candidateGenerationDiagnosticSchema,
+  candidateGenerationInputSchema,
+  candidateGenerationResultSchema,
   candidateSchema,
   compositionSchema,
   domainEntitySchemas,
@@ -177,6 +180,44 @@ describe("SPEC 5.1 entity contracts", () => {
     for (const providerClass of ["local", "network", "cloud"] as const) {
       expect(providerProvenanceSchema.safeParse({ ...provenance, providerClass }).success).toBe(true);
     }
+  });
+});
+
+describe("Candidate generation contracts", () => {
+  it("defaults to heuristic mode and requires an artifact in analysis mode", () => {
+    const episodeId = id();
+    expect(candidateGenerationInputSchema.parse({ episodeId })).toEqual({
+      episodeId,
+      count: 8,
+      mode: "heuristic"
+    });
+    expect(candidateGenerationInputSchema.safeParse({
+      episodeId,
+      mode: "analysis"
+    }).success).toBe(false);
+    expect(candidateGenerationInputSchema.parse({
+      episodeId,
+      mode: "analysis",
+      analysisArtifactId: id()
+    })).toMatchObject({ count: 8, mode: "analysis" });
+  });
+
+  it("discriminates sufficient and insufficient diagnostics", () => {
+    expect(candidateGenerationDiagnosticSchema.safeParse({
+      sufficient: false,
+      code: "INSUFFICIENT_MATERIAL",
+      minimumCandidateCount: 5,
+      requestedCount: 8,
+      generatedCount: 2,
+      eligibleWindowCount: 3,
+      rejectionCounts: {
+        duration: 4, quality: 1, overlap: 0, semanticDuplication: 0
+      }
+    }).success).toBe(true);
+    expect(candidateGenerationResultSchema.safeParse({
+      candidates: [],
+      diagnostic: { sufficient: true, requestedCount: 8, generatedCount: 0 }
+    }).success).toBe(false);
   });
 });
 

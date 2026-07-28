@@ -283,6 +283,81 @@ export const candidateSchema = z.strictObject({
 export type Candidate = z.infer<typeof candidateSchema>;
 export type ClipCandidate = Candidate;
 
+const candidateGenerationCountSchema = z.number().int().min(5).max(10).default(8);
+export const candidateGenerationInputSchema = z.union([
+  z.strictObject({
+    episodeId: idSchema,
+    count: candidateGenerationCountSchema,
+    mode: z.literal("analysis"),
+    analysisArtifactId: idSchema
+  }),
+  z.strictObject({
+    episodeId: idSchema,
+    count: candidateGenerationCountSchema,
+    mode: z.literal("heuristic").default("heuristic")
+  })
+]);
+export type CandidateGenerationInput = z.input<typeof candidateGenerationInputSchema>;
+
+const candidateGenerationCountsSchema = z.strictObject({
+  requestedCount: z.number().int().min(5).max(10),
+  generatedCount: z.number().int().nonnegative().max(10)
+});
+export const candidateGenerationDiagnosticSchema = z.discriminatedUnion("sufficient", [
+  candidateGenerationCountsSchema.extend({
+    sufficient: z.literal(true)
+  }),
+  candidateGenerationCountsSchema.extend({
+    sufficient: z.literal(false),
+    code: z.literal("INSUFFICIENT_MATERIAL"),
+    minimumCandidateCount: z.literal(5),
+    eligibleWindowCount: z.number().int().nonnegative(),
+    rejectionCounts: z.strictObject({
+      duration: z.number().int().nonnegative(),
+      quality: z.number().int().nonnegative(),
+      overlap: z.number().int().nonnegative(),
+      semanticDuplication: z.number().int().nonnegative()
+    })
+  })
+]).superRefine((diagnostic, context) => {
+  if (diagnostic.generatedCount > diagnostic.requestedCount) {
+    context.addIssue({
+      code: "custom",
+      path: ["generatedCount"],
+      message: "Generated count cannot exceed requested count"
+    });
+  }
+  if (diagnostic.sufficient && diagnostic.generatedCount < 5) {
+    context.addIssue({
+      code: "custom",
+      path: ["generatedCount"],
+      message: "A sufficient result must contain at least five Candidates"
+    });
+  }
+  if (!diagnostic.sufficient && diagnostic.generatedCount >= 5) {
+    context.addIssue({
+      code: "custom",
+      path: ["generatedCount"],
+      message: "An insufficient result must contain fewer than five Candidates"
+    });
+  }
+});
+export type CandidateGenerationDiagnostic =
+  z.infer<typeof candidateGenerationDiagnosticSchema>;
+export const candidateGenerationResultSchema = z.strictObject({
+  candidates: z.array(candidateSchema).max(10),
+  diagnostic: candidateGenerationDiagnosticSchema
+}).superRefine((result, context) => {
+  if (result.candidates.length !== result.diagnostic.generatedCount) {
+    context.addIssue({
+      code: "custom",
+      path: ["diagnostic", "generatedCount"],
+      message: "Generated count must match the Candidate array"
+    });
+  }
+});
+export type CandidateGenerationResult = z.infer<typeof candidateGenerationResultSchema>;
+
 export const cropKeyframeSchema = z.strictObject({
   atMs: z.number().int().nonnegative(),
   ...normalizedRectangleSchema.shape,

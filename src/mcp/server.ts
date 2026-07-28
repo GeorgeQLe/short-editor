@@ -145,7 +145,10 @@ register("jobs.cancel", "Request cancellation of a queued or running job.", { jo
 register("candidates.list", "List ranked highlight candidates for an episode.", { episodeId: uuid },
   ({ episodeId }) => core(`/candidates?episodeId=${episodeId}`));
 register("candidates.generate", "Generate 5–10 sentence-aligned, deduplicated candidates.", {
-  episodeId: uuid, count: z.number().int().min(5).max(10).optional()
+  episodeId: uuid,
+  count: z.number().int().min(5).max(10).optional(),
+  mode: z.enum(["heuristic", "analysis"]).default("heuristic"),
+  analysisArtifactId: uuid.optional()
 }, (input) => core("/candidates/generate", "POST", input));
 register("candidates.review", "Approve or reject a candidate.", {
   candidateId: uuid, status: z.enum(["approved", "rejected"])

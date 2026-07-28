@@ -557,6 +557,26 @@ absorb a downstream task.
   and capture macOS evidence. Deferred to UI-01.2 and WIN-03.3.
 - **Evidence / acceptance:** G3 automated assertions pass and owners record the
   beta corpus quality threshold and result before release.
+- **Completion evidence (2026-07-27):** Implemented versioned heuristic and
+  explicitly selected analysis-backed generation in
+  [`src/core/candidates.ts`](src/core/candidates.ts), with accepted-revision and
+  provider/artifact provenance, complete 20–90 second segment-window
+  enumeration, deterministic highlight alignment/expansion, immutable scoring
+  and deduplication versions, documented quality floors and ordering, stable
+  duplicate groups, and structured insufficiency diagnostics. Shared schemas,
+  service, HTTP, MCP, and repository ordering are covered by
+  [`tests/candidates.test.ts`](tests/candidates.test.ts),
+  [`tests/candidate-integration.test.ts`](tests/candidate-integration.test.ts),
+  and [`tests/persistence.test.ts`](tests/persistence.test.ts). The anonymized
+  `candidate-corpus-v1` keeps transcripts and labels separate and passes the
+  owner-approved `balanced-beta-v1` gate: 100% duration/alignment/provenance/
+  distinctness validity, 100% labeled-highlight recall at temporal IoU ≥0.5,
+  100% generated-Candidate precision, and 100% pairwise ranking accuracy,
+  exceeding the respective 100%/80%/60%/75% thresholds. Full `npm test`
+  (27 files, 171 tests), `npm run build`, and `git diff --check` pass.
+  Interactive macOS and native Windows evidence remains assigned to
+  UI-01.2/WIN-03.3; append/replace strategies and reviewed-decision conflict
+  handling remain TRC-03.
 
 ### TRC-03 — Preserve decisions and accepted copy across regeneration
 

@@ -2,6 +2,20 @@
 
 ## 2026-07-27
 
+- Completed TRC-02 with versioned deterministic Candidate generation, explicit
+  heuristic or selected-analysis modes, accepted-transcript revision binding,
+  provider/artifact provenance, complete aligned 20–90 second enumeration,
+  quality floors, stable ranking and duplicate groups, and explicit
+  insufficient-material diagnostics through service, HTTP, and MCP.
+- Added a separate-label anonymized `candidate-corpus-v1` and enforced the
+  approved `balanced-beta-v1` gate. Recorded 100% validity, highlight recall,
+  generated precision, and pairwise ranking accuracy against thresholds of
+  100%, 80%, 60%, and 75%, respectively.
+- Added deterministic repeat/tie/boundary/alignment tests, analysis visual-score
+  ranking, stale/mismatched/malformed artifact rejection without fallback,
+  actual revision/provenance binding, persistence ordering, and HTTP/MCP
+  diagnostics. Full `npm test` (27 files, 171 tests), `npm run build`, and
+  `git diff --check` pass.
 - Completed TRC-01 with immutable accepted transcript snapshots, exact/current
   revision reads, full-snapshot optimistic edits, manual-edit provenance, and
   validation for nonempty text plus ordered/bounded segment and word timing.

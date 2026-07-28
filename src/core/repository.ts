@@ -6,6 +6,7 @@ import type {
 } from "../shared/domain.js";
 import { analysisArtifactSchema, timedSegmentsSchema } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
+import { compareCandidates } from "./candidates.js";
 import { assertEpisodeTransition, type RelinkContext } from "../shared/episode-transitions.js";
 import { randomUUID } from "node:crypto";
 import { validateOwnedRelativePath } from "./artifact-path.js";
@@ -616,8 +617,8 @@ export class Repository {
 
   listCandidates(episodeId: string): ClipCandidate[] {
     return (this.db.prepare(
-      "SELECT * FROM candidates WHERE episode_id=? ORDER BY score DESC"
-    ).all(episodeId) as Row[]).map(mapCandidate);
+      "SELECT * FROM candidates WHERE episode_id=?"
+    ).all(episodeId) as Row[]).map(mapCandidate).sort(compareCandidates);
   }
 
   getCandidate(id: string): ClipCandidate {
@@ -753,6 +754,18 @@ export class Repository {
     return (this.db.prepare(`
       SELECT * FROM analysis_artifacts WHERE entity_id=? ORDER BY created_at
     `).all(entityId) as Row[]).map(mapAnalysisArtifact);
+  }
+
+  getAnalysisArtifact(id: string): AnalysisArtifact {
+    const row = this.db.prepare(
+      "SELECT * FROM analysis_artifacts WHERE id=?"
+    ).get(id) as Row | undefined;
+    if (!row) throw new AppError("NOT_FOUND", "Analysis artifact not found", 404);
+    try {
+      return analysisArtifactSchema.parse(mapAnalysisArtifact(row));
+    } catch {
+      throw new AppError("PROVIDER_OUTPUT_INVALID", "Analysis artifact is malformed", 422);
+    }
   }
 
   findAnalysisArtifact(

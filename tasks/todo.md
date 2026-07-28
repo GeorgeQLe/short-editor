@@ -1,10 +1,12 @@
 # Current work
 
-- [ ] TRC-02 — Make Candidate generation deterministic, diagnostic, and
-  corpus-tested.
+- [ ] TRC-03 — Preserve decisions and accepted copy across Candidate
+  regeneration.
 
 ## Completed
 
+- [x] TRC-02 — Make Candidate generation deterministic, diagnostic, and
+  corpus-tested.
 - [x] TRC-01 — Add accepted transcript revisions and safe editing.
 - [x] PRO-05 — Implement OpenAI adapters, provenance, and cache identity.
 - [x] PRO-04 — Add Windows-protected credentials and persisted cloud

@@ -2,73 +2,82 @@
 
 ## User goal
 
-Complete TRC-01 by adding immutable accepted transcript revisions and safe
-editing, then wrap up and ship the session.
+Complete TRC-02 by making Candidate generation deterministic, diagnostic, and
+corpus-tested, then wrap up and ship the session.
 
 ## Changed files and per-file purpose
 
-- `src/shared/contracts.ts` defines normalized transcript-update snapshots,
-  nullable unavailable word/speaker data, nonempty text, timing/order
-  validation, and the optimistic update input.
-- `src/core/repository.ts` accepts a new transcript revision transactionally,
-  keeps exact history, updates the accepted projection, and invalidates every
-  dependent result without changing published schedules or raw transcript
-  artifacts.
-- `src/core/service.ts` exposes exact/current transcript reads and accepted
-  updates, and returns persisted revisions from generated transcription.
-- `src/core/api.ts` adds typed GET/PUT transcript operations with optional exact
-  revision selection.
-- `src/mcp/server.ts` adds typed transcript read/update tools and retains
-  structured error details for optimistic conflicts.
-- `tests/transcript-editing.test.ts` covers repository invariants, HTTP
-  contracts, MCP parity, large snapshots, privacy, and dependent invalidation.
-- `README.md` records accepted transcript editing in the current vertical slice.
-- `SPEC.md` reconciles transcript and Short-invalidation implementation status.
-- `IMPLEMENTATION_PLAN.md` records TRC-01 implementation evidence and preserves
-  its interactive/native validation gates.
-- `tasks/todo.md` completes TRC-01 and promotes TRC-02 as the sole current
-  executable task.
-- `tasks/history.md` records the implementation, review, and verification.
+- `src/core/candidates.ts` implements versioned heuristic and analysis-backed
+  Candidate generation, exhaustive aligned 20–90 second window enumeration,
+  explicit quality floors, stable ranking, semantic/temporal grouping,
+  provenance, and insufficiency diagnostics.
+- `src/shared/contracts.ts` defines strict generation inputs, sufficient and
+  insufficient diagnostics, and result consistency validation.
+- `src/core/service.ts` binds generation to the accepted transcript revision,
+  requires explicit analysis-artifact selection, validates active typed
+  analysis output, and persists the generated result without silent fallback.
+- `src/core/repository.ts` validates selected analysis artifacts and applies the
+  canonical Candidate ranking when reading persisted rows.
+- `src/core/api.ts` and `src/mcp/server.ts` expose the typed generation modes,
+  analysis-artifact selection, and structured diagnostics.
+- `tests/candidates.test.ts` covers repeatability, ordering, boundaries,
+  exhaustive enumeration, quality floors, alignment, provenance, and
+  insufficiency.
+- `tests/candidate-integration.test.ts` covers accepted-revision binding,
+  selected-artifact validation, direct and enveloped typed analysis output,
+  provider provenance, and HTTP/MCP parity.
+- `tests/candidate-corpus.test.ts` enforces the approved corpus quality gate.
+- `tests/fixtures/candidate-corpus/manifest.json`,
+  `tests/fixtures/candidate-corpus/transcripts.json`, and
+  `tests/fixtures/candidate-corpus/labels.json` provide a versioned anonymized
+  corpus with labels stored separately from generation input.
+- `tests/domain-contracts.test.ts` covers generation-schema defaults and
+  diagnostic discrimination.
+- `tests/persistence.test.ts` proves persisted Candidate ordering uses all
+  documented tie breakers.
+- `IMPLEMENTATION_PLAN.md` and `SPEC.md` record TRC-02 implementation evidence,
+  metrics, and the remaining TRC-03/UI/native validation boundary.
+- `tasks/todo.md` completes TRC-02 and promotes TRC-03 as the sole executable
+  current task.
+- `tasks/history.md` records the implementation and verification.
 - `tasks/ship-manifest.md` records this exact shipping boundary and evidence.
 
 Generated `.agents/skillpacks/`, `.claude/skills/`, and `.codex/skills/` local
 artifacts are excluded from the commit. No path under `.claude/skills/` or
 `.codex/skills/` is tracked. `.agents/project.json` remains tracked and
-unchanged. There are no unrelated tracked changes or earlier unpushed commits
-in the boundary.
+unchanged. There are no earlier unpushed commits in the boundary.
 
 ## User-goal mapping
 
-The shared snapshot schema and repository transaction make accepted transcripts
-editable without mutating history or provider raw results. Repository
-invalidation prevents analysis, approved Shorts, successful Renders, or
-non-published schedules from silently continuing against stale transcript
-content. Service, HTTP, and MCP layers expose the same current/exact read and
-optimistic full-snapshot update behavior. The new tests prove validation,
-privacy, history, conflict, invalidation, large-input, and adapter parity
-requirements. Project and task documents close TRC-01 and route the next
-milestone item.
+The generator now produces ranked, sentence/segment-aligned Candidates from the
+actual accepted transcript revision and records an immutable generation
+version. Analysis mode requires an explicitly selected active artifact and
+retains its provider provenance; malformed, mismatched, stale, or missing
+artifacts fail instead of falling back. Quality floors and duplicate grouping
+prevent low-quality padding, while structured diagnostics return every valid
+choice when fewer than five survive. Shared schemas and HTTP/MCP integration
+make those rules consistent at each public boundary. The separate-label corpus
+and deterministic fixtures prove the documented quality and stability claims.
 
 ## Tests run
 
-Executable verification against the shipping source:
+Executable verification against the final source boundary:
 
-- `npm test`: all 25 test files and 160 tests passed. This includes 11 new
-  transcript-editing tests plus all persistence, migration, provider, security,
-  worker, media, reconciliation, scheduling, and regression suites.
+- `npm test`: all 27 test files and 171 tests passed, including the new
+  deterministic generator, corpus, service, HTTP/MCP, schema, and persistence
+  coverage plus the complete regression suite.
 - `npm run build`: TypeScript application checking, Vite production UI build,
   and Node-target TypeScript compilation passed.
-- `git diff --check`: passed against the final pre-commit boundary after
-  documentation reconciliation.
-- A targeted credential-signature scan found no credential material in the
-  shipping paths. The sole match is an intentional fake credential string in
-  `tests/credential-vault.test.ts`.
+- `git diff --check`: passed.
+- A targeted credential-signature scan found no credential material. Matches
+  were policy prose, the Candidate hook heuristic word `secret`, and an
+  intentional schema-rejection fixture.
 
 Documentation/task verification:
 
 - `scripts/audit-task-docs.mjs` is absent, so the repository defines no
   task-document audit command.
-- `tasks/todo.md` has one current executable item, TRC-02, and TRC-01 appears
+- `tasks/todo.md` has one current executable item, TRC-03, and TRC-02 appears
   once under completed work.
 
 ## Skipped tests
@@ -77,56 +86,55 @@ Documentation/task verification:
   is no Makefile, Justfile, Python-project, Cargo validation surface, installed
   `quality-sweep`/`expert-review` command, or task-doc audit. The full Vitest
   suite, production build, failure-oriented review, credential scan, and diff
-  checks are the available gates.
-- `npm run package:win` is deferred because packaged Windows behavior is
-  explicitly owned by WIN-02/WIN-03. This macOS host cannot prove native
-  SQLite, process/IPC behavior, long-path handling, or frozen worker resources.
-- Interactive text/timing/speaker edits and an actual two-client UI conflict
-  were not exercised because the UI does not expose this workflow yet;
-  deterministic repository/HTTP/MCP fixtures cover the executable core, while
-  UI-01.2 and WIN-03.3 own interactive macOS/native Windows evidence.
+  check are the available gates.
+- `npm run package:win` is deferred because packaged Windows behavior is owned
+  by WIN-02/WIN-03. This macOS host cannot prove native SQLite, process/IPC,
+  long-path, or frozen-worker-resource behavior.
+- Interactive regeneration, score inspection, and recovery from insufficient
+  material are deferred to UI-01.2 and WIN-03.3 because the current UI does not
+  expose this workflow; repository, service, HTTP, and MCP tests cover the
+  executable core.
 - No visual check is relevant because this boundary changes no UI component or
   rendered visual asset.
 
 ## Adversarial review
 
-An explicitly justified failure-oriented self-review was used as the quality
-sweep equivalent because no standalone review command is installed and
-multi-agent delegation was not authorized for this invocation. The review
-traced stale and concurrent clients, exact-history mutability, first/generated
-revision behavior, missing-source edits, empty and overlapping content, words
-outside segments, duplicate segment IDs, timing beyond Episode duration,
-nullable no-diarization data, provider raw-output preservation, accepted and
-proposed analysis invalidation, Short approval/revision changes, succeeded
-versus failed Render behavior, non-published versus published schedules, HTTP
-error redaction, MCP error detail, 1,001-segment persistence, and generated
-local artifact boundaries.
+An explicitly justified failure-oriented self-review was used as the review
+lane because no standalone review command is installed and multi-agent review
+was not requested. The review traced empty/short/long transcripts, exact 20 and
+90 second boundaries, transcripts with more than the former segment cap,
+quality-floor rejection, overlap and semantic grouping, tied scores and ranges,
+whitespace/token normalization, short-highlight expansion, outside and
+overlong highlights, selected artifacts that are missing, stale, mismatched,
+or malformed, direct and typed-envelope provider output, accepted transcript
+revision changes, persistence ordering, insufficient-result consistency,
+HTTP/MCP schema behavior, generated local artifacts, and credential patterns.
 
-No correctness finding remained after review. The full executable suite and
-build passed without warnings.
+No correctness finding remained after review. All executable checks passed
+without warnings.
 
 ## Residual risk
 
-- Accepted transcript replacement increments every dependent Short and
-  non-published schedule revision, even when an edit is semantically
-  equivalent. This deliberately favors safe invalidation; UI-01.2 should make
-  that consequence visible before accepting an edit.
-- Repository transactions serialize optimistic updates within the supported
-  single Electron-owned SQLite topology. Unsupported multi-process direct
-  database writers are outside the acceptance boundary.
-- The HTTP/MCP snapshot path handles the required 1,001-segment fixture, but
-  native packaged performance on unusually large transcripts remains part of
-  WIN-03.3.
-- Interactive editing, conflict presentation, and macOS/Windows evidence remain
-  unproven until the UI task exposes the operation.
+- The anonymized corpus is deliberately small and synthetic. Its 100% result
+  proves the versioned gate but does not establish production quality on a
+  broad real-world creator corpus.
+- Candidate IDs and timestamps are newly generated on each run; deterministic
+  ordering/content/provenance are stable for identical accepted inputs, while
+  identity preservation and user-decision conflict handling are intentionally
+  deferred to TRC-03.
+- Pending Candidate replacement is transactional and reviewed rows survive, but
+  regeneration does not yet suppress conflicts against retained decisions.
+  TRC-03 owns append/replace strategies, accepted-copy preservation, and
+  conflict resolution.
+- Interactive macOS and packaged native Windows validation remain open under
+  UI-01.2 and WIN-03.3.
 
 ## Rollback note
 
-Revert the TRC-01 commit. No schema migration is added by this boundary; existing
-transcript revision rows remain compatible. Reverting removes accepted-edit
-operations and their invalidation behavior but does not delete stored revision
-history, raw provider artifacts, media, or user projects.
+Revert the TRC-02 feature commit to restore the prior single-mode Candidate
+generator and API. This boundary adds no database migration; persisted
+generation provenance uses existing columns.
 
 ## Next command
 
-`$exec TRC-02`
+`$exec`

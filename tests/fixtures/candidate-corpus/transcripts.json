@@ -1,0 +1,58 @@
+{
+  "long-form-sufficient": {
+    "durationsMs": [20000, 20000, 20000, 20000, 20000, 20000],
+    "texts": [
+      "Here is why a clear opening gives the audience a complete practical lesson.",
+      "The result is a focused example about preparing a useful interview question.",
+      "This independent explanation shows how a careful edit preserves the speaker's meaning.",
+      "A concise demonstration reveals why visual motion supports the strongest moment.",
+      "The takeaway is a complete method for checking evidence before publishing a claim.",
+      "Finally, this self-contained example explains how a clear ending rewards the viewer."
+    ],
+    "highlights": [
+      {"startMs": 0, "endMs": 20000, "title": "Opening", "reason": "Complete idea", "scores": {"hook": 0.96, "coherence": 0.92, "payoff": 0.88, "independence": 0.94, "delivery": 0.82, "visualActivity": 0.72}},
+      {"startMs": 20000, "endMs": 40000, "title": "Question", "reason": "Complete idea", "scores": {"hook": 0.86, "coherence": 0.9, "payoff": 0.84, "independence": 0.91, "delivery": 0.8, "visualActivity": 0.61}},
+      {"startMs": 40000, "endMs": 60000, "title": "Meaning", "reason": "Complete idea", "scores": {"hook": 0.8, "coherence": 0.88, "payoff": 0.81, "independence": 0.9, "delivery": 0.79, "visualActivity": 0.66}},
+      {"startMs": 60000, "endMs": 80000, "title": "Motion", "reason": "Complete idea", "scores": {"hook": 0.79, "coherence": 0.86, "payoff": 0.78, "independence": 0.87, "delivery": 0.77, "visualActivity": 0.98}},
+      {"startMs": 80000, "endMs": 100000, "title": "Evidence", "reason": "Complete idea", "scores": {"hook": 0.75, "coherence": 0.84, "payoff": 0.76, "independence": 0.85, "delivery": 0.75, "visualActivity": 0.7}},
+      {"startMs": 100000, "endMs": 120000, "title": "Ending", "reason": "Complete idea", "scores": {"hook": 0.72, "coherence": 0.82, "payoff": 0.74, "independence": 0.83, "delivery": 0.73, "visualActivity": 0.68}}
+    ]
+  },
+  "short-insufficient": {
+    "durationsMs": [10000, 10000],
+    "texts": [
+      "Here is why one concise setup matters.",
+      "The result completes this short practical lesson."
+    ],
+    "highlights": [
+      {"startMs": 0, "endMs": 20000, "title": "Only idea", "reason": "Complete but alone", "scores": {"hook": 0.9, "coherence": 0.9, "payoff": 0.9, "independence": 0.9, "delivery": 0.8, "visualActivity": 0.6}},
+      {"startMs": 5000, "endMs": 15000, "title": "Below floor", "reason": "Rejected quality", "scores": {"hook": 0.9, "coherence": 0.5, "payoff": 0.9, "independence": 0.9, "delivery": 0.8, "visualActivity": 0.6}}
+    ]
+  },
+  "repeated-topic-and-boundaries": {
+    "durationsMs": [90000, 20000, 20000],
+    "texts": [
+      "Here is why the exact ninety second boundary provides one complete anonymized lesson.",
+      "A repeated practical topic uses the same normalized words for semantic grouping.",
+      "A repeated practical topic uses the same normalized words for semantic grouping."
+    ],
+    "highlights": [
+      {"startMs": 0, "endMs": 90000, "title": "Ninety", "reason": "Exact boundary", "scores": {"hook": 0.92, "coherence": 0.9, "payoff": 0.86, "independence": 0.91, "delivery": 0.8, "visualActivity": 0.7}},
+      {"startMs": 90000, "endMs": 110000, "title": "Repeated A", "reason": "Semantic representative", "scores": {"hook": 0.84, "coherence": 0.86, "payoff": 0.8, "independence": 0.88, "delivery": 0.78, "visualActivity": 0.72}},
+      {"startMs": 110000, "endMs": 130000, "title": "Repeated B", "reason": "Semantic duplicate", "scores": {"hook": 0.78, "coherence": 0.82, "payoff": 0.76, "independence": 0.84, "delivery": 0.74, "visualActivity": 0.7}}
+    ]
+  },
+  "alignment-and-tied-scores": {
+    "durationsMs": [10000, 10000, 10000, 10000],
+    "texts": [
+      "Here is why the earlier segment completes the first aligned idea.",
+      "The result closes the first aligned idea at a transcript boundary.",
+      "A separate explanation begins with a complete independent setup.",
+      "Finally, the separate explanation ends with a practical takeaway."
+    ],
+    "highlights": [
+      {"startMs": 10100, "endMs": 11000, "title": "Expanded", "reason": "Earlier tie break", "scores": {"hook": 0.8, "coherence": 0.85, "payoff": 0.8, "independence": 0.85, "delivery": 0.75, "visualActivity": 0.7}},
+      {"startMs": 20000, "endMs": 40000, "title": "Exact", "reason": "Tied score", "scores": {"hook": 0.8, "coherence": 0.85, "payoff": 0.8, "independence": 0.85, "delivery": 0.75, "visualActivity": 0.7}}
+    ]
+  }
+}

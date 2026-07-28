@@ -182,6 +182,42 @@ describe("complete transactional persistence", () => {
     expect(repository.getShort(project.id)).toEqual(project);
   });
 
+  it("lists Candidates with the generation rank tie breakers", () => {
+    const repository = setup();
+    const source = episode();
+    repository.insertEpisode(source);
+    const lowHook = candidate(source.id, {
+      id: randomUUID(),
+      startMs: 0,
+      endMs: 20_000,
+      score: .8,
+      scores: {
+        hook: .7, coherence: .8, payoff: .8,
+        independence: .8, delivery: .8, visualActivity: .5
+      }
+    });
+    const later = candidate(source.id, {
+      id: randomUUID(),
+      startMs: 40_000,
+      endMs: 60_000,
+      score: .8,
+      scores: {
+        hook: .9, coherence: .8, payoff: .8,
+        independence: .8, delivery: .8, visualActivity: .5
+      }
+    });
+    const earlier = candidate(source.id, {
+      id: randomUUID(),
+      startMs: 20_000,
+      endMs: 40_000,
+      score: .8,
+      scores: later.scores
+    });
+    repository.replaceCandidates(source.id, [lowHook, later, earlier]);
+    expect(repository.listCandidates(source.id).map((item) => item.id))
+      .toEqual([earlier.id, later.id, lowHook.id]);
+  });
+
   it("uses CAS guards for transcripts, templates, rules, and forbidden states", () => {
     const repository = setup();
     const source = episode({ status: "discovered" });

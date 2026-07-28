@@ -4,6 +4,8 @@ import { extname, resolve } from "node:path";
 import { z } from "zod";
 import {
   type Asset,
+  candidateGenerationInputSchema,
+  type CandidateGenerationInput,
   type Composition,
   type ScheduleRules,
   type ShortProject,
@@ -26,6 +28,7 @@ import type { CloudAuthorization } from "./repository.js";
 import { WatchedFolderCoordinator } from "./watched-folders.js";
 import {
   classifyProviderEndpoint,
+  episodeAnalysisOutputSchema,
   localAnalysisJobOptionsSchema,
   type OllamaAnalysisProvider,
   type LocalVisualSampler
@@ -572,13 +575,60 @@ export class CoreService {
     });
   }
 
-  generateCandidates(episodeId: string, count?: number) {
-    this.repository.getEpisode(episodeId);
-    const transcript = this.repository.getTranscript(episodeId);
-    if (!transcript.length) throw new AppError("INVALID_STATE", "Episode has no transcript", 409);
-    const candidates = generateCandidates(episodeId, transcript, { count });
-    this.repository.replaceCandidates(episodeId, candidates);
-    return candidates;
+  generateCandidates(input: CandidateGenerationInput) {
+    const parsed = candidateGenerationInputSchema.parse(input);
+    this.repository.getEpisode(parsed.episodeId);
+    const transcript = this.repository.getAcceptedTranscriptRevision(parsed.episodeId);
+    let result;
+    if (parsed.mode === "analysis") {
+      const artifact = this.repository.getAnalysisArtifact(parsed.analysisArtifactId);
+      if (
+        artifact.entityId !== parsed.episodeId
+        || artifact.ownerType !== "episode"
+        || artifact.kind !== "episode_analysis"
+        || (artifact.state !== "proposed" && artifact.state !== "accepted")
+      ) {
+        throw new AppError(
+          "INVALID_STATE",
+          "Analysis artifact is not an active episode analysis for this Episode",
+          409
+        );
+      }
+      const direct = episodeAnalysisOutputSchema.safeParse(artifact.rawOutput);
+      const envelope = z.strictObject({
+        typedOutput: episodeAnalysisOutputSchema,
+        providerOutput: z.json(),
+        requestMetadata: z.json()
+      }).safeParse(artifact.rawOutput);
+      const output = direct.success ? direct.data : envelope.success ? envelope.data.typedOutput : null;
+      if (!output) {
+        throw new AppError(
+          "PROVIDER_OUTPUT_INVALID",
+          "Analysis artifact output does not match a supported analysis envelope",
+          422
+        );
+      }
+      result = generateCandidates({
+        episodeId: parsed.episodeId,
+        transcriptRevision: transcript.revision,
+        segments: transcript.segments,
+        count: parsed.count,
+        mode: "analysis",
+        analysisArtifactId: artifact.id,
+        provider: artifact.provenance,
+        highlights: output.highlights
+      });
+    } else {
+      result = generateCandidates({
+        episodeId: parsed.episodeId,
+        transcriptRevision: transcript.revision,
+        segments: transcript.segments,
+        count: parsed.count,
+        mode: "heuristic"
+      });
+    }
+    this.repository.replaceCandidates(parsed.episodeId, result.candidates);
+    return result;
   }
   listCandidates(episodeId: string) { return this.repository.listCandidates(episodeId); }
   reviewCandidate(id: string, status: "approved" | "rejected") {
@@ -720,4 +770,4 @@ export const relinkSourceInput = z.strictObject({
 export const confirmRelinkInput = z.strictObject({
   confirmationToken: z.string().min(1)
 });
-export const candidateGenerateInput = z.object({ episodeId: z.string().uuid(), count: z.number().int().min(5).max(10).optional() });
+export const candidateGenerateInput = candidateGenerationInputSchema;

@@ -127,7 +127,7 @@ export function createApi(service: CoreService, desktopToken?: string) {
   app.get("/v1/candidates", route((req) => service.listCandidates(id.parse(req.query.episodeId))));
   app.post("/v1/candidates/generate", route((req) => {
     const input = candidateGenerateInput.parse(req.body);
-    return service.generateCandidates(input.episodeId, input.count);
+    return service.generateCandidates(input);
   }));
   app.post("/v1/candidates/:id/review", route((req) => service.reviewCandidate(
     id.parse(req.params.id), z.enum(["approved", "rejected"]).parse(req.body.status)

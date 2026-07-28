@@ -1,0 +1,17 @@
+{
+  "corpusVersion": "candidate-corpus-v1",
+  "qualityGateVersion": "balanced-beta-v1",
+  "thresholds": {
+    "validity": 1,
+    "recall": 0.8,
+    "precision": 0.6,
+    "pairwiseRankingAccuracy": 0.75,
+    "temporalIou": 0.5
+  },
+  "cases": [
+    "long-form-sufficient",
+    "short-insufficient",
+    "repeated-topic-and-boundaries",
+    "alignment-and-tied-scores"
+  ]
+}

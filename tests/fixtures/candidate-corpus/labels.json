@@ -1,0 +1,33 @@
+{
+  "long-form-sufficient": {
+    "expectedStatus": "sufficient",
+    "eligibleHighlights": [
+      {"startMs": 0, "endMs": 20000, "grade": 4, "semanticGroup": "opening"},
+      {"startMs": 20000, "endMs": 40000, "grade": 4, "semanticGroup": "question"},
+      {"startMs": 40000, "endMs": 60000, "grade": 3, "semanticGroup": "meaning"},
+      {"startMs": 60000, "endMs": 80000, "grade": 3, "semanticGroup": "motion"},
+      {"startMs": 80000, "endMs": 100000, "grade": 2, "semanticGroup": "evidence"},
+      {"startMs": 100000, "endMs": 120000, "grade": 1, "semanticGroup": "ending"}
+    ]
+  },
+  "short-insufficient": {
+    "expectedStatus": "insufficient",
+    "eligibleHighlights": [
+      {"startMs": 0, "endMs": 20000, "grade": 3, "semanticGroup": "only-idea"}
+    ]
+  },
+  "repeated-topic-and-boundaries": {
+    "expectedStatus": "insufficient",
+    "eligibleHighlights": [
+      {"startMs": 0, "endMs": 90000, "grade": 4, "semanticGroup": "ninety"},
+      {"startMs": 90000, "endMs": 110000, "grade": 3, "semanticGroup": "repeated"}
+    ]
+  },
+  "alignment-and-tied-scores": {
+    "expectedStatus": "insufficient",
+    "eligibleHighlights": [
+      {"startMs": 0, "endMs": 20000, "grade": 3, "semanticGroup": "expanded"},
+      {"startMs": 20000, "endMs": 40000, "grade": 3, "semanticGroup": "exact"}
+    ]
+  }
+}
