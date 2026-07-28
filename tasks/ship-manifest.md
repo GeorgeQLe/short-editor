@@ -120,7 +120,8 @@ already marked published should remain treated as immutable during rollback.
 
 ### Next command
 
-Begin API-01 versioned HTTP API inventory and contract coverage.
+Run `npx skillpacks install exec-loop` from the project shell before invoking
+`$exec` for API-01 versioned HTTP API inventory and contract coverage.
 
 ## SCH-01 shipping boundary — 2026-07-28
 
