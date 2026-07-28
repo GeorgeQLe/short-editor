@@ -12,6 +12,10 @@ import {
   renderPreflightResultSchema,
   renderStartRequestSchema,
   renderStartResultSchema,
+  scheduleDraftInputSchema,
+  scheduleDraftResultSchema,
+  scheduleRuleSetSchema,
+  scheduleRuleUpdateInputSchema,
   sourceRangesSchema,
   templateCloneInputSchema,
   templateUpdateInputSchema,
@@ -62,6 +66,30 @@ const register = (
     };
   }
 });
+const registerStructured = <T>(
+  name: string,
+  description: string,
+  inputSchema: Record<string, z.ZodType>,
+  outputSchema: z.ZodType<T>,
+  run: (input: Record<string, unknown>) => Promise<unknown>
+) => server.registerTool(
+  name,
+  { description, inputSchema, outputSchema },
+  async (input) => {
+    try {
+      const value = outputSchema.parse(await run(input));
+      return { ...result(value), structuredContent: value as Record<string, unknown> };
+    } catch (error) {
+      return {
+        isError: true,
+        content: [{
+          type: "text" as const,
+          text: error instanceof Error ? error.message : String(error)
+        }]
+      };
+    }
+  }
+);
 
 register("library.list_episodes", "List inventoried episodes and production coverage.", {
   search: z.string().optional()
@@ -334,10 +362,23 @@ register("renders.list", "List render records, optionally for one Short.", {
 
 register("schedule.get", "Get launch calendar entries.", {},
   () => core("/schedule"));
-register("schedule.draft", "Draft deterministic legal slots from approved validated renders.", {
-  shorts: z.array(z.record(z.string(), z.unknown())),
-  rules: z.record(z.string(), z.unknown())
-}, (input) => core("/schedule/draft", "POST", input));
+registerStructured("schedule.get_rules", "Get the persisted default schedule rule snapshot.", {},
+  scheduleRuleSetSchema, () => core("/schedule/rules"));
+registerStructured("schedule.update_rules", "Create or exactly replace the persisted default schedule rule snapshot.", {
+  expectedRevision: scheduleRuleUpdateInputSchema.shape.expectedRevision,
+  startDate: scheduleRuleUpdateInputSchema.shape.startDate,
+  timezone: scheduleRuleUpdateInputSchema.shape.timezone,
+  allowedWeekdays: scheduleRuleUpdateInputSchema.shape.allowedWeekdays,
+  times: scheduleRuleUpdateInputSchema.shape.times,
+  maxPerDay: scheduleRuleUpdateInputSchema.shape.maxPerDay,
+  blackoutDates: scheduleRuleUpdateInputSchema.shape.blackoutDates,
+  minimumSameEpisodeSpacingHours:
+    scheduleRuleUpdateInputSchema.shape.minimumSameEpisodeSpacingHours
+}, scheduleRuleSetSchema, (input) => core("/schedule/rules", "PUT", input));
+registerStructured("schedule.draft", "Draft deterministic legal slots from approved validated renders.", {
+  shorts: scheduleDraftInputSchema.shape.shorts,
+  expectedRulesRevision: scheduleDraftInputSchema.shape.expectedRulesRevision
+}, scheduleDraftResultSchema, (input) => core("/schedule/draft", "POST", input));
 register("schedule.move", "Move an unlocked entry to a legal, collision-free slot.", {
   entryId: uuid, expectedRevision, publishAt: z.string().datetime()
 }, ({ entryId, ...input }) => core(`/schedule/${entryId}/move`, "POST", input));

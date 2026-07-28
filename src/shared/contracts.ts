@@ -1104,23 +1104,103 @@ export const renderPreflightResultSchema = z.strictObject({
 });
 export type RenderPreflightResult = z.infer<typeof renderPreflightResultSchema>;
 
+const uniqueScheduleValues = (
+  values: readonly (string | number)[],
+  context: z.RefinementCtx,
+  path: string
+) => {
+  const seen = new Set<string | number>();
+  values.forEach((value, index) => {
+    if (seen.has(value)) {
+      context.addIssue({
+        code: "custom",
+        path: [path, index],
+        message: `Duplicate ${path === "times" ? "wall time" : path === "allowedWeekdays" ? "weekday" : "blackout date"}`
+      });
+    }
+    seen.add(value);
+  });
+};
+
 export const scheduleRulesSchema = z.strictObject({
   startDate: dateSchema,
   timezone: ianaTimezoneSchema,
   allowedWeekdays: z.array(z.number().int().min(0).max(6)).min(1),
   times: z.array(wallTimeSchema).min(1),
-  maxPerDay: z.number().int().positive(),
+  maxPerDay: z.number().int().positive().max(1440),
   blackoutDates: z.array(dateSchema),
-  minimumSameEpisodeSpacingHours: z.number().int().nonnegative()
+  minimumSameEpisodeSpacingHours: z.number().int().nonnegative().max(24 * 365)
+}).superRefine((rules, context) => {
+  uniqueScheduleValues(rules.allowedWeekdays, context, "allowedWeekdays");
+  uniqueScheduleValues(rules.times, context, "times");
+  uniqueScheduleValues(rules.blackoutDates, context, "blackoutDates");
+  if (rules.maxPerDay > rules.times.length) {
+    context.addIssue({
+      code: "custom",
+      path: ["maxPerDay"],
+      message: "Daily cap cannot exceed the number of configured wall times"
+    });
+  }
 });
 export type ScheduleRules = z.infer<typeof scheduleRulesSchema>;
-export const scheduleRuleSetSchema = scheduleRulesSchema.extend({
+export const scheduleRuleSetSchema = scheduleRulesSchema.safeExtend({
   id: z.union([idSchema, z.string().min(1)]),
   revision: positiveRevisionSchema,
+  timezoneDatabaseVersion: z.string().min(1),
   createdAt: utcInstantSchema,
   updatedAt: utcInstantSchema
 });
 export type ScheduleRuleSet = z.infer<typeof scheduleRuleSetSchema>;
+export const scheduleRuleUpdateInputSchema = scheduleRulesSchema.safeExtend({
+  expectedRevision: positiveRevisionSchema.optional()
+});
+export type ScheduleRuleUpdateInput = z.infer<typeof scheduleRuleUpdateInputSchema>;
+
+export const schedulableShortSchema = z.strictObject({
+  shortId: idSchema,
+  renderId: idSchema,
+  episodeId: idSchema,
+  priority: z.number().int(),
+  topic: z.string().min(1).optional()
+});
+export type SchedulableShort = z.infer<typeof schedulableShortSchema>;
+export const scheduleDraftInputSchema = z.strictObject({
+  shorts: z.array(schedulableShortSchema),
+  expectedRulesRevision: positiveRevisionSchema
+});
+export type ScheduleDraftInput = z.infer<typeof scheduleDraftInputSchema>;
+
+export const scheduleDstPolicyId = "shift-forward-gap-earlier-overlap-v1" as const;
+export const scheduleDstWarningSchema = z.strictObject({
+  kind: z.enum(["nonexistent_local_time", "ambiguous_local_time"]),
+  localDate: dateSchema,
+  localTime: wallTimeSchema,
+  timezone: ianaTimezoneSchema,
+  selectedUtcInstant: utcInstantSchema,
+  alternativeUtcInstant: utcInstantSchema.optional(),
+  adjustmentMinutes: z.number().int().nonnegative()
+});
+export type ScheduleDstWarning = z.infer<typeof scheduleDstWarningSchema>;
+
+export const scheduleDraftEntrySchema = z.strictObject({
+  id: idSchema,
+  shortId: idSchema,
+  renderId: idSchema,
+  episodeId: idSchema,
+  publishAt: utcInstantSchema,
+  timezone: ianaTimezoneSchema,
+  priority: z.number().int(),
+  rationale: z.string().min(1)
+});
+export type ScheduleDraftEntry = z.infer<typeof scheduleDraftEntrySchema>;
+export const scheduleDraftResultSchema = z.strictObject({
+  entries: z.array(scheduleDraftEntrySchema),
+  warnings: z.array(scheduleDstWarningSchema),
+  rulesRevision: positiveRevisionSchema,
+  dstPolicy: z.literal(scheduleDstPolicyId),
+  resolverTimezoneDatabaseVersion: z.string().min(1)
+});
+export type ScheduleDraftResult = z.infer<typeof scheduleDraftResultSchema>;
 
 export const scheduleEntryStatuses = ["draft", "planned", "published"] as const;
 export const scheduleEntryStatusSchema = z.enum(scheduleEntryStatuses);

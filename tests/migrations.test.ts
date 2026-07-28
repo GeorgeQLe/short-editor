@@ -48,6 +48,7 @@ describe("database migrations", () => {
       migrateDatabase(legacy, databaseMigrations.slice(0, version));
       const episodeId = randomUUID();
       const segmentId = randomUUID();
+      const scheduleEntryId = randomUUID();
       const now = "2026-07-27T12:00:00.000Z";
       legacy.prepare(`
         INSERT INTO episodes(
@@ -88,6 +89,33 @@ describe("database migrations", () => {
           ) VALUES(?,?,'image','fixture',1,'["tag"]',?,?)
         `).run(randomUUID(), "/asset.png", now, now);
       }
+      legacy.pragma("foreign_keys = OFF");
+      legacy.prepare(`
+        INSERT INTO schedule_entries(
+          id,short_id,render_id,episode_id,publish_at,timezone,status,priority,
+          rationale,locked,youtube_url,needs_rerender,revision,created_at,updated_at
+        ) VALUES(?,?,?,?,?,'America/New_York','draft',7,'preserve schedule',0,
+          NULL,0,1,?,?)
+      `).run(
+        scheduleEntryId,
+        randomUUID(),
+        randomUUID(),
+        episodeId,
+        "2026-08-01T13:30:00.000Z",
+        now,
+        now
+      );
+      legacy.pragma("foreign_keys = ON");
+      if (version >= 3) {
+        legacy.prepare(`
+          INSERT INTO schedule_rule_sets(
+            id,revision,start_date,timezone,allowed_weekdays_json,times_json,
+            max_per_day,blackout_dates_json,minimum_same_episode_spacing_hours,
+            created_at,updated_at
+          ) VALUES('default',3,'2026-07-27','America/New_York','[1,3,5]',
+            '["09:30"]',1,'[]',48,?,?)
+        `).run(now, now);
+      }
       legacy.close();
 
       const upgraded = openDatabase(path);
@@ -103,6 +131,22 @@ describe("database migrations", () => {
       if (version >= 2) {
         expect(upgraded.prepare("SELECT source_path,tags_json FROM assets").get())
           .toEqual({ source_path: "/asset.png", tags_json: "[\"tag\"]" });
+      }
+      expect(upgraded.prepare(`
+        SELECT publish_at,rationale FROM schedule_entries WHERE id=?
+      `).get(scheduleEntryId)).toEqual({
+        publish_at: "2026-08-01T13:30:00.000Z",
+        rationale: "preserve schedule"
+      });
+      if (version >= 3) {
+        expect(upgraded.prepare(`
+          SELECT revision,times_json,timezone_database_version
+          FROM schedule_rule_sets WHERE id='default'
+        `).get()).toEqual({
+          revision: 3,
+          times_json: "[\"09:30\"]",
+          timezone_database_version: "unknown"
+        });
       }
     });
   }
@@ -127,6 +171,29 @@ describe("database migrations", () => {
     expect(db.prepare(
       "SELECT 1 FROM schema_migrations WHERE version=?"
     ).get(CURRENT_SCHEMA_VERSION + 1)).toBeUndefined();
+  });
+
+  it("preserves legacy schedule rules with unknown timezone database diagnostics", () => {
+    const db = new Database(":memory:");
+    databases.push(db);
+    migrateDatabase(db, databaseMigrations.slice(0, 15));
+    const now = "2026-07-27T12:00:00.000Z";
+    db.prepare(`
+      INSERT INTO schedule_rule_sets(
+        id,revision,start_date,timezone,allowed_weekdays_json,times_json,max_per_day,
+        blackout_dates_json,minimum_same_episode_spacing_hours,created_at,updated_at
+      ) VALUES('default',4,'2026-07-27','America/New_York','[1,3,5]',
+        '["09:30","17:00"]',2,'["2026-12-25"]',48,?,?)
+    `).run(now, now);
+    migrateDatabase(db);
+    expect(db.prepare(`
+      SELECT revision,times_json,timezone_database_version
+      FROM schedule_rule_sets WHERE id='default'
+    `).get()).toEqual({
+      revision: 4,
+      times_json: "[\"09:30\",\"17:00\"]",
+      timezone_database_version: "unknown"
+    });
   });
 
   it("demotes pre-RND-03 successes while preserving their legacy outputs", () => {

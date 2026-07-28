@@ -2,6 +2,23 @@
 
 ## 2026-07-28
 
+- Completed SCH-01 with migration 16, one canonical revisioned `default`
+  schedule-rule snapshot, first-create and exact-CAS replacement semantics,
+  canonical weekday/time/blackout ordering, and write-time timezone-database
+  provenance while preserving migrated rows as `unknown`.
+- Added the documented `shift-forward-gap-earlier-overlap-v1` resolver using
+  explicit IANA zones: nonexistent local times shift by the exact transition
+  gap, ambiguous times select the earlier instant, and selected anomalous slots
+  return typed diagnostics plus resolver timezone-database provenance.
+- Drafting now requires an exact persisted rules revision across HTTP and typed
+  MCP and creates entries transactionally. Failure-oriented review found and
+  fixed a caller-controlled Episode mismatch that could bypass same-Episode
+  spacing; eligibility now binds the Short, Render, and persisted owning
+  Episode before scheduling.
+- Full verification passes 37 test files and 269 tests plus production
+  build/typecheck, diff hygiene, and focused secret scanning. Interactive
+  calendar proof remains UI-01.5/WIN-03.7. Promoted SCH-02.
+
 - Completed RND-04 with migration 15 and strict public Render lineage fields:
   roots are attempt 1, retries point to the immediately previous immutable
   attempt, `(lineage_id, attempt)` is unique, and each lineage is capped at

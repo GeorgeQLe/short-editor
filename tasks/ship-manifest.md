@@ -1,5 +1,129 @@
 # Ship manifest
 
+## SCH-01 shipping boundary — 2026-07-28
+
+### User goal
+
+Persist canonical revisioned schedule rules and implement deterministic,
+machine-timezone-independent DST resolution with a documented warning policy
+through the core, HTTP, and typed MCP boundaries.
+
+### Changed files
+
+`IMPLEMENTATION_PLAN.md`, `SPEC.md`, `src/core/api.ts`,
+`src/core/database.ts`, `src/core/repository.ts`, `src/core/scheduler.ts`,
+`src/core/service.ts`, `src/mcp/server.ts`, `src/shared/contracts.ts`,
+`tasks/history.md`, `tasks/ship-manifest.md`, `tasks/todo.md`,
+`tests/domain-contracts.test.ts`, `tests/migrations.test.ts`,
+`tests/persistence.test.ts`, `tests/schedule-rules.test.ts`, and
+`tests/scheduler.test.ts`.
+
+Generated `.agents/skillpacks/`, `.claude/`, and `.codex/` local artifacts are
+unrelated and excluded. No path under `.claude/skills/` or
+`.codex/skills/` is tracked. `.agents/project.json` remains tracked and
+unchanged. There are no earlier unpushed commits or unrelated tracked changes
+in the boundary.
+
+### Per-file purpose
+
+- `src/shared/contracts.ts` defines strict schedule-rule updates, schedulable
+  Shorts, draft results, the v1 DST policy, warnings, canonical-value
+  constraints, and timezone-database diagnostics.
+- `src/core/database.ts` adds migration 16 and preserves legacy rule snapshots
+  with explicit `unknown` timezone-database provenance.
+- `src/core/repository.ts` reads, creates, and exactly replaces complete
+  revisioned snapshots including timezone-database provenance.
+- `src/core/scheduler.ts` resolves explicit-zone wall times, implements exact
+  gap shifting and earlier-overlap selection, emits selected-slot warnings,
+  and returns rule/resolver provenance with deterministic drafts.
+- `src/core/service.ts` canonicalizes full snapshots, coordinates first-create
+  and CAS updates, requires the persisted rule revision for drafting, validates
+  current approved deterministic Renders, binds each Short to its persisted
+  owning Episode, and inserts the draft atomically.
+- `src/core/api.ts` and `src/mcp/server.ts` expose strict matching rule read,
+  update, and persisted-revision draft operations.
+- `tests/scheduler.test.ts` covers gaps, overlaps, non-hour transitions,
+  historical/future offsets, host-zone independence, warning selection,
+  cadence, blackouts, occupation, and Episode spacing.
+- `tests/schedule-rules.test.ts` covers creation, canonicalization, CAS,
+  invalid snapshots, persisted-revision drafting, Short/Episode ownership, and
+  HTTP/MCP parity. The migration, persistence, and domain-contract suites cover
+  migration 16 and the expanded strict entity surface.
+- `SPEC.md` and `IMPLEMENTATION_PLAN.md` document the implemented DST and
+  revision policy and distinguish SCH-02/UI work. `tasks/todo.md` closes
+  SCH-01 and promotes SCH-02; `tasks/history.md` records the completed behavior
+  and evidence; this manifest records the exact shipping boundary.
+
+### User-goal mapping
+
+The shared schemas, migration, repository, and service form one durable
+full-snapshot rule lifecycle with canonical storage and exact revisions. The
+resolver and scheduler preserve configured wall-clock intent using an explicit
+versioned anomaly policy and expose enough provenance to diagnose runtime
+timezone-data differences. HTTP and MCP use the same strict contracts and core
+logic. The executable suites exercise every promised persistence, resolution,
+transport, and rollback boundary.
+
+### Tests run
+
+- Executable verification: `npm test` passed all 37 test files and 269 tests,
+  including real FFmpeg coverage and the new DST/rule/ownership regressions.
+- Executable verification: `npm run build` passed application typecheck, Vite
+  production build, and Node TypeScript compilation without warnings.
+- Repository verification: `git diff --check` passed.
+- Security verification: a focused changed-file scan found no private-key,
+  credential, token, password, secret, or API-key material.
+
+### Skipped tests
+
+- Native Windows NSIS packaging and Windows timezone-database behavior were
+  skipped because the current host is macOS; WIN-03.7 owns the packaged
+  calendar acceptance gate.
+- Interactive stale-save, spring/fall warning, calendar, and recovery checks
+  were skipped because this boundary adds core/HTTP/MCP behavior rather than
+  the calendar UI; UI-01.5 owns that acceptance.
+- No lint script exists in `package.json`; the full suite, typecheck,
+  production build, diff hygiene, and focused security scan are the available
+  automated gates.
+
+### Adversarial review
+
+A failure-oriented changed-file review served as the equivalent review lane
+because no repository-local `quality-sweep` or `expert-review` command is
+installed. It traced invalid/canonical snapshots, missing and stale revisions,
+concurrent first writes, migration preservation, host timezone leakage,
+ordinary/gap/overlap resolution, non-one-hour transitions, warning selection,
+occupied slots, transaction rollback, approved/current/deterministic Render
+eligibility, caller-controlled identity fields, and HTTP/MCP parity.
+
+The review found that an otherwise valid Short/Render could be paired with a
+caller-supplied unrelated Episode ID, bypassing same-Episode spacing and
+persisting inconsistent ownership. The service now requires the requested
+Episode to match the persisted Short, and a regression test proves rejection
+leaves the schedule unchanged. No blocking finding remains.
+
+### Residual risk
+
+Runtime `Intl` behavior is covered for ordinary, gap, overlap, non-hour,
+historical, future, and host-zone-independent cases on the current Node/macOS
+stack, but packaged Windows may ship different timezone data. The stored
+write-time and resolver versions make such differences diagnosable; WIN-03.7
+must repeat the fixtures on the release build. Move, lock, publication URL,
+rerender, and interactive calendar semantics remain explicitly assigned to
+SCH-02 and UI-01.5.
+
+### Rollback note
+
+Revert the SCH-01 feature commit before deploying migration 16. After a
+database has migrated, restore a pre-migration backup before running older
+application code because older code does not write or understand the
+timezone-database diagnostic column.
+
+### Next command
+
+Run `npx skillpacks install exec-loop` from the project shell before invoking
+`$exec` for SCH-02 draft, move, lock, and publication semantics.
+
 ## RND-04 shipping boundary — 2026-07-28
 
 ### User goal

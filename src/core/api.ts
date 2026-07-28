@@ -15,7 +15,8 @@ import {
   manualCropRemoveInputSchema,
   renderPreflightRequestSchema,
   renderStartRequestSchema,
-  scheduleRulesSchema,
+  scheduleDraftInputSchema,
+  scheduleRuleUpdateInputSchema,
   shortApprovalInputSchema,
   shortTimelineUpdateInputSchema,
   templateCloneInputSchema,
@@ -266,14 +267,13 @@ export function createApi(service: CoreService, desktopToken?: string) {
     z.object({ path: z.string() }).parse(req.body).path
   )));
   app.post("/v1/schedule/draft", route((req) => {
-    const input = z.object({
-      shorts: z.array(z.object({
-        shortId: id, renderId: id, episodeId: id, priority: z.number().int(), topic: z.string().optional()
-      })),
-      rules: scheduleRulesSchema
-    }).parse(req.body);
-    return service.draftSchedule(input.shorts, input.rules);
+    const input = scheduleDraftInputSchema.parse(req.body);
+    return service.draftSchedule(input.shorts, input.expectedRulesRevision);
   }));
+  app.get("/v1/schedule/rules", route(() => service.getScheduleRules()));
+  app.put("/v1/schedule/rules", route((req) =>
+    service.updateScheduleRules(scheduleRuleUpdateInputSchema.parse(req.body))
+  ));
   app.get("/v1/schedule", (_req, res) => res.json(ok(service.getSchedule())));
   app.post("/v1/schedule/:id/move", route((req) => {
     const input = z.object({ expectedRevision: revision, publishAt: z.string().datetime() }).parse(req.body);

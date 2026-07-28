@@ -286,6 +286,7 @@ describe("complete transactional persistence", () => {
       maxPerDay: 2,
       blackoutDates: ["2026-12-25"],
       minimumSameEpisodeSpacingHours: 48,
+      timezoneDatabaseVersion: "fixture-tzdb",
       createdAt: now,
       updatedAt: now
     };

@@ -987,6 +987,18 @@ artifact cleanup, and redacted disk/finalization failures.
 
 ### SCH-01 — Persist revisioned schedule rules with a documented DST policy
 
+Completed 2026-07-28. Migration 16 adds write-time timezone-database
+diagnostics while preserving legacy rows as `unknown`. Strict shared contracts,
+the repository/service, HTTP, and typed MCP tools now expose one canonical
+`default` full-snapshot rule set with first-create and exact-CAS semantics.
+Drafting accepts only `expectedRulesRevision` and reads the persisted snapshot.
+The `shift-forward-gap-earlier-overlap-v1` resolver enumerates valid instants
+through explicit-zone `Intl` data, shifts nonexistent times by the exact gap,
+selects the earlier ambiguous instant, and returns typed warnings plus resolver
+timezone-database provenance. Scheduler, rule-service, transport, persistence,
+contract, and every-prior-version migration suites cover the acceptance cases;
+interactive calendar proof remains assigned to UI-01.5/WIN-03.7.
+
 - **SPEC / gates:** 5.1–5.3, 6.10, 7.2; G7, G8.
 - **Prerequisites / unblocks:** FND-02; unblocks SCH-02 and complete calendar UI.
 - **Behavior:** Persist revisioned start date, IANA timezone, weekdays, multiple

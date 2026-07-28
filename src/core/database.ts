@@ -622,6 +622,14 @@ const migrations: readonly Migration[] = [
           SELECT RAISE(ABORT, 'render lineage is immutable');
         END;
     `)
+  },
+  {
+    version: 16,
+    name: "schedule timezone database diagnostics",
+    up: (db) => db.exec(`
+      ALTER TABLE schedule_rule_sets ADD COLUMN timezone_database_version TEXT NOT NULL
+        DEFAULT 'unknown';
+    `)
   }
 ];
 

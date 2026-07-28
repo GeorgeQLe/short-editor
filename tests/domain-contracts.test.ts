@@ -179,6 +179,7 @@ describe("SPEC 5.1 entity contracts", () => {
       id: id(), revision: 1, startDate: "2026-07-27", timezone: "America/New_York",
       allowedWeekdays: [1, 3, 5], times: ["09:30", "17:00"], maxPerDay: 2,
       blackoutDates: ["2026-08-01"], minimumSameEpisodeSpacingHours: 48,
+      timezoneDatabaseVersion: "fixture-tzdb",
       createdAt: now, updatedAt: now
     }],
     ["ScheduleEntry", scheduleEntrySchema, {

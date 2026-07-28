@@ -6,7 +6,7 @@ import {
   candidateGenerationInputSchema,
   type CandidateGenerationInput,
   type Composition,
-  type ScheduleRules,
+  type ScheduleRuleUpdateInput,
   type ShortProject,
   type Template,
   type TranscriptSegment,
@@ -26,6 +26,7 @@ import {
   captionUpdateInputSchema,
   audioUpdateInputSchema,
   renderStartRequestSchema,
+  scheduleRuleUpdateInputSchema,
   watchedFolderConfigurationInputSchema
 } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
@@ -33,7 +34,11 @@ import { CANDIDATE_GENERATION_VERSION, generateCandidates } from "./candidates.j
 import type { Repository } from "./repository.js";
 import type { MediaService } from "./media.js";
 import type { JobQueue } from "./jobs.js";
-import { draftSchedule, type SchedulableShort } from "./scheduler.js";
+import {
+  draftSchedule,
+  timezoneDatabaseVersion,
+  type SchedulableShort
+} from "./scheduler.js";
 import { validateRender } from "./render.js";
 import { sha256, type ArtifactStore } from "./artifact-store.js";
 import type { CloudAuthorization } from "./repository.js";
@@ -1188,30 +1193,113 @@ export class CoreService {
     return this.repository.retryRenderAttempt(renderId);
   }
   validateRender(path: string) { return validateRender(path); }
-  draftSchedule(shorts: SchedulableShort[], rules: ScheduleRules) {
-    for (const item of shorts) {
-      const eligible = this.repository.db.prepare(`
-        SELECT 1 FROM renders r JOIN short_projects s ON s.id=r.short_id
-        WHERE r.id=? AND r.short_id=? AND r.state='succeeded' AND r.project_revision=s.revision
-          AND s.approved=1
-          AND json_extract(r.determinism_json, '$.comparison') IN ('baseline','matched')
-      `).get(item.renderId, item.shortId);
-      if (!eligible) throw new AppError(
-        "INVALID_STATE", `Short ${item.shortId} needs an approved current validated render`, 409
-      );
+  getScheduleRules() {
+    return this.repository.getScheduleRuleSet("default");
+  }
+  updateScheduleRules(rawInput: ScheduleRuleUpdateInput | unknown) {
+    const parsed = scheduleRuleUpdateInputSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      throw new AppError("VALIDATION_ERROR", "Invalid schedule rules", 422, parsed.error.issues);
     }
-    const occupied = (this.repository.db.prepare("SELECT publish_at FROM schedule_entries").all() as { publish_at: string }[])
-      .map((row) => row.publish_at);
-    const draft = draftSchedule(shorts, rules, occupied);
+    const input = parsed.data;
+    const { expectedRevision, ...uncanonicalized } = input;
+    const rules = {
+      ...uncanonicalized,
+      allowedWeekdays: [...uncanonicalized.allowedWeekdays].sort((left, right) => left - right),
+      times: [...uncanonicalized.times].sort(),
+      blackoutDates: [...uncanonicalized.blackoutDates].sort()
+    };
     const now = new Date().toISOString();
-    const insert = this.repository.db.prepare(`
-      INSERT INTO schedule_entries(id,short_id,render_id,episode_id,publish_at,timezone,status,
-        priority,rationale,locked,youtube_url,needs_rerender,revision,created_at,updated_at)
-      VALUES(@id,@shortId,@renderId,@episodeId,@publishAt,@timezone,'draft',
-        @priority,@rationale,0,NULL,0,1,@now,@now)
-    `);
-    this.repository.db.transaction(() => draft.forEach((entry) => insert.run({ ...entry, now })))();
-    return draft;
+    const tzVersion = timezoneDatabaseVersion();
+    try {
+      return this.repository.transaction(() => {
+        const current = this.repository.findScheduleRuleSet("default");
+        if (!current) {
+          if (expectedRevision !== undefined) {
+            throw new AppError(
+              "REVISION_CONFLICT",
+              "Schedule rule set must be reloaded before it is created",
+              409,
+              { expectedRevision, actualRevision: 0 }
+            );
+          }
+          return this.repository.createScheduleRuleSet({
+            id: "default",
+            revision: 1,
+            ...rules,
+            timezoneDatabaseVersion: tzVersion,
+            createdAt: now,
+            updatedAt: now
+          });
+        }
+        if (expectedRevision === undefined) {
+          throw new AppError(
+            "VALIDATION_ERROR",
+            "expectedRevision is required when replacing schedule rules",
+            422,
+            [{ path: ["expectedRevision"], message: "Reload rules and provide their revision" }]
+          );
+        }
+        return this.repository.updateScheduleRuleSet("default", expectedRevision, {
+          ...rules,
+          timezoneDatabaseVersion: tzVersion
+        });
+      });
+    } catch (error) {
+      if (
+        !(error instanceof AppError) &&
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        String(error.code).startsWith("SQLITE_CONSTRAINT")
+      ) {
+        const actualRevision = this.repository.findScheduleRuleSet("default")?.revision ?? 0;
+        throw new AppError(
+          "REVISION_CONFLICT",
+          "Schedule rule set was created by another client; reload it",
+          409,
+          { expectedRevision: null, actualRevision }
+        );
+      }
+      throw error;
+    }
+  }
+  draftSchedule(shorts: SchedulableShort[], expectedRulesRevision: number) {
+    return this.repository.transaction(() => {
+      const rules = this.repository.getScheduleRuleSet("default");
+      if (rules.revision !== expectedRulesRevision) {
+        throw new AppError(
+          "REVISION_CONFLICT",
+          "Schedule rule set was edited by another client",
+          409,
+          { expectedRevision: expectedRulesRevision, actualRevision: rules.revision }
+        );
+      }
+      for (const item of shorts) {
+        const eligible = this.repository.db.prepare(`
+          SELECT 1 FROM renders r JOIN short_projects s ON s.id=r.short_id
+          WHERE r.id=? AND r.short_id=? AND r.state='succeeded' AND r.project_revision=s.revision
+            AND s.episode_id=? AND s.approved=1
+            AND json_extract(r.determinism_json, '$.comparison') IN ('baseline','matched')
+        `).get(item.renderId, item.shortId, item.episodeId);
+        if (!eligible) throw new AppError(
+          "INVALID_STATE", `Short ${item.shortId} needs an approved current validated render`, 409
+        );
+      }
+      const occupied = (this.repository.db.prepare(
+        "SELECT publish_at FROM schedule_entries"
+      ).all() as { publish_at: string }[]).map((row) => row.publish_at);
+      const result = draftSchedule(shorts, rules, occupied, rules.revision);
+      const now = new Date().toISOString();
+      const insert = this.repository.db.prepare(`
+        INSERT INTO schedule_entries(id,short_id,render_id,episode_id,publish_at,timezone,status,
+          priority,rationale,locked,youtube_url,needs_rerender,revision,created_at,updated_at)
+        VALUES(@id,@shortId,@renderId,@episodeId,@publishAt,@timezone,'draft',
+          @priority,@rationale,0,NULL,0,1,@now,@now)
+      `);
+      result.entries.forEach((entry) => insert.run({ ...entry, now }));
+      return result;
+    });
   }
   getSchedule() {
     return this.repository.db.prepare("SELECT * FROM schedule_entries ORDER BY publish_at").all();

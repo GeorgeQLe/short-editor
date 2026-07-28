@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] SCH-01 — Persist revisioned schedule rules with a documented DST policy.
+- [ ] SCH-02 — Complete draft, move, lock, and publication semantics.
 
 ## Completed
 
+- [x] SCH-01 — Persist revisioned schedule rules with a documented DST policy.
 - [x] RND-04 — Add safe cancellation, retry attempts, and crash recovery.
 - [x] RND-03 — Gate Render success on normalized determinism evidence.
 - [x] RND-02 — Compose originals with an explicit FFmpeg graph.

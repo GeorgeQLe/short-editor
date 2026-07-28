@@ -1819,17 +1819,24 @@ export class Repository {
     this.db.prepare(`
       INSERT INTO schedule_rule_sets(
         id,revision,start_date,timezone,allowed_weekdays_json,times_json,max_per_day,
-        blackout_dates_json,minimum_same_episode_spacing_hours,created_at,updated_at
+        blackout_dates_json,minimum_same_episode_spacing_hours,timezone_database_version,
+        created_at,updated_at
       ) VALUES(@id,@revision,@startDate,@timezone,@allowedWeekdays,@times,@maxPerDay,
-        @blackoutDates,@minimumSameEpisodeSpacingHours,@createdAt,@updatedAt)
+        @blackoutDates,@minimumSameEpisodeSpacingHours,@timezoneDatabaseVersion,
+        @createdAt,@updatedAt)
     `).run(serializeScheduleRuleSet(ruleSet));
     return ruleSet;
   }
 
-  getScheduleRuleSet(id: string): ScheduleRuleSet {
+  findScheduleRuleSet(id: string): ScheduleRuleSet | null {
     const row = this.db.prepare("SELECT * FROM schedule_rule_sets WHERE id=?").get(id) as Row | undefined;
-    if (!row) throw new AppError("NOT_FOUND", "Schedule rule set not found", 404);
-    return mapScheduleRuleSet(row);
+    return row ? mapScheduleRuleSet(row) : null;
+  }
+
+  getScheduleRuleSet(id: string): ScheduleRuleSet {
+    const ruleSet = this.findScheduleRuleSet(id);
+    if (!ruleSet) throw new AppError("NOT_FOUND", "Schedule rule set not found", 404);
+    return ruleSet;
   }
 
   updateScheduleRuleSet(
@@ -1854,6 +1861,7 @@ export class Repository {
           timezone=@timezone,allowed_weekdays_json=@allowedWeekdays,times_json=@times,
           max_per_day=@maxPerDay,blackout_dates_json=@blackoutDates,
           minimum_same_episode_spacing_hours=@minimumSameEpisodeSpacingHours,
+          timezone_database_version=@timezoneDatabaseVersion,
           updated_at=@updatedAt WHERE id=@id AND revision=@expectedRevision
       `).run({ ...values, expectedRevision });
       if (!result.changes) {
@@ -2459,6 +2467,7 @@ function mapScheduleRuleSet(row: Row): ScheduleRuleSet {
     maxPerDay: Number(row.max_per_day),
     blackoutDates: json<string[]>(row.blackout_dates_json),
     minimumSameEpisodeSpacingHours: Number(row.minimum_same_episode_spacing_hours),
+    timezoneDatabaseVersion: String(row.timezone_database_version),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at)
   };
