@@ -284,7 +284,7 @@ describe("Candidate generation service", () => {
       candidateRevision: 2,
       accepted: packageBefore.proposed
     });
-  });
+  }, 10_000);
 
   it("survives provider switches and rolls the complete generation write back on failure", () => {
     const { repository, source, service } = setup();

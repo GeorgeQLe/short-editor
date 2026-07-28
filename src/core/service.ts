@@ -668,6 +668,28 @@ export class CoreService {
     if (candidate.state !== "active") {
       throw new AppError("INVALID_STATE", "Superseded Candidate cannot create a Short", 409);
     }
+    const episode = this.repository.getEpisode(candidate.episodeId);
+    if (episode.missing || episode.status === "source_missing") {
+      throw new AppError("SOURCE_MISSING", "Episode source media is unavailable", 409, {
+        episodeId: episode.id
+      });
+    }
+    if (episode.durationMs === null) {
+      throw new AppError("INVALID_STATE", "Episode duration is unknown", 409);
+    }
+    if (
+      !Number.isInteger(candidate.startMs)
+      || !Number.isInteger(candidate.endMs)
+      || candidate.startMs < 0
+      || candidate.endMs <= candidate.startMs
+      || candidate.endMs > episode.durationMs
+    ) {
+      throw new AppError("VALIDATION_ERROR", "Candidate range is outside the Episode duration", 422, [{
+        path: ["sourceRanges", 0],
+        message: "Candidate range must be a positive integer millisecond range within the Episode duration"
+      }]);
+    }
+    const transcript = this.repository.getAcceptedTranscriptRevision(candidate.episodeId);
     const candidateCopy = this.repository.getCandidateContentPackage(candidateId);
     const copy = candidateCopy.accepted ?? candidateCopy.proposed;
     const template = templateById(templateId);
@@ -681,7 +703,9 @@ export class CoreService {
       composition: structuredClone(template.composition),
       captions: {
         enabled: true,
-        segments: [],
+        segments: structuredClone(transcript.segments.filter((segment) =>
+          segment.startMs >= candidate.startMs && segment.endMs <= candidate.endMs
+        )),
         style: { fontFamily: "Arial", fontSize: 64, color: "#ffffff", highlightColor: "#ffdc5e" }
       },
       audio: {
@@ -698,13 +722,20 @@ export class CoreService {
   updateComposition(id: string, expectedRevision: number, composition: Composition) {
     return this.repository.updateShort(id, expectedRevision, { composition });
   }
+  updateTimeline(
+    id: string,
+    expectedRevision: number,
+    sourceRanges: ShortProject["sourceRanges"]
+  ) {
+    return this.repository.updateShortTimeline(id, expectedRevision, sourceRanges);
+  }
   updateCopy(id: string, expectedRevision: number, copy: ShortProject["copy"]) {
     return this.repository.updateShort(id, expectedRevision, {
       copy, copyState: "accepted", copySource: "user_accepted"
     });
   }
   approveShort(id: string, expectedRevision: number) {
-    return this.repository.updateShort(id, expectedRevision, { approved: true });
+    return this.repository.approveShort(id, expectedRevision);
   }
 
   listTemplates() { return this.repository.listTemplates(); }

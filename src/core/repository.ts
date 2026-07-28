@@ -6,7 +6,7 @@ import type {
   ProviderProvenance, ScheduleEntry, ScheduleRuleSet, ShortProject, Template, TranscriptRevision,
   TranscriptSegment, WatchedFolder
 } from "../shared/domain.js";
-import { analysisArtifactSchema, timedSegmentsSchema } from "../shared/domain.js";
+import { analysisArtifactSchema, sourceRangesSchema, timedSegmentsSchema } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
 import { candidatesConflict, compareCandidates } from "./candidates.js";
 import { assertEpisodeTransition, type RelinkContext } from "../shared/episode-transitions.js";
@@ -928,8 +928,6 @@ export class Repository {
     composition?: Composition;
     copy?: ShortProject["copy"];
     title?: string;
-    approved?: boolean;
-    sourceRanges?: ShortProject["sourceRanges"];
     captions?: ShortProject["captions"];
     audio?: ShortProject["audio"];
     copyState?: ShortProject["copyState"];
@@ -943,17 +941,14 @@ export class Repository {
         });
       }
       const renderAffecting = patch.composition !== undefined
-        || patch.sourceRanges !== undefined
         || patch.captions !== undefined
-        || patch.audio !== undefined
-        || patch.title !== undefined
-        || patch.copy !== undefined;
+        || patch.audio !== undefined;
       const next = {
         ...current,
         ...patch,
         copyState: patch.copy !== undefined ? (patch.copyState ?? "accepted") : current.copyState,
         copySource: patch.copy !== undefined ? (patch.copySource ?? "user_accepted") : current.copySource,
-        approved: renderAffecting ? false : (patch.approved ?? current.approved),
+        approved: renderAffecting ? false : current.approved,
         revision: current.revision + 1,
         updatedAt: new Date().toISOString()
       };
@@ -979,6 +974,72 @@ export class Repository {
         `).run(next.updatedAt, id);
       }
       return next;
+    })();
+  }
+
+  updateShortTimeline(
+    id: string,
+    expectedRevision: number,
+    sourceRanges: ShortProject["sourceRanges"]
+  ): ShortProject {
+    return this.db.transaction(() => {
+      const current = this.getShort(id);
+      if (current.revision !== expectedRevision) {
+        throw revisionConflict("Short", expectedRevision, current.revision);
+      }
+      const episode = this.getEpisode(current.episodeId);
+      assertSourceAvailable(episode);
+      validateSourceRanges(sourceRanges, episode.durationMs);
+
+      const now = new Date().toISOString();
+      const nextRevision = current.revision + 1;
+      const changed = this.db.prepare(`
+        UPDATE short_projects
+        SET source_ranges_json=?,approved=0,revision=?,updated_at=?
+        WHERE id=? AND revision=?
+      `).run(JSON.stringify(sourceRanges), nextRevision, now, id, expectedRevision);
+      if (!changed.changes) {
+        const actual = this.getShort(id).revision;
+        throw revisionConflict("Short", expectedRevision, actual);
+      }
+      this.db.prepare(`
+        UPDATE renders SET state='stale',updated_at=?
+        WHERE short_id=? AND state='succeeded'
+      `).run(now, id);
+      this.db.prepare(`
+        UPDATE schedule_entries SET needs_rerender=1,updated_at=?,revision=revision+1
+        WHERE short_id=? AND status<>'published'
+      `).run(now, id);
+      return this.getShort(id);
+    })();
+  }
+
+  approveShort(id: string, expectedRevision: number): ShortProject {
+    return this.db.transaction(() => {
+      const current = this.getShort(id);
+      if (current.revision !== expectedRevision) {
+        throw revisionConflict("Short", expectedRevision, current.revision);
+      }
+      if (current.approved) {
+        throw new AppError("INVALID_STATE", "Short is already approved", 409);
+      }
+      if (current.copyState !== "accepted") {
+        throw new AppError("INVALID_STATE", "Accept the Short copy before approval", 409);
+      }
+      const episode = this.getEpisode(current.episodeId);
+      assertSourceAvailable(episode);
+      validateSourceRanges(current.sourceRanges, episode.durationMs);
+
+      const now = new Date().toISOString();
+      const changed = this.db.prepare(`
+        UPDATE short_projects SET approved=1,revision=revision+1,updated_at=?
+        WHERE id=? AND revision=? AND approved=0
+      `).run(now, id, expectedRevision);
+      if (!changed.changes) {
+        const actual = this.getShort(id).revision;
+        throw revisionConflict("Short", expectedRevision, actual);
+      }
+      return this.getShort(id);
     })();
   }
 
@@ -1708,4 +1769,32 @@ function revisionConflict(entity: string, expectedRevision: number, actualRevisi
     expectedRevision,
     actualRevision
   });
+}
+
+function assertSourceAvailable(episode: Episode): void {
+  if (episode.missing || episode.status === "source_missing") {
+    throw new AppError("SOURCE_MISSING", "Episode source media is unavailable", 409, {
+      episodeId: episode.id
+    });
+  }
+}
+
+function validateSourceRanges(
+  sourceRanges: ShortProject["sourceRanges"],
+  durationMs: number | null
+): void {
+  if (durationMs === null) {
+    throw new AppError("INVALID_STATE", "Episode duration is unknown", 409);
+  }
+  const parsed = sourceRangesSchema.safeParse(sourceRanges);
+  if (!parsed.success) {
+    throw new AppError("VALIDATION_ERROR", "Invalid Short source ranges", 422, parsed.error.issues);
+  }
+  const outside = parsed.data.findIndex((range) => range.endMs > durationMs);
+  if (outside !== -1) {
+    throw new AppError("VALIDATION_ERROR", "Short source range exceeds Episode duration", 422, [{
+      path: ["sourceRanges", outside, "endMs"],
+      message: "Range must be within the Episode duration"
+    }]);
+  }
 }

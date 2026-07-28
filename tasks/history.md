@@ -2,6 +2,22 @@
 
 ## 2026-07-27
 
+- Completed EDT-01 with guarded revision-1 Short creation, independent accepted
+  transcript caption snapshots, strict integer-millisecond timeline contracts,
+  bounded same-Episode ranges, atomic timeline and approval compare-and-swap
+  operations, and typed HTTP/MCP parity.
+- Classified composition, ranges, captions, audio, and accepted-transcript
+  changes as render-affecting while title/content-package changes preserve
+  approval, successful Render state, and schedule flags. Render-affecting
+  changes stale successful Renders and mark only non-published schedule entries;
+  published rows remain byte-for-byte unchanged.
+- Added creation, range, lifecycle, invalidation, HTTP, and MCP fixtures in
+  `tests/short-lifecycle.test.ts`; interactive editor and packaged Windows
+  evidence remain assigned to UI-01.3 and WIN-03.
+- Full `npm test` passes all 28 files and 188 tests; `npm run build`,
+  `git diff --check`, and the focused added-line credential scan also pass.
+- Promoted EDT-02 as the sole current executable task.
+
 - Completed TRC-03 with durable Candidate generation runs, explicit
   replace-pending and append-pending strategies, retained reviewed decisions,
   accepted-copy preservation, conflict suppression, and superseded history for

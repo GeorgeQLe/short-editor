@@ -655,6 +655,17 @@ absorb a downstream task.
   evidence; defer release closure to WIN-03.4.
 - **Evidence / acceptance:** Every render-affecting mutation clears approval or
   makes render impossible until a new explicit approval at the current revision.
+- **Implemented 2026-07-27:** Shared strict integer-millisecond timeline and
+  approval contracts now drive service, HTTP, and MCP mutations. Short creation
+  requires an active approved Candidate, available known-duration Episode, and
+  accepted transcript, and revision 1 contains an independent bounded caption
+  snapshot. Repository transactions enforce timeline/approval CAS, exact
+  revision increments, accepted-copy approval, render-affecting invalidation,
+  copy-only preservation, and published schedule immutability.
+  [`tests/short-lifecycle.test.ts`](tests/short-lifecycle.test.ts) covers creation
+  prerequisites, range classes and bounds, stale writes, reapproval, render and
+  schedule invalidation, strict HTTP inputs, and MCP parity. Interactive editor
+  and packaged Windows evidence remain assigned to UI-01.3 and WIN-03.
 
 ### EDT-02 — Persist template clones, materialized lineage, and complete assets
 

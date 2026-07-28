@@ -513,6 +513,17 @@ export const shortProjectSchema = z.strictObject({
 });
 export type ShortProject = z.infer<typeof shortProjectSchema>;
 
+export const shortTimelineUpdateInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  sourceRanges: sourceRangesSchema
+});
+export type ShortTimelineUpdateInput = z.infer<typeof shortTimelineUpdateInputSchema>;
+
+export const shortApprovalInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema
+});
+export type ShortApprovalInput = z.infer<typeof shortApprovalInputSchema>;
+
 export const templateSchema = z.strictObject({
   id: z.string().min(1),
   name: z.string().min(1),

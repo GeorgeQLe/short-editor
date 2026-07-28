@@ -14,7 +14,7 @@ const setup = () => {
 afterEach(() => databases.splice(0).forEach((db) => db.close()));
 
 describe("repository revisions and recovery", () => {
-  it("rejects stale updates and invalidates renders and schedules", () => {
+  it("rejects stale updates while copy-only title changes preserve renders and schedules", () => {
     const repository = setup();
     const source = episode();
     repository.insertEpisode(source);
@@ -54,8 +54,8 @@ describe("repository revisions and recovery", () => {
 
     const updated = repository.updateShort(project.id, 1, { title: "B" });
     expect(updated.revision).toBe(2);
-    expect(repository.db.prepare("SELECT state FROM renders WHERE id=?").get(renderId)).toEqual({ state: "stale" });
-    expect(repository.db.prepare("SELECT needs_rerender FROM schedule_entries").get()).toEqual({ needs_rerender: 1 });
+    expect(repository.db.prepare("SELECT state FROM renders WHERE id=?").get(renderId)).toEqual({ state: "succeeded" });
+    expect(repository.db.prepare("SELECT needs_rerender FROM schedule_entries").get()).toEqual({ needs_rerender: 0 });
     try {
       repository.updateShort(project.id, 1, { title: "C" });
       expect.fail("Expected a revision conflict");

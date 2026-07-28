@@ -1,7 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { contentPackageSchema, transcriptUpdateSegmentsSchema } from "../shared/domain.js";
+import {
+  contentPackageSchema,
+  sourceRangesSchema,
+  transcriptUpdateSegmentsSchema
+} from "../shared/domain.js";
 
 const coreUrl = process.env.SHORT_EDITOR_CORE_URL ?? "http://127.0.0.1:43120/v1";
 const server = new McpServer({ name: "short-editor", version: "1.0.0" });
@@ -170,9 +174,15 @@ register("shorts.get", "Get a Short project and its current revision.", { shortI
 register("shorts.update_composition", "Update composition using optimistic revision control.", {
   shortId: uuid, expectedRevision, composition: z.record(z.string(), z.unknown())
 }, ({ shortId, ...input }) => core(`/shorts/${shortId}/composition`, "PUT", input));
+register("shorts.update_timeline", "Update ordered Episode source ranges using optimistic revision control.", {
+  shortId: uuid, expectedRevision, sourceRanges: sourceRangesSchema
+}, ({ shortId, ...input }) => core(`/shorts/${shortId}/timeline`, "PUT", input));
 register("shorts.update_copy", "Update accepted copy without overwriting other fields.", {
   shortId: uuid, expectedRevision, copy: contentPackageSchema
 }, ({ shortId, ...input }) => core(`/shorts/${shortId}/copy`, "PUT", input));
+register("shorts.approve", "Approve the current Short revision after timeline and copy validation.", {
+  shortId: uuid, expectedRevision
+}, ({ shortId, ...input }) => core(`/shorts/${shortId}/approve`, "POST", input));
 
 register("renders.start", "Queue a render for an approved, current Short revision.", {
   shortId: uuid, expectedRevision

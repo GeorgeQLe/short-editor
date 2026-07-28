@@ -1,9 +1,11 @@
 # Current work
 
-- [ ] EDT-01 — Complete the Short timeline and approval lifecycle.
+- [ ] EDT-02 — Persist template clones, materialized lineage, and complete
+  assets.
 
 ## Completed
 
+- [x] EDT-01 — Complete the Short timeline and approval lifecycle.
 - [x] TRC-03 — Preserve decisions and accepted copy across Candidate
   regeneration.
 - [x] TRC-02 — Make Candidate generation deterministic, diagnostic, and

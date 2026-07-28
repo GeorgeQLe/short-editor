@@ -7,6 +7,8 @@ import {
   compositionSchema,
   contentPackageSchema,
   scheduleRulesSchema,
+  shortApprovalInputSchema,
+  shortTimelineUpdateInputSchema,
   transcriptUpdateInputSchema
 } from "../shared/domain.js";
 import { AppError, errorEnvelope, normalizeError } from "../shared/errors.js";
@@ -153,14 +155,21 @@ export function createApi(service: CoreService, desktopToken?: string) {
   app.put("/v1/shorts/:id/composition", route((req) => service.updateComposition(
     id.parse(req.params.id), revision.parse(req.body.expectedRevision), compositionSchema.parse(req.body.composition)
   )));
+  app.put("/v1/shorts/:id/timeline", route((req) => {
+    const input = shortTimelineUpdateInputSchema.parse(req.body);
+    return service.updateTimeline(
+      id.parse(req.params.id), input.expectedRevision, input.sourceRanges
+    );
+  }));
   app.put("/v1/shorts/:id/copy", route((req) => {
     const project = service.getShort(id.parse(req.params.id));
     return service.updateCopy(project.id, revision.parse(req.body.expectedRevision),
       project.copy && contentPackageSchema.parse(req.body.copy));
   }));
-  app.post("/v1/shorts/:id/approve", route((req) => service.approveShort(
-    id.parse(req.params.id), revision.parse(req.body.expectedRevision)
-  )));
+  app.post("/v1/shorts/:id/approve", route((req) => {
+    const input = shortApprovalInputSchema.parse(req.body);
+    return service.approveShort(id.parse(req.params.id), input.expectedRevision);
+  }));
   app.get("/v1/templates", (_req, res) => res.json(ok(service.listTemplates())));
   app.get("/v1/assets", (_req, res) => res.json(ok(service.listAssets())));
   app.post("/v1/assets/import", route((req) => {
