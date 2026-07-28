@@ -1169,6 +1169,28 @@ export const scheduleDraftInputSchema = z.strictObject({
   expectedRulesRevision: positiveRevisionSchema
 });
 export type ScheduleDraftInput = z.infer<typeof scheduleDraftInputSchema>;
+export const scheduleMoveInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  publishAt: utcInstantSchema
+});
+export type ScheduleMoveInput = z.infer<typeof scheduleMoveInputSchema>;
+
+const youtubeUrlSchema = z.string().url().superRefine((value, context) => {
+  const url = new URL(value);
+  if (url.protocol !== "https:" || ![
+    "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"
+  ].includes(url.hostname.toLowerCase())) {
+    context.addIssue({
+      code: "custom",
+      message: "YouTube URL must use HTTPS on youtube.com or youtu.be"
+    });
+  }
+});
+export const scheduleMarkPublishedInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  youtubeUrl: youtubeUrlSchema.optional()
+});
+export type ScheduleMarkPublishedInput = z.infer<typeof scheduleMarkPublishedInputSchema>;
 
 export const scheduleDstPolicyId = "shift-forward-gap-earlier-overlap-v1" as const;
 export const scheduleDstWarningSchema = z.strictObject({
@@ -1220,9 +1242,12 @@ export const scheduleEntrySchema = z.strictObject({
   revision: positiveRevisionSchema,
   createdAt: utcInstantSchema,
   updatedAt: utcInstantSchema
-}).refine((entry) => entry.status !== "published" || entry.locked, {
+}).refine((entry) => entry.locked === (entry.status === "published"), {
   path: ["locked"],
-  message: "Published entries must be locked"
+  message: "Only published entries may be locked, and published entries must be locked"
+}).refine((entry) => entry.status === "published" || entry.youtubeUrl === null, {
+  path: ["youtubeUrl"],
+  message: "Only published entries may have a YouTube URL"
 });
 export type ScheduleEntry = z.infer<typeof scheduleEntrySchema>;
 

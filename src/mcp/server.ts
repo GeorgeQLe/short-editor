@@ -14,6 +14,9 @@ import {
   renderStartResultSchema,
   scheduleDraftInputSchema,
   scheduleDraftResultSchema,
+  scheduleEntrySchema,
+  scheduleMarkPublishedInputSchema,
+  scheduleMoveInputSchema,
   scheduleRuleSetSchema,
   scheduleRuleUpdateInputSchema,
   sourceRangesSchema,
@@ -379,12 +382,18 @@ registerStructured("schedule.draft", "Draft deterministic legal slots from appro
   shorts: scheduleDraftInputSchema.shape.shorts,
   expectedRulesRevision: scheduleDraftInputSchema.shape.expectedRulesRevision
 }, scheduleDraftResultSchema, (input) => core("/schedule/draft", "POST", input));
-register("schedule.move", "Move an unlocked entry to a legal, collision-free slot.", {
-  entryId: uuid, expectedRevision, publishAt: z.string().datetime()
-}, ({ entryId, ...input }) => core(`/schedule/${entryId}/move`, "POST", input));
-register("schedule.mark_published", "Mark an entry published and optionally attach its YouTube URL.", {
-  entryId: uuid, expectedRevision, youtubeUrl: z.string().url().optional()
-}, ({ entryId, ...input }) => core(`/schedule/${entryId}/published`, "POST", input));
+registerStructured("schedule.move", "Move an unlocked entry to a legal, collision-free slot.", {
+  entryId: uuid,
+  expectedRevision: scheduleMoveInputSchema.shape.expectedRevision,
+  publishAt: scheduleMoveInputSchema.shape.publishAt
+}, scheduleEntrySchema, ({ entryId, ...input }) =>
+  core(`/schedule/${entryId}/move`, "POST", input));
+registerStructured("schedule.mark_published", "Manually record publication and permanently lock the entry.", {
+  entryId: uuid,
+  expectedRevision: scheduleMarkPublishedInputSchema.shape.expectedRevision,
+  youtubeUrl: scheduleMarkPublishedInputSchema.shape.youtubeUrl
+}, scheduleEntrySchema, ({ entryId, ...input }) =>
+  core(`/schedule/${entryId}/published`, "POST", input));
 
 register("templates.list", "List versioned composition templates.", {}, () => core("/templates"));
 register("templates.clone", "Clone a built-in or user template with direct-parent lineage.", {

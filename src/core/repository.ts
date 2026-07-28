@@ -1892,10 +1892,19 @@ export class Repository {
     return mapScheduleEntry(row);
   }
 
+  listScheduleEntries(): ScheduleEntry[] {
+    return (this.db.prepare(
+      "SELECT * FROM schedule_entries ORDER BY publish_at,id"
+    ).all() as Row[]).map(mapScheduleEntry);
+  }
+
   updateScheduleEntry(
     id: string,
     expectedRevision: number,
-    patch: Pick<Partial<ScheduleEntry>, "publishAt" | "status" | "priority" | "rationale" | "youtubeUrl">
+    patch: Pick<
+      Partial<ScheduleEntry>,
+      "publishAt" | "timezone" | "status" | "priority" | "rationale" | "youtubeUrl"
+    >
   ): ScheduleEntry {
     return this.transaction(() => {
       const current = this.getScheduleEntry(id);
@@ -1907,6 +1916,9 @@ export class Repository {
         throw new AppError("INVALID_STATE", "A stale render cannot be published", 409);
       }
       const nextStatus = patch.status ?? current.status;
+      if (current.status === "planned" && nextStatus === "draft") {
+        throw new AppError("INVALID_STATE", "A planned schedule entry cannot return to draft", 409);
+      }
       const next = {
         ...current,
         ...patch,
@@ -1915,13 +1927,16 @@ export class Repository {
         revision: current.revision + 1,
         updatedAt: new Date().toISOString()
       };
+      if (next.status !== "published" && next.youtubeUrl !== null) {
+        throw new AppError("INVALID_STATE", "Only published entries may have a YouTube URL", 409);
+      }
       try {
         const result = this.db.prepare(`
-          UPDATE schedule_entries SET publish_at=?,status=?,priority=?,rationale=?,
+          UPDATE schedule_entries SET publish_at=?,timezone=?,status=?,priority=?,rationale=?,
             youtube_url=?,locked=?,revision=?,updated_at=?
           WHERE id=? AND revision=? AND locked=0
         `).run(
-          next.publishAt, next.status, next.priority, next.rationale, next.youtubeUrl,
+          next.publishAt, next.timezone, next.status, next.priority, next.rationale, next.youtubeUrl,
           next.locked ? 1 : 0, next.revision, next.updatedAt, id, expectedRevision
         );
         if (!result.changes) throw revisionConflict("Schedule entry", expectedRevision, current.revision);

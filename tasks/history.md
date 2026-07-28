@@ -2,6 +2,21 @@
 
 ## 2026-07-28
 
+- Completed SCH-02 with transactional eligibility checks, stable priority/ID
+  drafting, existing-entry Episode spacing, duplicate scheduling protection,
+  and camel-case domain reads.
+- Moves now require exact entry revisions and a current rules-legal,
+  collision-free instant, enforce same-Episode spacing, and transition unlocked
+  entries to `planned`. Publication is manual, rejects rerender-needed entries,
+  accepts only optional HTTPS YouTube URLs, increments exactly once, and locks
+  the entry permanently.
+- Added strict shared HTTP/MCP contracts and focused state, collision, stale
+  revision, same-Episode move spacing, URL, lock, and parity regressions. Full
+  verification passes 38 test files and 275 tests plus production
+  build/typecheck and diff hygiene.
+  Interactive calendar and packaged Windows proof remain UI-01.5/WIN-03.7.
+  Promoted API-01.
+
 - Completed SCH-01 with migration 16, one canonical revisioned `default`
   schedule-rule snapshot, first-create and exact-CAS replacement semantics,
   canonical weekday/time/blackout ordering, and write-time timezone-database

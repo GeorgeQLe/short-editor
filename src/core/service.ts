@@ -26,6 +26,8 @@ import {
   captionUpdateInputSchema,
   audioUpdateInputSchema,
   renderStartRequestSchema,
+  scheduleMarkPublishedInputSchema,
+  scheduleMoveInputSchema,
   scheduleRuleUpdateInputSchema,
   watchedFolderConfigurationInputSchema
 } from "../shared/domain.js";
@@ -36,6 +38,7 @@ import type { MediaService } from "./media.js";
 import type { JobQueue } from "./jobs.js";
 import {
   draftSchedule,
+  isLegalScheduleInstant,
   timezoneDatabaseVersion,
   type SchedulableShort
 } from "./scheduler.js";
@@ -1275,21 +1278,41 @@ export class CoreService {
           { expectedRevision: expectedRulesRevision, actualRevision: rules.revision }
         );
       }
+      const shortIds = new Set<string>();
+      const renderIds = new Set<string>();
       for (const item of shorts) {
+        if (shortIds.has(item.shortId) || renderIds.has(item.renderId)) {
+          throw new AppError("INVALID_STATE", "A Short or Render may appear only once in a draft", 409);
+        }
+        shortIds.add(item.shortId);
+        renderIds.add(item.renderId);
         const eligible = this.repository.db.prepare(`
           SELECT 1 FROM renders r JOIN short_projects s ON s.id=r.short_id
           WHERE r.id=? AND r.short_id=? AND r.state='succeeded' AND r.project_revision=s.revision
             AND s.episode_id=? AND s.approved=1
+            AND json_extract(r.validation_json, '$.valid')=1
             AND json_extract(r.determinism_json, '$.comparison') IN ('baseline','matched')
         `).get(item.renderId, item.shortId, item.episodeId);
         if (!eligible) throw new AppError(
           "INVALID_STATE", `Short ${item.shortId} needs an approved current validated render`, 409
         );
+        if (this.repository.db.prepare(
+          "SELECT 1 FROM schedule_entries WHERE short_id=?"
+        ).get(item.shortId)) {
+          throw new AppError("INVALID_STATE", `Short ${item.shortId} is already scheduled`, 409);
+        }
       }
-      const occupied = (this.repository.db.prepare(
-        "SELECT publish_at FROM schedule_entries"
-      ).all() as { publish_at: string }[]).map((row) => row.publish_at);
-      const result = draftSchedule(shorts, rules, occupied, rules.revision);
+      const occupiedEntries = this.repository.listScheduleEntries().map((entry) => ({
+        publishAt: entry.publishAt,
+        episodeId: entry.episodeId
+      }));
+      const result = draftSchedule(
+        shorts,
+        rules,
+        occupiedEntries.map((entry) => entry.publishAt),
+        rules.revision,
+        occupiedEntries
+      );
       const now = new Date().toISOString();
       const insert = this.repository.db.prepare(`
         INSERT INTO schedule_entries(id,short_id,render_id,episode_id,publish_at,timezone,status,
@@ -1302,32 +1325,85 @@ export class CoreService {
     });
   }
   getSchedule() {
-    return this.repository.db.prepare("SELECT * FROM schedule_entries ORDER BY publish_at").all();
+    return this.repository.listScheduleEntries();
   }
   moveScheduleEntry(entryId: string, expectedRevision: number, publishAt: string) {
-    const instant = new Date(publishAt);
-    if (Number.isNaN(instant.getTime())) throw new AppError("VALIDATION_ERROR", "Invalid publish instant", 422);
-    const row = this.repository.db.prepare("SELECT * FROM schedule_entries WHERE id=?").get(entryId) as
-      { revision: number; locked: number } | undefined;
-    if (!row) throw new AppError("NOT_FOUND", "Schedule entry not found", 404);
-    if (row.revision !== expectedRevision) throw new AppError("REVISION_CONFLICT", "Schedule entry revision is stale", 409);
-    if (row.locked) throw new AppError("INVALID_STATE", "Schedule entry is locked", 409);
-    try {
-      this.repository.db.prepare(`
-        UPDATE schedule_entries SET publish_at=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?
-      `).run(instant.toISOString(), new Date().toISOString(), entryId, expectedRevision);
-    } catch {
-      throw new AppError("SCHEDULE_COLLISION", "Another entry already occupies that instant", 409);
-    }
-    return this.repository.db.prepare("SELECT * FROM schedule_entries WHERE id=?").get(entryId);
+    ({ expectedRevision, publishAt } = scheduleMoveInputSchema.parse({
+      expectedRevision,
+      publishAt
+    }));
+    return this.repository.transaction(() => {
+      const entry = this.repository.getScheduleEntry(entryId);
+      if (entry.revision !== expectedRevision) {
+        throw new AppError("REVISION_CONFLICT", "Schedule entry revision is stale", 409, {
+          expectedRevision,
+          actualRevision: entry.revision
+        });
+      }
+      if (entry.locked || entry.status === "published") {
+        throw new AppError("INVALID_STATE", "Published schedule entries are permanently locked", 409);
+      }
+      const rules = this.repository.getScheduleRuleSet("default");
+      const normalized = new Date(publishAt).toISOString();
+      if (!isLegalScheduleInstant(normalized, rules)) {
+        throw new AppError(
+          "INVALID_STATE",
+          "The requested instant is not legal under the current schedule rules",
+          409
+        );
+      }
+      const entries = this.repository.listScheduleEntries().filter((other) => other.id !== entryId);
+      if (entries.some((other) => other.publishAt === normalized)) {
+        throw new AppError("SCHEDULE_COLLISION", "Another entry already occupies that instant", 409);
+      }
+      const spacingMs = rules.minimumSameEpisodeSpacingHours * 3_600_000;
+      const targetTime = new Date(normalized).getTime();
+      if (entries.some((other) =>
+        other.episodeId === entry.episodeId &&
+        Math.abs(new Date(other.publishAt).getTime() - targetTime) < spacingMs
+      )) {
+        throw new AppError(
+          "SCHEDULE_COLLISION",
+          "The requested instant violates minimum same-Episode spacing",
+          409
+        );
+      }
+      return this.repository.updateScheduleEntry(entryId, expectedRevision, {
+        publishAt: normalized,
+        timezone: rules.timezone,
+        status: "planned",
+        rationale: "Manually planned at a legal slot under the current schedule rules."
+      });
+    });
   }
   markPublished(entryId: string, expectedRevision: number, youtubeUrl?: string) {
-    const update = this.repository.db.prepare(`
-      UPDATE schedule_entries SET status='published',youtube_url=?,locked=1,
-        revision=revision+1,updated_at=? WHERE id=? AND revision=? AND needs_rerender=0
-    `).run(youtubeUrl ?? null, new Date().toISOString(), entryId, expectedRevision);
-    if (!update.changes) throw new AppError("REVISION_CONFLICT", "Entry is stale or needs rerender", 409);
-    return this.repository.db.prepare("SELECT * FROM schedule_entries WHERE id=?").get(entryId);
+    ({ expectedRevision, youtubeUrl } = scheduleMarkPublishedInputSchema.parse({
+      expectedRevision,
+      youtubeUrl
+    }));
+    return this.repository.transaction(() => {
+      const entry = this.repository.getScheduleEntry(entryId);
+      if (entry.revision !== expectedRevision) {
+        throw new AppError("REVISION_CONFLICT", "Schedule entry revision is stale", 409, {
+          expectedRevision,
+          actualRevision: entry.revision
+        });
+      }
+      if (entry.locked || entry.status === "published") {
+        throw new AppError("INVALID_STATE", "Published schedule entries are permanently locked", 409);
+      }
+      if (entry.needsRerender) {
+        throw new AppError(
+          "INVALID_STATE",
+          "A schedule entry that needs rerendering cannot be published",
+          409
+        );
+      }
+      return this.repository.updateScheduleEntry(entryId, expectedRevision, {
+        status: "published",
+        youtubeUrl: youtubeUrl ?? null
+      });
+    });
   }
 }
 

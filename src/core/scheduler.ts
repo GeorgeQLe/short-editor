@@ -25,6 +25,11 @@ interface ZonedParts {
   second: number;
 }
 
+export interface OccupiedScheduleEntry {
+  publishAt: string;
+  episodeId: string;
+}
+
 const zoneFormatters = new Map<string, Intl.DateTimeFormat>();
 
 export function timezoneDatabaseVersion(): string {
@@ -35,7 +40,8 @@ export function draftSchedule(
   shorts: SchedulableShort[],
   rules: ScheduleRules,
   occupiedInstants: string[] = [],
-  rulesRevision = 1
+  rulesRevision = 1,
+  occupiedEntries: OccupiedScheduleEntry[] = []
 ): ScheduleDraftResult {
   validateTimezone(rules.timezone);
   const occupied = new Set(occupiedInstants.map((instant) => new Date(instant).toISOString()));
@@ -43,6 +49,12 @@ export function draftSchedule(
   const entries: ScheduleDraftEntry[] = [];
   const warnings: ScheduleDstWarning[] = [];
   const episodeTimes = new Map<string, number[]>();
+  for (const entry of occupiedEntries) {
+    const time = new Date(entry.publishAt).getTime();
+    if (!Number.isNaN(time)) {
+      episodeTimes.set(entry.episodeId, [...(episodeTimes.get(entry.episodeId) ?? []), time]);
+    }
+  }
   const slots = legalSlots(rules, 730);
 
   for (const item of sorted) {
@@ -77,6 +89,30 @@ export function draftSchedule(
     dstPolicy: scheduleDstPolicyId,
     resolverTimezoneDatabaseVersion: timezoneDatabaseVersion()
   };
+}
+
+export function isLegalScheduleInstant(publishAt: string, rules: ScheduleRules): boolean {
+  const instant = new Date(publishAt);
+  if (Number.isNaN(instant.getTime())) return false;
+  const local = partsInZone(instant, rules.timezone);
+  for (const dayOffset of [-1, 0, 1]) {
+    const candidateDate = addUtcDays(
+      new Date(Date.UTC(local.year, local.month - 1, local.day)),
+      dayOffset
+    );
+    const dateKey = formatDate(candidateDate);
+    if (
+      dateKey < rules.startDate ||
+      rules.blackoutDates.includes(dateKey) ||
+      !rules.allowedWeekdays.includes(candidateDate.getUTCDay())
+    ) continue;
+    for (const time of rules.times.slice(0, rules.maxPerDay)) {
+      if (resolveZonedWallTime(dateKey, time, rules.timezone).instant.getTime() === instant.getTime()) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 export function resolveZonedWallTime(

@@ -16,6 +16,8 @@ import {
   renderPreflightRequestSchema,
   renderStartRequestSchema,
   scheduleDraftInputSchema,
+  scheduleMarkPublishedInputSchema,
+  scheduleMoveInputSchema,
   scheduleRuleUpdateInputSchema,
   shortApprovalInputSchema,
   shortTimelineUpdateInputSchema,
@@ -276,11 +278,11 @@ export function createApi(service: CoreService, desktopToken?: string) {
   ));
   app.get("/v1/schedule", (_req, res) => res.json(ok(service.getSchedule())));
   app.post("/v1/schedule/:id/move", route((req) => {
-    const input = z.object({ expectedRevision: revision, publishAt: z.string().datetime() }).parse(req.body);
+    const input = scheduleMoveInputSchema.parse(req.body);
     return service.moveScheduleEntry(id.parse(req.params.id), input.expectedRevision, input.publishAt);
   }));
   app.post("/v1/schedule/:id/published", route((req) => {
-    const input = z.object({ expectedRevision: revision, youtubeUrl: z.string().url().optional() }).parse(req.body);
+    const input = scheduleMarkPublishedInputSchema.parse(req.body);
     return service.markPublished(id.parse(req.params.id), input.expectedRevision, input.youtubeUrl);
   }));
 

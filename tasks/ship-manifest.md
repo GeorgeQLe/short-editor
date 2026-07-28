@@ -1,5 +1,127 @@
 # Ship manifest
 
+## SCH-02 shipping boundary — 2026-07-28
+
+### User goal
+
+Complete deterministic schedule drafting, legal moves, permanent publication
+locking, and manual publication recording semantics.
+
+### Changed files
+
+`SPEC.md`, `src/core/api.ts`, `src/core/repository.ts`,
+`src/core/scheduler.ts`, `src/core/service.ts`, `src/mcp/server.ts`,
+`src/shared/contracts.ts`, `tasks/history.md`, `tasks/ship-manifest.md`,
+`tasks/todo.md`, and `tests/schedule-semantics.test.ts`.
+
+Generated `.agents/skillpacks/`, `.claude/`, and `.codex/` local artifacts are
+unrelated and excluded.
+
+### Per-file purpose
+
+- `src/shared/contracts.ts` defines strict move/publication requests and complete
+  entry lock/URL invariants.
+- `src/core/scheduler.ts` incorporates persisted same-Episode occupancy and
+  validates exact instants against current legal wall-clock slots.
+- `src/core/repository.ts` returns public schedule entities and applies guarded,
+  exact-CAS entry transitions including permanent publication locks.
+- `src/core/service.ts` makes drafting, moves, and publication transactional and
+  enforces eligibility, uniqueness, current rules, collisions, spacing, and
+  rerender state.
+- `src/core/api.ts` and `src/mcp/server.ts` use the same strict shared inputs and
+  typed schedule-entry outputs.
+- `tests/schedule-semantics.test.ts` covers the completed state, scheduling,
+  move, publication, lock, and transport behavior.
+- `SPEC.md` records the completed implementation evidence.
+- `tasks/todo.md` closes SCH-02 and promotes API-01.
+- `tasks/history.md` records the behavior, verification, and deferred native/UI
+  proof.
+- `tasks/ship-manifest.md` documents this exact shipping and rollback boundary.
+
+### User-goal mapping
+
+The scheduler and service provide deterministic eligible drafting against both
+new and persisted entries. The repository and service enforce legal
+collision-free moves, exact revisions, one-way states, rerender protection, and
+permanent publication locks. Shared contracts plus HTTP/MCP adapters expose the
+same validated behavior, while the focused suite proves the required boundary
+and the task/spec records make the completed scope and next task explicit.
+
+### Behavior and evidence
+
+- Drafting requires an approved current successful Render with passing
+  validation and accepted determinism evidence, rejects duplicate/already
+  scheduled Shorts, preserves priority plus stable-ID ordering, and applies
+  same-Episode spacing against both new and persisted entries.
+- Moves require exact entry CAS, a slot legal under the current persisted rules,
+  no occupied instant, and valid same-Episode spacing. A successful move
+  transitions `draft` or `planned` to `planned` and increments once.
+- Publication is manual recordkeeping only. It accepts an optional HTTPS
+  `youtube.com`/`youtu.be` URL, rejects rerender-needed or already published
+  entries, transitions to `published`, and locks the row permanently.
+- Shared strict request schemas drive HTTP and typed MCP. Schedule reads return
+  the public camel-case domain contract rather than database rows.
+- `tests/schedule-semantics.test.ts` covers stable ties, daily slots, persisted
+  spacing, rollback, illegal/colliding moves, stale revisions, rerender blocks,
+  optional valid/invalid URLs, permanent locks, and HTTP/MCP parity. Existing
+  preflight coverage proves the over-60-second Content ID warning.
+
+### Tests run
+
+- `npx vitest run --config vitest.config.ts
+  tests/schedule-semantics.test.ts`: all 6 focused tests passed after adding the
+  adversarial same-Episode move assertion.
+- `npm test`: 38 files and 275 tests passed, including real FFmpeg coverage.
+- `npm run build`: typecheck, Vite production build, and Node TypeScript build
+  passed without warnings.
+- `git diff --check` passed.
+- A filename-only changed-file credential scan found no private-key, token,
+  password, secret, or API-key material.
+
+### Skipped tests
+
+- Native Windows NSIS packaging and packaged timezone/calendar behavior were
+  skipped on the current macOS host; WIN-03.7 owns that release gate.
+- Interactive list/calendar, stale-save, and post-publication Short-edit checks
+  were skipped because this boundary adds no UI; UI-01.5 owns those checks, and
+  existing repository suites provide executable published-entry immutability
+  coverage.
+- No lint command exists in `package.json`; the full suite, typecheck,
+  production build, diff hygiene, and focused credential scan are the available
+  automated gates.
+
+### Adversarial review
+
+A failure-oriented changed-file review served as the equivalent review lane
+because no repository-local `quality-sweep` or `expert-review` command is
+installed. It traced duplicate inputs, already-scheduled Shorts, persisted
+same-Episode spacing, invalid/stale Render evidence, exact rule and entry
+revisions, illegal/colliding moves, timezone changes, one-way state transitions,
+rerender blocks, YouTube URL validation, published-row immutability, transaction
+rollback, and HTTP/MCP parity.
+
+The review found an evidence gap: move-time same-Episode spacing was enforced
+but not directly asserted by the focused suite. The move fixture now uses two
+entries from one Episode and proves an otherwise legal unoccupied slot is
+rejected when it violates spacing. The focused test and full suite pass after
+the fix. No blocking finding remains.
+
+### Residual risk
+
+Interactive list/calendar behavior is assigned to UI-01.5. Packaged Windows
+calendar and timezone behavior is assigned to WIN-03.7. No YouTube OAuth,
+upload, authentication, or remote-publication verification was added.
+
+### Rollback note
+
+This boundary adds no migration. Reverting its source, test, and documentation
+changes restores the SCH-01 behavior without changing persisted data. Entries
+already marked published should remain treated as immutable during rollback.
+
+### Next command
+
+Begin API-01 versioned HTTP API inventory and contract coverage.
+
 ## SCH-01 shipping boundary — 2026-07-28
 
 ### User goal

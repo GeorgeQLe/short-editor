@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] SCH-02 — Complete draft, move, lock, and publication semantics.
+- [ ] API-01 — Complete and contract-test the versioned HTTP API.
 
 ## Completed
 
+- [x] SCH-02 — Complete draft, move, lock, and publication semantics.
 - [x] SCH-01 — Persist revisioned schedule rules with a documented DST policy.
 - [x] RND-04 — Add safe cancellation, retry attempts, and crash recovery.
 - [x] RND-03 — Gate Render success on normalized determinism evidence.
