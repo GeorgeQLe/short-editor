@@ -941,6 +941,12 @@ eligibility enforcement, and real-media/contract/migration coverage.
 
 ### RND-04 — Add safe cancellation, retry attempts, and crash recovery
 
+**Status: Complete (2026-07-28).** Implemented by migration 15, immutable
+three-attempt Render lineages, transactional snapshot-bound manual retry,
+paired Render/Job cancellation and startup reconciliation, cooperative
+subprocess cancellation with two-second forced termination, interrupted
+artifact cleanup, and redacted disk/finalization failures.
+
 - **SPEC / gates:** 4.2, 5.2, 6.9, 6.11, 7.2; G6, G8, G9.
 - **Prerequisites / unblocks:** RND-03 and FND-03; unblocks final UI recovery and
   Windows gates.
@@ -965,6 +971,17 @@ eligibility enforcement, and real-media/contract/migration coverage.
   errors, and bounded recovery. Capture macOS evidence; defer to WIN-03.6/.9.
 - **Evidence / acceptance:** G6/G9 fault injection yields only safe retry or a
   terminal actionable error, with each attempt durably distinguishable.
+- **Implementation evidence (2026-07-28):** Public Render contracts expose
+  `lineageId`, `previousRenderId`, and `attempt`; HTTP and typed MCP expose
+  `renders.retry`. Repository immediate transactions serialize retries, retain
+  the exact preflight/revision/sidecar decision, reject stale or unapproved
+  revisions and legacy attempts, and cap each lineage at three. Startup
+  preserves committed successes, aligns terminal pairs, repairs queued
+  cancellation mismatches, bounds other idempotent reclaims at three
+  executions, and makes interrupted running attempts manually retryable after
+  artifact cleanup. Render encoding, probing, normalization, dependency
+  inspection, and hashing share cancellation checks; staged/final artifacts
+  are removed on cancellation or failure.
 
 ## Milestone 7 — Scheduling and publication records
 

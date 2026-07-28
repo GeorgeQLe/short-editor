@@ -121,7 +121,10 @@ describe("artifact store", () => {
       validate: () => {
         throw Object.assign(new Error("injected filesystem failure"), { code: "ENOSPC" });
       }
-    })).toThrowError(new AppError("INTERNAL_ERROR", "Artifact creation failed"));
+    })).toThrowError(new AppError(
+      "INTERNAL_ERROR",
+      "Storage is full; free disk space and retry this Render"
+    ));
     expect(existsSync(join(directory, relativePath))).toBe(false);
     expect(readdirSync(join(directory, "artifacts"), { recursive: true })
       .some((entry) => String(entry).endsWith(".tmp"))).toBe(false);

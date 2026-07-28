@@ -163,7 +163,8 @@ describe("database migrations", () => {
     const upgraded = openDatabase(path);
     databases.push(upgraded);
     expect(upgraded.prepare(`
-      SELECT state,output_path,sidecar_path,determinism_json,error_code,error_message
+      SELECT state,output_path,sidecar_path,determinism_json,error_code,error_message,
+        lineage_id,previous_render_id,attempt
       FROM renders WHERE id=?
     `).get(renderId)).toEqual({
       state: "stale",
@@ -171,7 +172,10 @@ describe("database migrations", () => {
       sidecar_path: "artifacts/renders/legacy/captions.srt",
       determinism_json: null,
       error_code: "INVALID_STATE",
-      error_message: "Rerender required: this output predates normalized determinism evidence."
+      error_message: "Rerender required: this output predates normalized determinism evidence.",
+      lineage_id: renderId,
+      previous_render_id: null,
+      attempt: 1
     });
   });
 

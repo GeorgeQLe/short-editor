@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] RND-04 — Add safe cancellation, retry attempts, and crash recovery.
+- [ ] SCH-01 — Persist revisioned schedule rules with a documented DST policy.
 
 ## Completed
 
+- [x] RND-04 — Add safe cancellation, retry attempts, and crash recovery.
 - [x] RND-03 — Gate Render success on normalized determinism evidence.
 - [x] RND-02 — Compose originals with an explicit FFmpeg graph.
 - [x] RND-01 — Build typed preflight from an immutable revision snapshot.

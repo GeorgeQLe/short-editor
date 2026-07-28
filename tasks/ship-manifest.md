@@ -1,5 +1,139 @@
 # Ship manifest
 
+## RND-04 shipping boundary — 2026-07-28
+
+### User goal
+
+Add safe Render cancellation, immutable bounded retry attempts, and
+pair-consistent crash recovery without adopting newer Short edits or leaking
+unsafe filesystem diagnostics.
+
+### Changed files
+
+`IMPLEMENTATION_PLAN.md`, `SPEC.md`, `src/core/api.ts`,
+`src/core/artifact-store.ts`, `src/core/bootstrap.ts`,
+`src/core/database.ts`, `src/core/jobs.ts`, `src/core/render.ts`,
+`src/core/repository.ts`, `src/core/service.ts`, `src/mcp/server.ts`,
+`src/shared/contracts.ts`, `tasks/history.md`, `tasks/ship-manifest.md`,
+`tasks/todo.md`, `tests/artifact-store.test.ts`,
+`tests/domain-contracts.test.ts`, `tests/migrations.test.ts`,
+`tests/render.test.ts`, `tests/repository.test.ts`, and
+`tests/transcript-editing.test.ts`.
+
+Generated `.agents/skillpacks/`, `.claude/`, and `.codex/` local artifacts are
+unrelated and excluded. No path under `.claude/skills/` or `.codex/skills/` is
+tracked. `.agents/project.json` remains tracked and unchanged. There are no
+earlier unpushed commits or unrelated tracked changes in the boundary.
+
+### Per-file purpose
+
+- `src/shared/contracts.ts` exposes immutable Render lineage, predecessor, and
+  attempt values through the strict public entity contract.
+- `src/core/database.ts` adds migration 15 lineage storage, indexes, and
+  insert/update integrity triggers while upgrading every legacy Render to a
+  one-attempt self-rooted lineage.
+- `src/core/repository.ts` creates snapshot-bound retries in immediate
+  transactions, caps each lineage at three attempts, guards completion against
+  late cancellation, reconciles Render/Job pairs, and identifies invalid
+  completed-artifact state.
+- `src/core/jobs.ts` atomically cancels queued Render/Job pairs, retains a
+  durable cancellation request for running work, bounds automatic reclaim, and
+  preserves a committed Render success across a late cancellation race.
+- `src/core/render.ts` observes cancellation through dependency checks, input
+  hashing, encoding, probing, normalization, artifact finalization, and
+  completion; it escalates subprocess termination after two seconds and
+  removes interrupted attempt output.
+- `src/core/artifact-store.ts` makes streaming hashes cancellation-aware,
+  redacts disk/finalization failures, and removes artifact records/files left
+  by an interrupted Render.
+- `src/core/bootstrap.ts` orders artifact reconciliation, Render validation,
+  pair recovery, and interrupted-output cleanup at startup.
+- `src/core/service.ts`, `src/core/api.ts`, and `src/mcp/server.ts` expose the
+  same manual retry behavior through core, HTTP, and typed MCP boundaries.
+- `tests/artifact-store.test.ts`, `tests/migrations.test.ts`,
+  `tests/repository.test.ts`, and `tests/render.test.ts` cover redaction,
+  upgrades, lineage/retry constraints, pair recovery, cooperative
+  cancellation, cleanup, and the real-media path. The remaining test files
+  update strict Render fixtures and contract assertions.
+- `SPEC.md` and `IMPLEMENTATION_PLAN.md` record the implemented recovery
+  boundary and deferred native gates. `tasks/todo.md` closes RND-04 and promotes
+  SCH-01; `tasks/history.md` records behavior and evidence; this manifest
+  records the exact ship and rollback boundary.
+
+### User-goal mapping
+
+Migration and public contracts make every attempt durably distinguishable.
+Repository transactions retain the exact failed/cancelled attempt snapshot and
+serialize bounded retries. Job, renderer, and artifact-store changes carry one
+durable cancellation signal through all long-running stages and prevent a
+cancelled attempt from retaining output. Startup reconciliation restores a
+consistent Render/Job pair, preserves committed success, makes interrupted
+unsafe work manually recoverable, and removes its artifacts. Focused and
+real-media tests exercise each layer through the public and persistence
+boundaries.
+
+### Tests run
+
+- Executable verification: `npm test` passed all 36 files and 258 tests,
+  including the real FFmpeg render/retry/cancellation path.
+- Executable verification: `npm run build` passed application typecheck, Vite
+  production build, and Node TypeScript compilation without warnings.
+- Repository verification: `git diff --check` passed.
+- Security verification: a focused added-line scan found no private-key,
+  credential, token, password, secret, or API-key signatures.
+
+### Skipped tests
+
+- Native Windows NSIS packaging and packaged FFmpeg/FFprobe forced-termination
+  behavior were skipped because the current host is macOS; WIN-03.6/.9 own
+  those release gates.
+- A real operating-system crash at every filesystem/database boundary was not
+  injected. Repository/startup tests simulate the durable states, and
+  real-media tests prove cleanup during controlled cancellation, but native
+  packaged fault injection remains a release-gate risk.
+- Human UI retry/cancellation history and audiovisual inspection were skipped
+  because this boundary adds core/HTTP/MCP behavior rather than the editor
+  workflow; UI-01.4 owns that acceptance.
+- No lint script exists in `package.json`; the full suite, typecheck,
+  production build, diff hygiene, and focused security scan are the available
+  automated gates.
+
+### Adversarial review
+
+A failure-oriented changed-file review served as the equivalent review lane
+because no repository-local `quality-sweep` or `expert-review` command is
+installed. It traced malformed/legacy lineage, concurrent retries, stale or
+unapproved revisions, superseded and exhausted attempts, invalid persisted job
+snapshots, queued and running cancellation races, cancellation after artifact
+finalization, committed-success recovery, orphan/mismatched Render/Job pairs,
+bounded non-Render reclaim, disk exhaustion, path/error redaction, subprocess
+termination, and HTTP/MCP parity. Strict schemas, SQLite immediate
+transactions/triggers, guarded state transitions, cleanup paths, migration
+coverage, and real-media assertions cover the reviewed boundary. No blocking
+finding remains.
+
+### Residual risk
+
+The executable evidence covers the macOS process and SQLite behavior, but not
+the packaged Windows signal semantics or abrupt native process death between
+every individual fsync/rename/transaction step. Those failures should first be
+visible as a terminal recovery-required attempt with its own output removed;
+WIN-03.6/.9 must close the native packaged gates. The three-attempt retry
+surface is available through HTTP/MCP, but the human attempt-history and
+recovery experience remains UI-01.4.
+
+### Rollback note
+
+Revert the RND-04 feature commit before deploying migration 15. After migration
+15 has run, restore a pre-migration backup instead of down-migrating because
+older code does not understand the required lineage columns. Each interrupted
+or cancelled attempt owns only its own artifact records and files.
+
+### Next command
+
+Run `npx skillpacks install exec-loop` from the project shell before invoking
+`$exec` for SCH-01 revisioned schedule rules and documented DST policy.
+
 ## RND-03 shipping boundary — 2026-07-28
 
 ### User goal

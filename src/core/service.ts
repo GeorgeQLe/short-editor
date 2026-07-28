@@ -1184,6 +1184,9 @@ export class CoreService {
   startRenderAttempt(input: unknown) {
     return this.repository.startRenderAttempt(renderStartRequestSchema.parse(input));
   }
+  retryRenderAttempt(renderId: string) {
+    return this.repository.retryRenderAttempt(renderId);
+  }
   validateRender(path: string) { return validateRender(path); }
   draftSchedule(shorts: SchedulableShort[], rules: ScheduleRules) {
     for (const item of shorts) {

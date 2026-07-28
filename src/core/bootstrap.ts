@@ -54,7 +54,9 @@ export function createCore(
   const media = new MediaService(repository);
   const artifacts = new ArtifactStore(dataDirectory, repository);
   artifacts.reconcile();
+  repository.reconcileRenderArtifacts();
   jobs.recover();
+  artifacts.cleanupInterruptedRenderArtifacts();
   const watchedFolders = new WatchedFolderCoordinator(repository, media, jobs);
   const worker = new PythonWorkerSupervisor({
     launch: developmentPythonWorkerLaunch(process.cwd()),

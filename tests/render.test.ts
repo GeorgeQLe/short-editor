@@ -532,6 +532,47 @@ describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32
       expect(repository.listArtifactRecords().filter(
         (artifact) => artifact.ownerId === normalizationStart.render.id
       )).toEqual([]);
+
+      const retried = repository.retryRenderAttempt(normalizationStart.render.id);
+      expect(retried.render).toMatchObject({
+        lineageId: normalizationStart.render.id,
+        previousRenderId: normalizationStart.render.id,
+        attempt: 2,
+        projectRevision: normalizationStart.render.projectRevision,
+        preflightId: normalizationStart.render.preflightId,
+        decisionHash: normalizationStart.render.decisionHash,
+        state: "queued"
+      });
+      const retriedPayload = repository.db.prepare(
+        "SELECT payload_json FROM jobs WHERE id=?"
+      ).get(retried.job.id) as { payload_json: string };
+      expect(JSON.parse(retriedPayload.payload_json)).toMatchObject({
+        renderId: retried.render.id,
+        projectRevision: normalizationStart.render.projectRevision,
+        preflightId: normalizationStart.render.preflightId,
+        sidecarFormat: null
+      });
+      const cancelledJob = jobs.cancel(retried.job.id);
+      expect(cancelledJob).toMatchObject({
+        state: "cancelled",
+        cancelRequested: true,
+        errorCode: "JOB_CANCELLED"
+      });
+      expect(repository.getRender(retried.render.id)).toMatchObject({
+        state: "cancelled",
+        error: { code: "JOB_CANCELLED" }
+      });
+      expect(() => repository.retryRenderAttempt(normalizationStart.render.id))
+        .toThrow(/newer attempt/);
+      const finalAttempt = repository.retryRenderAttempt(retried.render.id);
+      expect(finalAttempt.render).toMatchObject({
+        lineageId: normalizationStart.render.id,
+        previousRenderId: retried.render.id,
+        attempt: 3
+      });
+      jobs.cancel(finalAttempt.job.id);
+      expect(() => repository.retryRenderAttempt(finalAttempt.render.id))
+        .toThrow(/three-attempt limit/);
       expect(createHash("sha256").update(readFileSync(sourcePath)).digest("hex")).toBe(sourceHash);
     }, 150_000);
   }

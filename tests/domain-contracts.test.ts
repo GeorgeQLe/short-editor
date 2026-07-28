@@ -148,6 +148,7 @@ describe("SPEC 5.1 entity contracts", () => {
     }],
     ["Render", renderSchema, {
       id: renderId, shortId, projectRevision: 1,
+      lineageId: renderId, previousRenderId: null, attempt: 1,
       preflightId: null,
       encoder: { ffmpegVersion: "7.0", videoCodec: "h264", audioCodec: "aac", settings: { crf: 18 } },
       outputPath: "/output/a.mp4",

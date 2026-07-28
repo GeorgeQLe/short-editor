@@ -95,14 +95,14 @@ export class ArtifactStore {
       return { write, finalPath, temporaryPath };
     } catch (error) {
       this.pendingPaths.delete(finalPath);
-      if (error instanceof AppError) throw error;
-      throw new AppError("INTERNAL_ERROR", "Artifact staging failed");
+      throw normalizeArtifactError(error, "Artifact staging failed");
     }
   }
 
   async finalizeExternal(
     reservation: ExternalArtifactReservation,
-    validate: (temporaryPath: string) => void | Promise<void>
+    validate: (temporaryPath: string) => void | Promise<void>,
+    cancelled: () => boolean = () => false
   ): Promise<StoredArtifact> {
     const { write, finalPath, temporaryPath } = reservation;
     try {
@@ -113,10 +113,12 @@ export class ArtifactStore {
       } finally {
         closeSync(descriptor);
       }
+      throwIfArtifactCancelled(cancelled);
       const [contentHash, file] = await Promise.all([
-        hashFile(temporaryPath),
+        hashFile(temporaryPath, cancelled),
         stat(temporaryPath)
       ]);
+      throwIfArtifactCancelled(cancelled);
       const artifact: StoredArtifact = {
         id: randomUUID(),
         kind: write.kind,
@@ -142,8 +144,7 @@ export class ArtifactStore {
       return artifact;
     } catch (error) {
       if (existsSync(temporaryPath)) unlinkSync(temporaryPath);
-      if (error instanceof AppError) throw error;
-      throw new AppError("INTERNAL_ERROR", "Artifact creation failed");
+      throw normalizeArtifactError(error, "Artifact finalization failed");
     } finally {
       this.pendingPaths.delete(finalPath);
     }
@@ -229,8 +230,7 @@ export class ArtifactStore {
           syncDirectory(dirname(item.finalPath));
         }
       }
-      if (error instanceof AppError) throw error;
-      throw new AppError("INTERNAL_ERROR", "Artifact creation failed");
+      throw normalizeArtifactError(error, "Artifact creation failed");
     } finally {
       staged.forEach(({ finalPath }) => this.pendingPaths.delete(finalPath));
     }
@@ -285,6 +285,27 @@ export class ArtifactStore {
     return { quarantinedTemporaryFiles, quarantinedArtifactFiles, corruptArtifactIds };
   }
 
+  cleanupInterruptedRenderArtifacts(): string[] {
+    const cleaned: string[] = [];
+    const interrupted = this.repository.listRenders().filter((render) =>
+      render.state === "failed" &&
+      render.error?.code === "INTERNAL_ERROR" &&
+      render.error.message === "Rendering was interrupted; manual retry is required"
+    );
+    for (const render of interrupted) {
+      for (const artifact of this.repository.listArtifactRecords(render.id)) {
+        const path = this.resolveOwnedPath(artifact.relativePath);
+        this.repository.deleteArtifactRecord(artifact.id);
+        if (existsSync(path)) {
+          unlinkSync(path);
+          syncDirectory(dirname(path));
+        }
+        cleaned.push(artifact.relativePath);
+      }
+    }
+    return cleaned;
+  }
+
   private quarantine(path: string): string {
     mkdirSync(this.quarantineDirectory, { recursive: true });
     const extension = path.endsWith(".tmp") ? ".tmp" : ".artifact";
@@ -301,15 +322,40 @@ export function sha256(bytes: Uint8Array): string {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
-async function hashFile(path: string): Promise<string> {
+async function hashFile(
+  path: string,
+  cancelled: () => boolean = () => false
+): Promise<string> {
   const hash = createHash("sha256");
   await new Promise<void>((resolvePromise, reject) => {
     const stream = createReadStream(path);
+    const cancellation = setInterval(() => {
+      if (cancelled()) stream.destroy(new AppError("JOB_CANCELLED", "Render was cancelled", 409));
+    }, 100);
     stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("close", () => clearInterval(cancellation));
     stream.on("end", resolvePromise);
     stream.on("error", reject);
   });
   return `sha256:${hash.digest("hex")}`;
+}
+
+function throwIfArtifactCancelled(cancelled: () => boolean): void {
+  if (cancelled()) throw new AppError("JOB_CANCELLED", "Render was cancelled", 409);
+}
+
+function normalizeArtifactError(error: unknown, fallback: string): AppError {
+  if (error instanceof AppError) return error;
+  const code = error && typeof error === "object" && "code" in error
+    ? String((error as { code?: unknown }).code)
+    : "";
+  if (code === "ENOSPC" || code === "EDQUOT") {
+    return new AppError(
+      "INTERNAL_ERROR",
+      "Storage is full; free disk space and retry this Render"
+    );
+  }
+  return new AppError("INTERNAL_ERROR", fallback);
 }
 
 function writeExclusiveAndSync(path: string, bytes: Uint8Array): void {

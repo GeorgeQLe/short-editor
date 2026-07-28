@@ -305,6 +305,26 @@ server.registerTool("renders.preflight", {
     };
   }
 });
+server.registerTool("renders.retry", {
+  description: "Manually retry a failed or cancelled snapshot-bound Render without adopting newer edits.",
+  inputSchema: { renderId: uuid },
+  outputSchema: renderStartResultSchema
+}, async ({ renderId }) => {
+  try {
+    const value = renderStartResultSchema.parse(
+      await core(`/renders/${renderId}/retry`, "POST")
+    );
+    return { ...result(value), structuredContent: value };
+  } catch (error) {
+    return {
+      isError: true,
+      content: [{
+        type: "text" as const,
+        text: error instanceof Error ? error.message : String(error)
+      }]
+    };
+  }
+});
 register("renders.validate", "Probe and validate a final 1080×1920 H.264/AAC MP4.", {
   path: z.string()
 }, (input) => core("/renders/validate", "POST", input));

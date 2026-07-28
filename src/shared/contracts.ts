@@ -978,6 +978,9 @@ export const renderSchema = z.strictObject({
   id: idSchema,
   shortId: idSchema,
   projectRevision: positiveRevisionSchema,
+  lineageId: idSchema,
+  previousRenderId: idSchema.nullable(),
+  attempt: positiveRevisionSchema,
   preflightId: idSchema.nullable(),
   encoder: z.strictObject({
     ffmpegVersion: z.string().min(1),

@@ -40,11 +40,13 @@ export interface RenderValidation {
 export async function validateRender(
   outputPath: string,
   ffprobePath = process.env.SHORT_EDITOR_FFPROBE ?? "ffprobe",
-  maxDurationMs = 180_000
+  maxDurationMs = 180_000,
+  cancelled: () => boolean = () => false
 ): Promise<RenderValidation> {
   try { await access(outputPath); }
   catch { throw new AppError("NOT_FOUND", "Render output does not exist", 404); }
-  const data = await runProbe(ffprobePath, outputPath);
+  throwIfCancelled(cancelled);
+  const data = await runProbe(ffprobePath, outputPath, cancelled);
   const streams = data.streams as Array<Record<string, unknown>> ?? [];
   const video = streams.find((stream) => stream.codec_type === "video");
   const audio = streams.find((stream) => stream.codec_type === "audio");
@@ -91,7 +93,8 @@ export class CompositionRenderer {
       normalize?: (
         path: string,
         ffmpegPath: string,
-        durationMs: number
+        durationMs: number,
+        cancelled?: () => boolean
       ) => Promise<Omit<PendingRenderDeterminism, "identityHash">>;
     } = {}
   ) {}
@@ -115,16 +118,14 @@ export class CompositionRenderer {
     let typedValidation: RenderValidationResult | null = null;
     let normalized: Omit<PendingRenderDeterminism, "identityHash"> | null = null;
     let completedEncoder: Render["encoder"] | null = null;
+    const cancelled = () => this.jobs.cancellationRequested(job.id);
     try {
       const stored = this.repository.getRenderPreflight(payload.preflightId);
       const snapshot = renderSnapshotSchema.parse(stored.snapshot);
       assertSnapshotBinding(snapshot, payload);
-      await this.assertDependencies(snapshot, ffmpegPath, ffprobePath);
-      await assertCapturedResources(snapshot);
-      if (this.jobs.cancellationRequested(job.id)) {
-        this.repository.transitionRender(render.id, "running", { state: "cancelled" });
-        return;
-      }
+      await this.assertDependencies(snapshot, ffmpegPath, ffprobePath, cancelled);
+      await assertCapturedResources(snapshot, cancelled);
+      throwIfCancelled(cancelled);
       const relativePath = `artifacts/renders/${render.id}/final.mp4`;
       reservation = this.artifacts.reserveExternal({
         kind: "render",
@@ -149,16 +150,11 @@ export class CompositionRenderer {
         ["-hide_banner", "-nostdin", ...graph.inputArgs, ...graph.outputArgs],
         snapshot.output.durationMs,
         (progress) => this.jobs.progress(job.id, 0.05 + progress * 0.82, "encoding"),
-        () => this.jobs.cancellationRequested(job.id)
+        cancelled
       );
-      if (this.jobs.cancellationRequested(job.id)) {
-        this.artifacts.discardExternal(reservation);
-        reservation = undefined;
-        this.repository.transitionRender(render.id, "running", { state: "cancelled" });
-        return;
-      }
-      await this.assertDependencies(snapshot, ffmpegPath, ffprobePath);
-      await assertCapturedResources(snapshot);
+      throwIfCancelled(cancelled);
+      await this.assertDependencies(snapshot, ffmpegPath, ffprobePath, cancelled);
+      await assertCapturedResources(snapshot, cancelled);
       const project = this.repository.getShort(payload.shortId);
       if (project.revision !== payload.projectRevision || !project.approved) {
         this.artifacts.discardExternal(reservation);
@@ -167,7 +163,7 @@ export class CompositionRenderer {
         throw staleRender(payload.projectRevision, project.revision);
       }
       this.jobs.progress(job.id, 0.9, "validating output");
-      const ffmpegBuildHash = await mediaDependencyBuildHash(ffmpegPath);
+      const ffmpegBuildHash = await mediaDependencyBuildHash(ffmpegPath, cancelled);
       completedEncoder = {
         ...render.encoder,
         settings: {
@@ -180,7 +176,7 @@ export class CompositionRenderer {
         }
       };
       const artifact = await this.artifacts.finalizeExternal(reservation, async (path) => {
-        typedValidation = await validateRenderContract(path, ffprobePath);
+        typedValidation = await validateRenderContract(path, ffprobePath, cancelled);
         if (!typedValidation.valid) {
           throw new AppError("VALIDATION_ERROR", "Rendered media failed output validation", 422);
         }
@@ -188,17 +184,14 @@ export class CompositionRenderer {
         normalized = await (this.options.normalize ?? normalizeRender)(
           path,
           ffmpegPath,
-          typedValidation.durationMs!
+          typedValidation.durationMs!,
+          cancelled
         );
-      });
+        throwIfCancelled(cancelled);
+      }, cancelled);
       finalizedArtifacts.push(artifact);
       reservation = undefined;
-      if (this.jobs.cancellationRequested(job.id)) {
-        this.artifacts.discardFinalized(artifact);
-        finalizedArtifacts.length = 0;
-        this.repository.transitionRender(render.id, "running", { state: "cancelled" });
-        return;
-      }
+      throwIfCancelled(cancelled);
       let sidecarPath: string | null = null;
       if (payload.sidecarFormat !== null) {
         const sidecars = generateCaptionSidecars(
@@ -219,14 +212,7 @@ export class CompositionRenderer {
         finalizedArtifacts.push(sidecar);
         sidecarPath = sidecar.relativePath;
       }
-      if (this.jobs.cancellationRequested(job.id)) {
-        for (const finalized of finalizedArtifacts.reverse()) {
-          this.artifacts.discardFinalized(finalized);
-        }
-        finalizedArtifacts.length = 0;
-        this.repository.transitionRender(render.id, "running", { state: "cancelled" });
-        return;
-      }
+      throwIfCancelled(cancelled);
       if (typedValidation === null || normalized === null || completedEncoder === null) {
         throw new AppError("INTERNAL_ERROR", "Render evidence was not completed");
       }
@@ -241,7 +227,14 @@ export class CompositionRenderer {
           ...normalizedEvidence,
           identityHash: renderDeterminismIdentity(render.decisionHash!, completedEncoder)
         }
-      });
+      }, job.id);
+      if (completed.state === "cancelled") {
+        for (const finalized of finalizedArtifacts.reverse()) {
+          this.artifacts.discardFinalized(finalized);
+        }
+        finalizedArtifacts.length = 0;
+        throw cancelledError();
+      }
       if (completed.state === "stale") {
         for (const finalized of finalizedArtifacts.reverse()) {
           this.artifacts.discardFinalized(finalized);
@@ -274,7 +267,7 @@ export class CompositionRenderer {
       if (current.state === "running") {
         const normalized = normalizeError(error);
         this.repository.transitionRender(render.id, "running", {
-          state: this.jobs.cancellationRequested(job.id) ? "cancelled" : "failed",
+          state: normalized.code === "JOB_CANCELLED" || cancelled() ? "cancelled" : "failed",
           ...(typedValidation === null ? {} : { validation: typedValidation }),
           ...(completedEncoder === null ? {} : { encoder: completedEncoder }),
           error: this.jobs.cancellationRequested(job.id)
@@ -292,13 +285,17 @@ export class CompositionRenderer {
   private async assertDependencies(
     snapshot: RenderSnapshot,
     ffmpegPath: string,
-    ffprobePath: string
+    ffprobePath: string,
+    cancelled: () => boolean
   ): Promise<void> {
-    const version = this.options.runVersion ?? dependencyVersion;
+    throwIfCancelled(cancelled);
+    const version = this.options.runVersion ??
+      ((binary: string) => dependencyVersion(binary, cancelled));
     const [ffmpeg, ffprobe] = await Promise.all([
       version(ffmpegPath),
       version(ffprobePath)
     ]);
+    throwIfCancelled(cancelled);
     if (
       ffmpeg !== snapshot.dependencyVersions.ffmpeg ||
       ffprobe !== snapshot.dependencyVersions.ffprobe
@@ -326,7 +323,8 @@ export function renderDeterminismIdentity(
 export async function normalizeRender(
   path: string,
   ffmpegPath = process.env.SHORT_EDITOR_FFMPEG ?? "ffmpeg",
-  durationMs = 180_000
+  durationMs = 180_000,
+  cancelled: () => boolean = () => false
 ): Promise<Omit<PendingRenderDeterminism, "identityHash">> {
   const videoBytesPerFrame = 1080 * 1920 * 3 / 2;
   const videoLimit = Math.ceil(durationMs / 1000 * 31 + 2) * videoBytesPerFrame;
@@ -337,13 +335,13 @@ export async function normalizeRender(
       "-map", "0:v:0", "-map_metadata", "-1", "-map_chapters", "-1",
       "-an", "-sn", "-dn", "-vf", "format=pix_fmts=yuv420p",
       "-fps_mode", "passthrough", "-bitexact", "-f", "rawvideo", "pipe:1"
-    ], videoLimit);
+    ], videoLimit, cancelled);
     const audio = await hashDecodedStream(ffmpegPath, [
       "-v", "error", "-nostdin", "-threads", "1", "-i", path,
       "-map", "0:a:0", "-map_metadata", "-1", "-map_chapters", "-1",
       "-vn", "-sn", "-dn", "-ac", "2", "-ar", "48000",
       "-c:a", "pcm_s16le", "-bitexact", "-f", "s16le", "pipe:1"
-    ], audioLimit);
+    ], audioLimit, cancelled);
     return {
       version: RENDER_DETERMINISM_VERSION,
       algorithm: "sha256",
@@ -360,7 +358,8 @@ export async function normalizeRender(
         ...audio
       }
     };
-  } catch {
+  } catch (error) {
+    if (normalizeError(error).code === "JOB_CANCELLED") throw error;
     throw new AppError(
       "ARTIFACT_CORRUPT",
       "Render normalization failed",
@@ -372,7 +371,8 @@ export async function normalizeRender(
 function hashDecodedStream(
   binary: string,
   args: string[],
-  byteLimit: number
+  byteLimit: number,
+  cancelled: () => boolean
 ): Promise<{ sha256: string; byteCount: number }> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(binary, args, {
@@ -384,9 +384,19 @@ function hashDecodedStream(
     let byteCount = 0;
     let stderrBytes = 0;
     let settled = false;
+    let forcedTermination: NodeJS.Timeout | undefined;
+    const cancellation = setInterval(() => {
+      if (!cancelled() || child.exitCode !== null || child.killed) return;
+      child.kill("SIGTERM");
+      forcedTermination = setTimeout(() => {
+        if (child.exitCode === null) child.kill("SIGKILL");
+      }, 2_000);
+    }, 100);
     const fail = () => {
       if (settled) return;
       settled = true;
+      clearInterval(cancellation);
+      if (forcedTermination) clearTimeout(forcedTermination);
       if (child.exitCode === null) child.kill("SIGKILL");
       reject(new Error("normalization failed"));
     };
@@ -407,6 +417,12 @@ function hashDecodedStream(
       void stderrBytes;
       if (settled) return;
       settled = true;
+      clearInterval(cancellation);
+      if (forcedTermination) clearTimeout(forcedTermination);
+      if (cancelled()) {
+        reject(cancelledError());
+        return;
+      }
       if (code !== 0 || byteCount === 0) {
         reject(new Error("normalization failed"));
         return;
@@ -418,9 +434,10 @@ function hashDecodedStream(
 
 async function validateRenderContract(
   path: string,
-  ffprobePath: string
+  ffprobePath: string,
+  cancelled: () => boolean
 ): Promise<RenderValidationResult> {
-  const validation = await validateRender(path, ffprobePath);
+  const validation = await validateRender(path, ffprobePath, 180_000, cancelled);
   return renderValidationResultSchema.parse({
     valid: validation.valid,
     findings: validation.errors.map((message, index) => ({
@@ -447,12 +464,16 @@ function assertSnapshotBinding(snapshot: RenderSnapshot, payload: RenderJobPaylo
   }
 }
 
-async function assertCapturedResources(snapshot: RenderSnapshot): Promise<void> {
+async function assertCapturedResources(
+  snapshot: RenderSnapshot,
+  cancelled: () => boolean
+): Promise<void> {
   const resources = [
     snapshot.resources.episode.file,
     ...snapshot.resources.assets.map(({ file }) => file)
   ];
   for (const resource of resources) {
+    throwIfCancelled(cancelled);
     if (!resource.before || !resource.contentHash) {
       throw new AppError("SOURCE_IDENTITY_MISMATCH", "A captured render input is unavailable", 409);
     }
@@ -465,7 +486,7 @@ async function assertCapturedResources(snapshot: RenderSnapshot): Promise<void> 
     if (
       current.size !== resource.before.size ||
       current.mtimeMs !== resource.before.modifiedAtMs ||
-      await hashFile(resource.path) !== resource.contentHash
+      await hashFile(resource.path, cancelled) !== resource.contentHash
     ) {
       throw new AppError(
         "SOURCE_IDENTITY_MISMATCH",
@@ -476,26 +497,36 @@ async function assertCapturedResources(snapshot: RenderSnapshot): Promise<void> 
   }
 }
 
-async function hashFile(path: string): Promise<string> {
+async function hashFile(path: string, cancelled: () => boolean): Promise<string> {
   const hash = createHash("sha256");
   await new Promise<void>((resolvePromise, reject) => {
     const stream = createReadStream(path);
+    const cancellation = setInterval(() => {
+      if (cancelled()) stream.destroy(cancelledError());
+    }, 100);
     stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("close", () => clearInterval(cancellation));
     stream.on("end", resolvePromise);
     stream.on("error", reject);
   });
   return hash.digest("hex");
 }
 
-async function dependencyVersion(binary: string): Promise<string> {
-  const result = await runProcess(binary, ["-version"], 64_000);
+async function dependencyVersion(
+  binary: string,
+  cancelled: () => boolean = () => false
+): Promise<string> {
+  const result = await runProcess(binary, ["-version"], 64_000, cancelled);
   const version = parseDependencyVersion(result.stdout);
   if (!version) throw new AppError("DEPENDENCY_UNAVAILABLE", "Media dependency version is unavailable", 503);
   return version;
 }
 
-async function mediaDependencyBuildHash(binary: string): Promise<string> {
-  const result = await runProcess(binary, ["-version"], 64_000);
+async function mediaDependencyBuildHash(
+  binary: string,
+  cancelled: () => boolean
+): Promise<string> {
+  const result = await runProcess(binary, ["-version"], 64_000, cancelled);
   return `sha256:${createHash("sha256").update(result.stdout).digest("hex")}`;
 }
 
@@ -515,8 +546,13 @@ function runFfmpeg(
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let forcedTermination: NodeJS.Timeout | undefined;
     const cancellation = setInterval(() => {
-      if (cancelled() && child.exitCode === null) child.kill("SIGTERM");
+      if (!cancelled() || child.exitCode !== null || child.killed) return;
+      child.kill("SIGTERM");
+      forcedTermination = setTimeout(() => {
+        if (child.exitCode === null) child.kill("SIGKILL");
+      }, 2_000);
     }, 100);
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
@@ -536,6 +572,7 @@ function runFfmpeg(
       if (settled) return;
       settled = true;
       clearInterval(cancellation);
+      if (forcedTermination) clearTimeout(forcedTermination);
       reject(error.code === "ENOENT"
         ? new AppError("DEPENDENCY_UNAVAILABLE", "FFmpeg is unavailable", 503)
         : error);
@@ -544,6 +581,7 @@ function runFfmpeg(
       if (settled) return;
       settled = true;
       clearInterval(cancellation);
+      if (forcedTermination) clearTimeout(forcedTermination);
       if (cancelled()) {
         reject(new AppError("JOB_CANCELLED", "Render was cancelled", 409));
       } else if (code === 0) {
@@ -563,7 +601,8 @@ function runFfmpeg(
 function runProcess(
   binary: string,
   args: string[],
-  cap: number
+  cap: number,
+  cancelled: () => boolean = () => false
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(binary, args, {
@@ -573,16 +612,30 @@ function runProcess(
     });
     let stdout = "";
     let stderr = "";
+    let forcedTermination: NodeJS.Timeout | undefined;
+    const cancellation = setInterval(() => {
+      if (!cancelled() || child.exitCode !== null || child.killed) return;
+      child.kill("SIGTERM");
+      forcedTermination = setTimeout(() => {
+        if (child.exitCode === null) child.kill("SIGKILL");
+      }, 2_000);
+    }, 100);
     child.stdout.on("data", (chunk) => { stdout = `${stdout}${String(chunk)}`.slice(0, cap); });
     child.stderr.on("data", (chunk) => { stderr = `${stderr}${String(chunk)}`.slice(0, cap); });
-    child.on("error", (error: NodeJS.ErrnoException) => reject(
-      error.code === "ENOENT"
+    child.on("error", (error: NodeJS.ErrnoException) => {
+      clearInterval(cancellation);
+      if (forcedTermination) clearTimeout(forcedTermination);
+      reject(error.code === "ENOENT"
         ? new AppError("DEPENDENCY_UNAVAILABLE", "Media dependency is unavailable", 503)
-        : error
-    ));
-    child.on("close", (code) => code === 0
-      ? resolvePromise({ stdout, stderr })
-      : reject(new AppError("DEPENDENCY_UNAVAILABLE", "Media dependency failed", 503)));
+        : error);
+    });
+    child.on("close", (code) => {
+      clearInterval(cancellation);
+      if (forcedTermination) clearTimeout(forcedTermination);
+      if (cancelled()) reject(cancelledError());
+      else if (code === 0) resolvePromise({ stdout, stderr });
+      else reject(new AppError("DEPENDENCY_UNAVAILABLE", "Media dependency failed", 503));
+    });
   });
 }
 
@@ -605,7 +658,11 @@ function staleRender(expectedRevision: number, actualRevision: number): AppError
   });
 }
 
-function runProbe(binary: string, path: string): Promise<Record<string, unknown>> {
+function runProbe(
+  binary: string,
+  path: string,
+  cancelled: () => boolean
+): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const child = spawn(binary, [
       "-v", "error", "-show_entries", "format=duration:stream=codec_type,codec_name,width,height",
@@ -613,14 +670,27 @@ function runProbe(binary: string, path: string): Promise<Record<string, unknown>
     ], { windowsHide: true, shell: false });
     let stdout = "";
     let stderr = "";
+    let forcedTermination: NodeJS.Timeout | undefined;
+    const cancellation = setInterval(() => {
+      if (!cancelled() || child.exitCode !== null || child.killed) return;
+      child.kill("SIGTERM");
+      forcedTermination = setTimeout(() => {
+        if (child.exitCode === null) child.kill("SIGKILL");
+      }, 2_000);
+    }, 100);
     child.stdout.on("data", (chunk) => { stdout = `${stdout}${String(chunk)}`.slice(0, 2_000_000); });
     child.stderr.on("data", (chunk) => { stderr = `${stderr}${String(chunk)}`.slice(-64_000); });
-    child.on("error", (error: NodeJS.ErrnoException) => reject(
-      error.code === "ENOENT"
+    child.on("error", (error: NodeJS.ErrnoException) => {
+      clearInterval(cancellation);
+      if (forcedTermination) clearTimeout(forcedTermination);
+      reject(error.code === "ENOENT"
         ? new AppError("DEPENDENCY_UNAVAILABLE", `${binary} is unavailable`, 503)
-        : error
-    ));
+        : error);
+    });
     child.on("close", (code) => {
+      clearInterval(cancellation);
+      if (forcedTermination) clearTimeout(forcedTermination);
+      if (cancelled()) return reject(cancelledError());
       if (code) return reject(new AppError(
         "VALIDATION_ERROR",
         "ffprobe could not validate the render output",
@@ -631,4 +701,12 @@ function runProbe(binary: string, path: string): Promise<Record<string, unknown>
       catch { reject(new AppError("VALIDATION_ERROR", "ffprobe returned invalid JSON", 502)); }
     });
   });
+}
+
+function cancelledError(): AppError {
+  return new AppError("JOB_CANCELLED", "Render was cancelled", 409);
+}
+
+function throwIfCancelled(cancelled: () => boolean): void {
+  if (cancelled()) throw cancelledError();
 }

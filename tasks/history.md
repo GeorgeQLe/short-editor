@@ -2,6 +2,31 @@
 
 ## 2026-07-28
 
+- Completed RND-04 with migration 15 and strict public Render lineage fields:
+  roots are attempt 1, retries point to the immediately previous immutable
+  attempt, `(lineage_id, attempt)` is unique, and each lineage is capped at
+  three attempts.
+- Added transactional manual retry over the exact persisted preflight,
+  project revision, decision hash, and sidecar choice. Failed/cancelled
+  attempts can retry through HTTP or typed MCP; stale, unapproved, active,
+  succeeded, legacy-unbound, superseded-attempt, and exhausted-lineage cases
+  fail without creating a Render or Job.
+- Queued cancellation now atomically terminates its paired Render and Job.
+  Running encoding, dependency probes, output probing, normalization, and file
+  hashing cooperatively observe cancellation, send graceful termination, force
+  termination after two seconds, and remove staged/finalized artifacts.
+- Startup reconciliation is Render/Job-pair aware: it preserves atomically
+  completed successes, aligns terminal pairs, repairs durable cancellation,
+  retains valid queued pairs, turns interrupted running attempts into
+  `recovery_required`, cleans their artifacts, and limits automatic reclaim of
+  other idempotent jobs to three executions. Disk-full/finalization diagnostics
+  are redacted and actionable.
+- Full verification passes 36 test files and 258 tests, including the real
+  FFmpeg retry/cancellation path, plus production build/typecheck, diff hygiene,
+  focused secret scanning, and failure-oriented review. Native Windows
+  termination/fault injection and the human recovery workflow remain assigned
+  to WIN-03.6/.9 and UI-01.4. Promoted SCH-01.
+
 - Completed RND-03 with strict `render-determinism-v1` evidence: canonical
   1080×1920 `yuv420p` video and signed-16-bit 48 kHz stereo PCM SHA-256 hashes
   and byte counts, plus a canonical identity over the decision snapshot,

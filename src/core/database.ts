@@ -596,6 +596,32 @@ const migrations: readonly Migration[] = [
           updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
       WHERE state='succeeded';
     `)
+  },
+  {
+    version: 15,
+    name: "render retry lineage",
+    up: (db) => db.exec(`
+      ALTER TABLE renders ADD COLUMN lineage_id TEXT NOT NULL
+        DEFAULT '00000000-0000-0000-0000-000000000000';
+      ALTER TABLE renders ADD COLUMN previous_render_id TEXT REFERENCES renders(id);
+      UPDATE renders SET lineage_id=id;
+      CREATE UNIQUE INDEX renders_lineage_attempt_unique_idx
+        ON renders(lineage_id, attempt);
+      CREATE INDEX renders_previous_render_idx ON renders(previous_render_id);
+      CREATE TRIGGER renders_lineage_valid_insert
+        BEFORE INSERT ON renders
+        WHEN NEW.attempt < 1
+          OR (NEW.attempt=1 AND NEW.previous_render_id IS NOT NULL)
+          OR (NEW.attempt>1 AND NEW.previous_render_id IS NULL)
+        BEGIN
+          SELECT RAISE(ABORT, 'render lineage is invalid');
+        END;
+      CREATE TRIGGER renders_lineage_immutable
+        BEFORE UPDATE OF lineage_id,previous_render_id,attempt ON renders
+        BEGIN
+          SELECT RAISE(ABORT, 'render lineage is immutable');
+        END;
+    `)
   }
 ];
 

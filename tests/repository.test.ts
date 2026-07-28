@@ -3,6 +3,7 @@ import { openDatabase } from "../src/core/database";
 import { Repository } from "../src/core/repository";
 import { starterTemplates } from "../src/shared/templates";
 import { AppError } from "../src/shared/errors";
+import type { Job, Render } from "../src/shared/domain";
 import { candidate, captionState, episode } from "./factories";
 
 const databases: ReturnType<typeof openDatabase>[] = [];
@@ -93,8 +94,15 @@ describe("repository revisions and recovery", () => {
       cancelRequested: false, errorCode: null, errorMessage: null, payloadReference: null,
       createdAt: now, updatedAt: now
     }, {});
+    const exhaustedId = crypto.randomUUID();
+    repository.insertJob({
+      id: exhaustedId, type: "hash", entityId: null, state: "running",
+      progress: .9, provider: null, stage: "hashing", attempts: 3,
+      cancelRequested: false, errorCode: null, errorMessage: null, payloadReference: null,
+      createdAt: now, updatedAt: now
+    }, {});
 
-    expect(repository.recoverJobs()).toBe(4);
+    expect(repository.recoverJobs()).toBe(5);
     const recovered = new Map(repository.listJobs().map((job) => [job.id, job]));
     expect(recovered.get(analyzeId)).toMatchObject({
       state: "queued", stage: "recovered", progress: .3
@@ -111,5 +119,99 @@ describe("repository revisions and recovery", () => {
     expect(recovered.get(cloudAnalyzeId)).toMatchObject({
       state: "failed", stage: "recovery_required", errorCode: "INTERNAL_ERROR"
     });
+    expect(recovered.get(exhaustedId)).toMatchObject({
+      state: "failed", stage: "recovery_required", attempts: 3
+    });
+  });
+
+  it("reconciles Render and Job pairs without undoing committed success", () => {
+    const repository = setup();
+    const source = episode();
+    repository.insertEpisode(source);
+    const now = new Date().toISOString();
+    const projectId = crypto.randomUUID();
+    repository.db.prepare(`
+      INSERT INTO short_projects(
+        id,episode_id,title,source_ranges_json,template_id,composition_json,
+        copy_json,approved,revision,created_at,updated_at
+      ) VALUES(?,?,'Recovery','[]','fullscreen-speaker-v1','{}','{}',1,1,?,?)
+    `).run(projectId, source.id, now, now);
+    const pair = (
+      renderState: Render["state"],
+      jobState: Job["state"],
+      cancelRequested = false
+    ) => {
+      const renderId = crypto.randomUUID();
+      repository.insertRender({
+        id: renderId,
+        shortId: projectId,
+        projectRevision: 1,
+        lineageId: renderId,
+        previousRenderId: null,
+        attempt: 1,
+        preflightId: null,
+        encoder: {
+          ffmpegVersion: "8",
+          videoCodec: "libx264",
+          audioCodec: "aac",
+          settings: {}
+        },
+        outputPath: renderState === "succeeded"
+          ? `artifacts/renders/${renderId}/final.mp4`
+          : null,
+        sidecarPath: null,
+        validation: null,
+        determinism: null,
+        state: renderState,
+        error: null,
+        contentHash: null,
+        decisionHash: null,
+        createdAt: now,
+        updatedAt: now
+      });
+      const jobId = crypto.randomUUID();
+      repository.insertJob({
+        id: jobId,
+        type: "render",
+        entityId: projectId,
+        provider: "local",
+        state: jobState,
+        progress: 0.5,
+        stage: "encoding",
+        attempts: 1,
+        errorCode: null,
+        errorMessage: null,
+        cancelRequested,
+        payloadReference: `render:${renderId}`,
+        createdAt: now,
+        updatedAt: now
+      }, {});
+      return { renderId, jobId };
+    };
+    const committed = pair("succeeded", "running");
+    const interrupted = pair("running", "running");
+    const beforeStart = pair("queued", "running");
+    const queuedCancel = pair("queued", "cancelled", true);
+
+    repository.recoverJobs();
+
+    expect(repository.getRender(committed.renderId).state).toBe("succeeded");
+    expect(repository.listJobs().find((job) => job.id === committed.jobId))
+      .toMatchObject({ state: "succeeded", stage: "complete", progress: 1 });
+    expect(repository.getRender(interrupted.renderId)).toMatchObject({
+      state: "failed",
+      outputPath: null,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Rendering was interrupted; manual retry is required"
+      }
+    });
+    expect(repository.listJobs().find((job) => job.id === interrupted.jobId))
+      .toMatchObject({ state: "failed", stage: "recovery_required" });
+    expect(repository.getRender(beforeStart.renderId).state).toBe("queued");
+    expect(repository.listJobs().find((job) => job.id === beforeStart.jobId))
+      .toMatchObject({ state: "queued", stage: "recovered" });
+    expect(repository.getRender(queuedCancel.renderId))
+      .toMatchObject({ state: "cancelled", error: { code: "JOB_CANCELLED" } });
   });
 });

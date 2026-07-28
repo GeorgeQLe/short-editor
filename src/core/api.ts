@@ -259,6 +259,9 @@ export function createApi(service: CoreService, desktopToken?: string) {
   app.post("/v1/renders/start", route((req) => {
     return service.startRenderAttempt(renderStartRequestSchema.parse(req.body));
   }));
+  app.post("/v1/renders/:renderId/retry", route((req) =>
+    service.retryRenderAttempt(id.parse(req.params.renderId))
+  ));
   app.post("/v1/renders/validate", route((req) => service.validateRender(
     z.object({ path: z.string() }).parse(req.body).path
   )));

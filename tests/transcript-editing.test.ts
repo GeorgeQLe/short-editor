@@ -94,10 +94,14 @@ function shortProject(episodeId: string): ShortProject {
 }
 
 function render(shortId: string, state: Render["state"] = "succeeded"): Render {
+  const id = randomUUID();
   return {
-    id: randomUUID(),
+    id,
     shortId,
     projectRevision: 4,
+    lineageId: id,
+    previousRenderId: null,
+    attempt: 1,
     preflightId: null,
     encoder: {
       ffmpegVersion: "7",

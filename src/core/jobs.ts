@@ -66,14 +66,48 @@ export class JobQueue {
   }
 
   cancel(id: string): Job {
-    const result = this.repository.db.prepare(`
-      UPDATE jobs SET cancel_requested=1,
-        state=CASE WHEN state='queued' THEN 'cancelled' ELSE state END,
-        stage=CASE WHEN state='queued' THEN 'cancelled' ELSE stage END,
-        updated_at=?
-      WHERE id=? AND state IN ('queued','running')
-    `).run(new Date().toISOString(), id);
-    if (!result.changes) throw new AppError("INVALID_STATE", "Job cannot be cancelled", 409);
+    this.repository.db.transaction(() => {
+      const row = this.repository.db.prepare(`
+        SELECT state,payload_reference FROM jobs WHERE id=?
+      `).get(id) as { state: Job["state"]; payload_reference: string | null } | undefined;
+      if (!row || (row.state !== "queued" && row.state !== "running")) {
+        throw new AppError("INVALID_STATE", "Job cannot be cancelled", 409);
+      }
+      const now = new Date().toISOString();
+      this.repository.db.prepare(`
+        UPDATE jobs SET cancel_requested=1,
+          state=CASE WHEN state='queued' THEN 'cancelled' ELSE state END,
+          stage=CASE WHEN state='queued' THEN 'cancelled' ELSE stage END,
+          error_code=CASE WHEN state='queued' THEN 'JOB_CANCELLED' ELSE error_code END,
+          error_message=CASE WHEN state='queued' THEN 'Render was cancelled before it started'
+            ELSE error_message END,
+          updated_at=?
+        WHERE id=? AND state IN ('queued','running')
+      `).run(now, id);
+      if (row.state === "queued" && row.payload_reference?.startsWith("render:")) {
+        const renderId = row.payload_reference.slice("render:".length);
+        const changed = this.repository.db.prepare(`
+          UPDATE renders SET state='cancelled',error_code='JOB_CANCELLED',
+            error_message='Render was cancelled before it started',updated_at=?
+          WHERE id=? AND state='queued'
+        `).run(now, renderId);
+        if (!changed.changes) {
+          throw new AppError(
+            "INVALID_STATE",
+            "Queued Render cancellation lost a concurrent state transition",
+            409
+          );
+        }
+      } else if (row.state === "running" && row.payload_reference?.startsWith("render:")) {
+        const renderState = this.repository.db.prepare(
+          "SELECT state FROM renders WHERE id=?"
+        ).get(row.payload_reference.slice("render:".length)) as
+          { state: RenderState } | undefined;
+        if (renderState?.state === "succeeded") {
+          throw new AppError("INVALID_STATE", "Render already completed successfully", 409);
+        }
+      }
+    }).immediate();
     return this.repository.listJobs().find((job) => job.id === id)!;
   }
 
@@ -171,6 +205,14 @@ export class JobQueue {
       { cancel_requested: number } | undefined;
     return row?.cancel_requested === 1;
   }
+
+  renderCompleted(jobId: string): boolean {
+    return Boolean(this.repository.db.prepare(`
+      SELECT 1 FROM jobs j
+      JOIN renders r ON j.payload_reference='render:' || r.id
+      WHERE j.id=? AND r.state='succeeded'
+    `).get(jobId));
+  }
 }
 
 function cloudNotAuthorized(): AppError {
@@ -220,12 +262,21 @@ export class JobRunner {
       );
       await handler(claimed.job, claimed.payload);
       if (this.queue.cancellationRequested(claimed.job.id)) {
-        this.queue.finalizeCancelled(claimed.job.id);
+        if (claimed.job.type === "render" && this.queue.renderCompleted(claimed.job.id)) {
+          this.queue.complete(claimed.job.id);
+        } else {
+          this.queue.finalizeCancelled(claimed.job.id);
+        }
       } else {
         this.queue.complete(claimed.job.id);
       }
     } catch (error) {
-      this.queue.fail(claimed.job.id, error);
+      const appError = normalizeError(error);
+      if (appError.code === "JOB_CANCELLED" || this.queue.cancellationRequested(claimed.job.id)) {
+        this.queue.finalizeCancelled(claimed.job.id);
+      } else {
+        this.queue.fail(claimed.job.id, appError);
+      }
     } finally {
       this.working = false;
       this.idleWaiters.splice(0).forEach((resolvePromise) => resolvePromise());
@@ -233,3 +284,5 @@ export class JobRunner {
     }
   }
 }
+
+type RenderState = "queued" | "running" | "succeeded" | "failed" | "cancelled" | "stale";

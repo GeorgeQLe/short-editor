@@ -1299,7 +1299,7 @@ export class Repository {
     return (this.db.prepare("SELECT * FROM assets ORDER BY created_at").all() as Row[]).map(mapAsset);
   }
 
-  insertRender(render: Render, attempt = 1): Render {
+  insertRender(render: Render): Render {
     if (render.outputPath !== null) {
       render = { ...render, outputPath: validateOwnedRelativePath(render.outputPath) };
     }
@@ -1313,18 +1313,19 @@ export class Repository {
       INSERT INTO renders(
         id,short_id,project_revision,preflight_id,output_path,sidecar_path,encoder_json,validation_json,
         determinism_json,state,
-        error_code,error_message,content_hash,decision_hash,attempt,created_at,updated_at
+        error_code,error_message,content_hash,decision_hash,lineage_id,previous_render_id,
+        attempt,created_at,updated_at
       ) VALUES(@id,@shortId,@projectRevision,@preflightId,@outputPath,@sidecarPath,@encoder,@validation,
         @determinism,@state,
-        @errorCode,@errorMessage,@contentHash,@decisionHash,@attempt,@createdAt,@updatedAt)
+        @errorCode,@errorMessage,@contentHash,@decisionHash,@lineageId,@previousRenderId,
+        @attempt,@createdAt,@updatedAt)
     `).run({
       ...render,
       encoder: JSON.stringify(render.encoder),
       validation: render.validation === null ? null : JSON.stringify(render.validation),
       determinism: render.determinism === null ? null : JSON.stringify(render.determinism),
       errorCode: render.error?.code ?? null,
-      errorMessage: render.error?.message ?? null,
-      attempt
+      errorMessage: render.error?.message ?? null
     });
     return render;
   }
@@ -1373,6 +1374,9 @@ export class Repository {
         id: randomUUID(),
         shortId: input.shortId,
         projectRevision: input.expectedRevision,
+        lineageId: "",
+        previousRenderId: null,
+        attempt: 1,
         preflightId: input.preflightId,
         encoder: {
           ffmpegVersion: preflight.dependencyVersions.ffmpeg!,
@@ -1402,6 +1406,7 @@ export class Repository {
         createdAt: now,
         updatedAt: now
       };
+      render.lineageId = render.id;
       const job: Job = {
         id: randomUUID(),
         type: "render",
@@ -1430,6 +1435,174 @@ export class Repository {
       });
       return { render, job };
     });
+  }
+
+  retryRenderAttempt(renderId: string): { render: Render; job: Job } {
+    return this.db.transaction(() => {
+      const source = this.getRender(renderId);
+      const project = this.getShort(source.shortId);
+      if (source.state === "stale") {
+        throw new AppError(
+          "REVISION_CONFLICT",
+          "The source Render no longer matches the approved current Short revision",
+          409,
+          {
+            expectedRevision: source.projectRevision,
+            actualRevision: project.revision
+          }
+        );
+      }
+      if (source.state !== "failed" && source.state !== "cancelled") {
+        throw new AppError(
+          "INVALID_STATE",
+          "Only failed or cancelled Render attempts can be retried",
+          409
+        );
+      }
+      if (source.preflightId === null) {
+        throw new AppError(
+          "INVALID_STATE",
+          "This legacy Render is not bound to an immutable preflight and cannot be retried",
+          409
+        );
+      }
+      if (project.revision !== source.projectRevision) {
+        throw revisionConflict("Short", source.projectRevision, project.revision);
+      }
+      if (!project.approved) {
+        throw new AppError(
+          "REVISION_CONFLICT",
+          "The source Short revision is no longer approved",
+          409,
+          { expectedRevision: source.projectRevision, actualRevision: project.revision }
+        );
+      }
+      const lineage = this.db.prepare(`
+        SELECT MAX(attempt) AS maximum_attempt,COUNT(*) AS attempt_count
+        FROM renders WHERE lineage_id=?
+      `).get(source.lineageId) as { maximum_attempt: number; attempt_count: number };
+      if (Number(lineage.maximum_attempt) !== source.attempt) {
+        throw new AppError(
+          "INVALID_STATE",
+          "A newer attempt already exists in this Render lineage",
+          409
+        );
+      }
+      if (Number(lineage.attempt_count) >= 3 || source.attempt >= 3) {
+        throw new AppError(
+          "INVALID_STATE",
+          "This Render lineage has reached the three-attempt limit",
+          409
+        );
+      }
+      const sourceJob = this.db.prepare(`
+        SELECT payload_json FROM jobs
+        WHERE payload_reference=? AND type='render'
+        ORDER BY created_at DESC LIMIT 1
+      `).get(`render:${source.id}`) as { payload_json: string } | undefined;
+      if (!sourceJob) {
+        throw new AppError(
+          "INVALID_STATE",
+          "The source Render has no persisted job snapshot and cannot be retried",
+          409
+        );
+      }
+      const sourcePayload = json<{
+        preflightId?: unknown;
+        sidecarFormat?: unknown;
+        projectRevision?: unknown;
+      }>(sourceJob.payload_json);
+      if (
+        sourcePayload.preflightId !== source.preflightId ||
+        sourcePayload.projectRevision !== source.projectRevision ||
+        (sourcePayload.sidecarFormat !== null &&
+          sourcePayload.sidecarFormat !== "srt" &&
+          sourcePayload.sidecarFormat !== "webvtt")
+      ) {
+        throw new AppError(
+          "INVALID_STATE",
+          "The persisted Render retry snapshot is invalid",
+          409
+        );
+      }
+      const preflight = this.getRenderPreflight(source.preflightId).result;
+      if (
+        preflight.status !== "passed" ||
+        preflight.shortId !== source.shortId ||
+        preflight.revision !== source.projectRevision ||
+        source.decisionHash !== preflight.snapshotHash
+      ) {
+        throw new AppError(
+          "INVALID_STATE",
+          "The immutable Render preflight no longer matches the source attempt",
+          409
+        );
+      }
+      const now = new Date().toISOString();
+      const render: Render = {
+        id: randomUUID(),
+        shortId: source.shortId,
+        projectRevision: source.projectRevision,
+        lineageId: source.lineageId,
+        previousRenderId: source.id,
+        attempt: source.attempt + 1,
+        preflightId: source.preflightId,
+        encoder: {
+          ffmpegVersion: preflight.dependencyVersions.ffmpeg!,
+          videoCodec: "libx264",
+          audioCodec: "aac",
+          settings: {
+            graphVersion: "ffmpeg-composition-v1",
+            width: 1080,
+            height: 1920,
+            frameRate: 30,
+            pixelFormat: "yuv420p",
+            crf: 18,
+            preset: "medium",
+            audioSampleRate: 48_000,
+            audioChannels: 2,
+            audioBitrate: "192k"
+          }
+        },
+        outputPath: null,
+        sidecarPath: null,
+        validation: null,
+        determinism: null,
+        state: "queued",
+        error: null,
+        contentHash: null,
+        decisionHash: source.decisionHash,
+        createdAt: now,
+        updatedAt: now
+      };
+      const job: Job = {
+        id: randomUUID(),
+        type: "render",
+        entityId: source.shortId,
+        provider: "local",
+        state: "queued",
+        progress: 0,
+        stage: "queued",
+        attempts: 0,
+        errorCode: null,
+        errorMessage: null,
+        cancelRequested: false,
+        payloadReference: `render:${render.id}`,
+        createdAt: now,
+        updatedAt: now
+      };
+      this.insertRender(render);
+      this.insertJob(job, {
+        apiVersion: "v1",
+        type: "render",
+        shortId: source.shortId,
+        projectRevision: source.projectRevision,
+        renderId: render.id,
+        preflightId: source.preflightId,
+        sidecarFormat: sourcePayload.sidecarFormat
+      });
+      return { render, job };
+    }).immediate();
   }
 
   transitionRender(
@@ -1494,12 +1667,28 @@ export class Repository {
     >, "validation"> & {
       validation: NonNullable<Render["validation"]>;
       determinism: Omit<RenderDeterminism, "comparison" | "referenceRenderId">;
-    }
+    },
+    jobId?: string
   ): Render {
     return this.db.transaction(() => {
       const render = this.getRender(id);
       if (render.state !== "running") {
         throw new AppError("INVALID_STATE", "Render is not running", 409);
+      }
+      if (jobId) {
+        const job = this.db.prepare(`
+          SELECT cancel_requested FROM jobs
+          WHERE id=? AND payload_reference=?
+        `).get(jobId, `render:${id}`) as { cancel_requested: number } | undefined;
+        if (!job) {
+          throw new AppError("INVALID_STATE", "Render completion is not bound to its Job", 409);
+        }
+        if (job.cancel_requested === 1) {
+          return this.transitionRender(id, "running", {
+            state: "cancelled",
+            error: { code: "JOB_CANCELLED", message: "Render was cancelled" }
+          });
+        }
       }
       const project = this.getShort(render.shortId);
       if (project.revision !== expectedRevision || !project.approved) {
@@ -1849,17 +2038,179 @@ export class Repository {
     return (this.db.prepare("SELECT * FROM jobs ORDER BY created_at DESC").all() as Row[]).map(mapJob);
   }
 
+  reconcileRenderArtifacts(): number {
+    const now = new Date().toISOString();
+    return this.transaction(() => {
+      const changed = this.db.prepare(`
+        UPDATE renders
+        SET state='failed',error_code='ARTIFACT_CORRUPT',
+          error_message='The completed Render artifact is missing or corrupt; manual retry is required',
+          updated_at=?
+        WHERE state='succeeded' AND (
+          output_path IS NULL OR NOT EXISTS (
+            SELECT 1 FROM artifact_records a
+            WHERE a.owner_type='render' AND a.owner_id=renders.id
+              AND a.kind='render' AND a.relative_path=renders.output_path
+              AND a.state='complete'
+          )
+          OR (
+            sidecar_path IS NOT NULL AND NOT EXISTS (
+              SELECT 1 FROM artifact_records a
+              WHERE a.owner_type='render' AND a.owner_id=renders.id
+                AND a.relative_path=renders.sidecar_path
+                AND a.state='complete'
+            )
+          )
+        )
+      `).run(now).changes;
+      if (changed) {
+        this.db.prepare(`
+          UPDATE schedule_entries SET needs_rerender=1,updated_at=?
+          WHERE status<>'published' AND render_id IN (
+            SELECT id FROM renders
+            WHERE state='failed' AND error_code='ARTIFACT_CORRUPT'
+              AND error_message='The completed Render artifact is missing or corrupt; manual retry is required'
+          )
+        `).run(now);
+      }
+      return changed;
+    });
+  }
+
   recoverJobs(): number {
     const now = new Date().toISOString();
     return this.transaction(() => {
+      let renderChanges = 0;
+      const renderJobs = this.db.prepare(`
+        SELECT j.id AS job_id,j.state AS job_state,j.cancel_requested,j.attempts,
+          j.payload_reference,r.id AS render_id,r.state AS render_state,
+          r.error_code AS render_error_code,r.error_message AS render_error_message
+        FROM jobs j
+        LEFT JOIN renders r
+          ON j.payload_reference='render:' || r.id
+        WHERE j.type='render' AND j.state IN ('queued','running')
+      `).all() as Array<{
+        job_id: string;
+        job_state: Job["state"];
+        cancel_requested: number;
+        attempts: number;
+        payload_reference: string | null;
+        render_id: string | null;
+        render_state: Render["state"] | null;
+        render_error_code: NonNullable<Render["error"]>["code"] | null;
+        render_error_message: string | null;
+      }>;
+      for (const pair of renderJobs) {
+        if (!pair.render_id || !pair.render_state) {
+          renderChanges += this.db.prepare(`
+            UPDATE jobs SET state='failed',stage='recovery_required',
+              error_code='INTERNAL_ERROR',
+              error_message='Interrupted work is not safe to retry automatically',
+              updated_at=? WHERE id=?
+          `).run(now, pair.job_id).changes;
+          continue;
+        }
+        if (pair.cancel_requested === 1 || pair.job_state === "cancelled") {
+          renderChanges += this.db.prepare(`
+            UPDATE renders SET state='cancelled',error_code='JOB_CANCELLED',
+              error_message='Cancellation was recovered after restart',updated_at=?
+            WHERE id=? AND state IN ('queued','running')
+          `).run(now, pair.render_id).changes;
+          renderChanges += this.db.prepare(`
+            UPDATE jobs SET state='cancelled',stage='cancelled',
+              error_code='JOB_CANCELLED',
+              error_message='Cancellation was recovered after restart',updated_at=?
+            WHERE id=? AND state IN ('queued','running')
+          `).run(now, pair.job_id).changes;
+          continue;
+        }
+        if (pair.render_state === "succeeded") {
+          renderChanges += this.db.prepare(`
+            UPDATE jobs SET state='succeeded',progress=1,stage='complete',
+              error_code=NULL,error_message=NULL,updated_at=?
+            WHERE id=? AND state IN ('queued','running')
+          `).run(now, pair.job_id).changes;
+          continue;
+        }
+        if (
+          pair.render_state === "failed" ||
+          pair.render_state === "cancelled" ||
+          pair.render_state === "stale"
+        ) {
+          const cancelled = pair.render_state === "cancelled";
+          renderChanges += this.db.prepare(`
+            UPDATE jobs SET state=?,stage=?,
+              error_code=?,error_message=?,updated_at=?
+            WHERE id=? AND state IN ('queued','running')
+          `).run(
+            cancelled ? "cancelled" : "failed",
+            cancelled ? "cancelled" : "failed",
+            cancelled ? "JOB_CANCELLED"
+              : pair.render_state === "stale"
+                ? "REVISION_CONFLICT"
+                : pair.render_error_code ?? "INTERNAL_ERROR",
+            cancelled ? "Render cancellation was recovered after restart"
+              : pair.render_state === "stale"
+                ? "Render became stale before its Job completed"
+                : pair.render_error_message ?? "Render failure was recovered after restart",
+            now,
+            pair.job_id
+          ).changes;
+          continue;
+        }
+        if (pair.render_state === "queued" && pair.job_state === "running") {
+          if (pair.attempts < 3) {
+            renderChanges += this.db.prepare(`
+              UPDATE jobs SET state='queued',stage='recovered',
+                error_code=NULL,error_message=NULL,updated_at=? WHERE id=? AND state='running'
+            `).run(now, pair.job_id).changes;
+          } else {
+            this.db.prepare(`
+              UPDATE renders SET state='failed',error_code='INTERNAL_ERROR',
+                error_message='Rendering was repeatedly interrupted before start; manual retry is required',
+                updated_at=? WHERE id=? AND state='queued'
+            `).run(now, pair.render_id);
+            renderChanges += this.db.prepare(`
+              UPDATE jobs SET state='failed',stage='recovery_required',
+                error_code='INTERNAL_ERROR',
+                error_message='Rendering was repeatedly interrupted before start; manual retry is required',
+                updated_at=? WHERE id=? AND state='running'
+            `).run(now, pair.job_id).changes;
+          }
+          continue;
+        }
+        if (pair.render_state === "running") {
+          renderChanges += this.db.prepare(`
+            UPDATE renders SET state='failed',output_path=NULL,sidecar_path=NULL,
+              content_hash=NULL,error_code='INTERNAL_ERROR',
+              error_message='Rendering was interrupted; manual retry is required',
+              updated_at=? WHERE id=? AND state='running'
+          `).run(now, pair.render_id).changes;
+          renderChanges += this.db.prepare(`
+            UPDATE jobs SET state='failed',stage='recovery_required',
+              error_code='INTERNAL_ERROR',
+              error_message='Rendering was interrupted; manual retry is required',
+              updated_at=? WHERE id=? AND state IN ('queued','running')
+          `).run(now, pair.job_id).changes;
+        }
+      }
+      const queuedCancelMismatches = this.db.prepare(`
+        UPDATE renders SET state='cancelled',error_code='JOB_CANCELLED',
+          error_message='Queued cancellation was repaired after restart',updated_at=?
+        WHERE state='queued' AND id IN (
+          SELECT substr(payload_reference,8) FROM jobs
+          WHERE type='render' AND state='cancelled' AND cancel_requested=1
+            AND payload_reference LIKE 'render:%'
+        )
+      `).run(now).changes;
       const cancelled = this.db.prepare(`
         UPDATE jobs SET state='cancelled',stage='cancelled',error_code='JOB_CANCELLED',
           error_message='Cancellation was recovered after restart',updated_at=?
-        WHERE state='running' AND cancel_requested=1
+        WHERE type<>'render' AND state='running' AND cancel_requested=1
       `).run(now).changes;
       const retried = this.db.prepare(`
         UPDATE jobs SET state='queued',stage='recovered',error_code=NULL,error_message=NULL,updated_at=?
-        WHERE state='running' AND cancel_requested=0
+        WHERE type<>'render' AND state='running' AND cancel_requested=0 AND attempts < 3
           AND (
             type IN ('probe','hash','candidates','watched_folder_scan','source_reconcile')
             OR (type='analyze' AND provider='local')
@@ -1869,9 +2220,9 @@ export class Repository {
         UPDATE jobs SET state='failed',stage='recovery_required',
           error_code='INTERNAL_ERROR',
           error_message='Interrupted work is not safe to retry automatically',updated_at=?
-        WHERE state='running' AND cancel_requested=0
+        WHERE type<>'render' AND state='running' AND cancel_requested=0
       `).run(now).changes;
-      return Number(cancelled + retried + failed);
+      return Number(renderChanges + queuedCancelMismatches + cancelled + retried + failed);
     });
   }
 }
@@ -2066,6 +2417,9 @@ function mapRender(row: Row): Render {
     id: String(row.id),
     shortId: String(row.short_id),
     projectRevision: Number(row.project_revision),
+    lineageId: String(row.lineage_id),
+    previousRenderId: row.previous_render_id ? String(row.previous_render_id) : null,
+    attempt: Number(row.attempt),
     preflightId: row.preflight_id ? String(row.preflight_id) : null,
     encoder: json<Render["encoder"]>(row.encoder_json),
     outputPath: row.output_path ? String(row.output_path) : null,
