@@ -1,15 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, statSync } from "node:fs";
-import { extname, resolve } from "node:path";
 import { z } from "zod";
 import {
-  type Asset,
   type ContentPackage,
   candidateGenerationInputSchema,
   type CandidateGenerationInput,
   type Composition,
   type ScheduleRules,
   type ShortProject,
+  type Template,
   type TranscriptSegment,
   type TranscriptRevision,
   type ProviderProvenance,
@@ -17,7 +15,6 @@ import {
   watchedFolderConfigurationInputSchema
 } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
-import { starterTemplates, templateById } from "../shared/templates.js";
 import { CANDIDATE_GENERATION_VERSION, generateCandidates } from "./candidates.js";
 import type { Repository } from "./repository.js";
 import type { MediaService } from "./media.js";
@@ -692,14 +689,18 @@ export class CoreService {
     const transcript = this.repository.getAcceptedTranscriptRevision(candidate.episodeId);
     const candidateCopy = this.repository.getCandidateContentPackage(candidateId);
     const copy = candidateCopy.accepted ?? candidateCopy.proposed;
-    const template = templateById(templateId);
-    if (!template) throw new AppError("NOT_FOUND", "Template not found", 404);
+    const template = this.repository.getTemplate(templateId);
+    this.validateCompositionAssets(template.composition);
     const now = new Date().toISOString();
     return this.repository.createShort({
       id: randomUUID(), episodeId: candidate.episodeId, candidateId, title: candidate.topic,
       sourceRanges: [{ startMs: candidate.startMs, endMs: candidate.endMs }],
       templateId,
-      templateLineage: { templateId, templateVersion: template.version, parentTemplateId: null },
+      templateLineage: {
+        templateId,
+        templateVersion: template.version,
+        parentTemplateId: template.parentTemplateId
+      },
       composition: structuredClone(template.composition),
       captions: {
         enabled: true,
@@ -720,6 +721,7 @@ export class CoreService {
   }
   getShort(id: string) { return this.repository.getShort(id); }
   updateComposition(id: string, expectedRevision: number, composition: Composition) {
+    this.validateCompositionAssets(composition);
     return this.repository.updateShort(id, expectedRevision, { composition });
   }
   updateTimeline(
@@ -739,24 +741,98 @@ export class CoreService {
   }
 
   listTemplates() { return this.repository.listTemplates(); }
+  cloneTemplate(sourceId: string, name: string, description?: string): Template {
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      throw new AppError("VALIDATION_ERROR", "Template name is required", 422);
+    }
+    const source = this.repository.getTemplate(sourceId);
+    const now = new Date().toISOString();
+    return this.repository.createTemplate({
+      id: randomUUID(),
+      name: normalizedName,
+      description: description ?? source.description,
+      version: 1,
+      revision: 1,
+      parentTemplateId: source.id,
+      builtIn: false,
+      composition: structuredClone(source.composition),
+      createdAt: now,
+      updatedAt: now
+    });
+  }
+  updateTemplate(
+    id: string,
+    expectedRevision: number,
+    patch: Pick<Partial<Template>, "name" | "description" | "composition">
+  ): Template {
+    if (
+      patch.name === undefined &&
+      patch.description === undefined &&
+      patch.composition === undefined
+    ) {
+      throw new AppError("VALIDATION_ERROR", "At least one template change is required", 422);
+    }
+    if (patch.name !== undefined && !patch.name.trim()) {
+      throw new AppError("VALIDATION_ERROR", "Template name is required", 422);
+    }
+    if (patch.composition !== undefined) {
+      this.validateCompositionAssets(patch.composition);
+    }
+    return this.repository.updateTemplate(id, expectedRevision, {
+      ...patch,
+      ...(patch.name === undefined ? {} : { name: patch.name.trim() }),
+      ...(patch.composition === undefined
+        ? {}
+        : { composition: structuredClone(patch.composition) })
+    });
+  }
   listAssets() {
     return this.repository.listAssets();
   }
-  importAsset(path: string, provenance: string, reusable: boolean) {
-    const sourcePath = resolve(path);
-    if (!existsSync(sourcePath) || !statSync(sourcePath).isFile()) {
-      throw new AppError("NOT_FOUND", "Asset file does not exist", 404);
+  async importAsset(path: string, provenance: string, reusable: boolean) {
+    const normalizedProvenance = provenance.trim();
+    if (!normalizedProvenance) {
+      throw new AppError("VALIDATION_ERROR", "Asset provenance is required", 422);
     }
-    const extension = extname(sourcePath).toLowerCase();
-    const kind: Asset["kind"] | null = [".png", ".jpg", ".jpeg", ".webp"].includes(extension) ? "image"
-      : [".mp4", ".mov", ".webm"].includes(extension) ? "video" : null;
-    if (!kind) throw new AppError("VALIDATION_ERROR", "Unsupported asset type", 422);
+    const inspected = await this.media.inspectAsset(path);
     const now = new Date().toISOString();
     const asset = {
-      id: randomUUID(), sourcePath, ownedArtifactPath: null, kind, provenance, reusable,
-      tags: [], width: null, height: null, durationMs: null, createdAt: now, updatedAt: now
+      id: randomUUID(),
+      sourcePath: inspected.sourcePath,
+      ownedArtifactPath: null,
+      kind: inspected.kind,
+      provenance: normalizedProvenance,
+      reusable,
+      tags: [],
+      width: inspected.width,
+      height: inspected.height,
+      durationMs: inspected.durationMs,
+      createdAt: now,
+      updatedAt: now
     };
     return this.repository.saveAsset(asset);
+  }
+  private validateCompositionAssets(composition: Composition): void {
+    for (const [index, layer] of composition.layers.entries()) {
+      if (layer.assetId === null) continue;
+      if (layer.source !== "asset") {
+        throw new AppError("VALIDATION_ERROR", "Bound asset layers must use asset source", 422, [{
+          path: ["composition", "layers", index, "assetId"],
+          message: "assetId is only valid for asset-sourced layers"
+        }]);
+      }
+      const asset = this.repository.getAsset(layer.assetId);
+      if (
+        (layer.type === "image" && asset.kind === "image") ||
+        (layer.type === "video" && asset.kind === "video") ||
+        (layer.type === "logo" && asset.kind === "logo")
+      ) continue;
+      throw new AppError("VALIDATION_ERROR", "Asset kind does not match composition layer type", 422, [{
+        path: ["composition", "layers", index, "assetId"],
+        message: `Expected ${layer.type} asset, received ${asset.kind}`
+      }]);
+    }
   }
   listRenders(shortId?: string) {
     return this.repository.listRenders(shortId);

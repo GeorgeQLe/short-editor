@@ -208,6 +208,64 @@ describe("database migrations", () => {
     });
   });
 
+  it("normalizes legacy Template and Short composition layers without replacing snapshots", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "short-editor-composition-migration-")), "fixture.db");
+    const legacy = new Database(path);
+    migrateDatabase(legacy, databaseMigrations.slice(0, 7));
+    const episodeId = randomUUID();
+    const shortId = randomUUID();
+    const now = "2026-07-27T12:00:00.000Z";
+    const composition = {
+      width: 1080,
+      height: 1920,
+      background: "#000",
+      safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+      layers: [{
+        id: "speaker",
+        type: "video",
+        source: "episode",
+        region: { x: 0, y: 0, width: 1, height: 1 },
+        fit: "fill",
+        cropTrack: []
+      }]
+    };
+    legacy.prepare(`
+      UPDATE templates SET composition_json=? WHERE id='fullscreen-speaker-v1'
+    `).run(JSON.stringify(composition));
+    legacy.prepare(`
+      INSERT INTO episodes(
+        id,source_path,canonical_path,fingerprint,file_size,modified_at_ms,status,
+        missing,created_at,updated_at
+      ) VALUES(?,?,?,?,?,?,?,0,?,?)
+    `).run(episodeId, "/original.mp4", "/canonical.mp4", "fingerprint", 10, 20, "ready", now, now);
+    legacy.prepare(`
+      INSERT INTO short_projects(
+        id,episode_id,candidate_id,title,source_ranges_json,template_id,
+        composition_json,copy_json,approved,revision,created_at,updated_at
+      ) VALUES(?,?,NULL,'Legacy Short','[{"startMs":0,"endMs":1000}]',
+        'fullscreen-speaker-v1',?,'{}',0,1,?,?)
+    `).run(shortId, episodeId, JSON.stringify(composition), now, now);
+    legacy.close();
+
+    const upgraded = openDatabase(path);
+    databases.push(upgraded);
+    const templateComposition = JSON.parse(String((upgraded.prepare(`
+      SELECT composition_json FROM templates WHERE id='fullscreen-speaker-v1'
+    `).get() as { composition_json: string }).composition_json));
+    const short = upgraded.prepare(`
+      SELECT composition_json,template_lineage_json FROM short_projects WHERE id=?
+    `).get(shortId) as { composition_json: string; template_lineage_json: string };
+    expect(templateComposition.layers[0]).toMatchObject({ id: "speaker", assetId: null });
+    expect(JSON.parse(short.composition_json).layers[0]).toMatchObject({
+      id: "speaker", assetId: null
+    });
+    expect(JSON.parse(short.template_lineage_json)).toEqual({
+      templateVersion: 1,
+      parentTemplateId: null,
+      templateId: "fullscreen-speaker-v1"
+    });
+  });
+
   it("keeps foreign-key enforcement active", () => {
     const db = openDatabase(":memory:");
     databases.push(db);

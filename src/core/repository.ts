@@ -1208,6 +1208,12 @@ export class Repository {
     return asset;
   }
 
+  getAsset(id: string): Asset {
+    const row = this.db.prepare("SELECT * FROM assets WHERE id=?").get(id) as Row | undefined;
+    if (!row) throw new AppError("NOT_FOUND", "Asset not found", 404);
+    return mapAsset(row);
+  }
+
   listAssets(): Asset[] {
     return (this.db.prepare("SELECT * FROM assets ORDER BY created_at").all() as Row[]).map(mapAsset);
   }

@@ -424,6 +424,7 @@ export const layerSchema = z.strictObject({
   id: z.string().min(1),
   type: z.enum(["video", "image", "captions", "shape", "logo"]),
   source: z.enum(["episode", "asset", "none"]),
+  assetId: idSchema.nullable(),
   region: normalizedRectangleSchema,
   fit: z.enum(["fill", "fit"]),
   cropTrack: z.array(cropKeyframeSchema).default([])
@@ -537,6 +538,21 @@ export const templateSchema = z.strictObject({
   updatedAt: utcInstantSchema
 });
 export type Template = z.infer<typeof templateSchema>;
+export const templateCloneInputSchema = z.strictObject({
+  name: z.string().trim().min(1),
+  description: z.string().optional()
+});
+export type TemplateCloneInput = z.infer<typeof templateCloneInputSchema>;
+export const templateUpdateInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  name: z.string().trim().min(1).optional(),
+  description: z.string().optional(),
+  composition: compositionSchema.optional()
+}).refine((input) =>
+  input.name !== undefined || input.description !== undefined || input.composition !== undefined, {
+  message: "At least one template change is required"
+});
+export type TemplateUpdateInput = z.infer<typeof templateUpdateInputSchema>;
 
 export const assetKinds = ["image", "video", "audio", "logo"] as const;
 export const assetKindSchema = z.enum(assetKinds);
@@ -558,6 +574,12 @@ export const assetSchema = z.strictObject({
   message: "Exactly one asset path must be supplied"
 });
 export type Asset = z.infer<typeof assetSchema>;
+export const assetImportInputSchema = z.strictObject({
+  path: z.string().trim().min(1),
+  provenance: z.string().trim().min(1),
+  reusable: z.boolean()
+});
+export type AssetImportInput = z.infer<typeof assetImportInputSchema>;
 
 export const renderStates = ["queued", "running", "succeeded", "failed", "cancelled", "stale"] as const;
 export const renderStateSchema = z.enum(renderStates);

@@ -154,6 +154,93 @@ describe("media inventory", () => {
   });
 });
 
+describe("asset inspection", () => {
+  it("imports supported still, video, and audio codecs with complete metadata in place", async () => {
+    const fixture = createFixture();
+    const core = new CoreService(
+      fixture.repository,
+      fixture.service,
+      new JobQueue(fixture.repository)
+    );
+    const sources = [
+      fixture.media("asset-png.dat"),
+      fixture.media("asset-jpeg.dat"),
+      fixture.media("asset-webp.dat"),
+      fixture.media("asset-h264.dat"),
+      fixture.media("asset-aac.dat"),
+      fixture.media("asset-mp3.dat"),
+      fixture.media("asset-pcm.dat")
+    ];
+    const before = sources.map(snapshot);
+    const assets = [];
+    for (const source of sources) {
+      assets.push(await core.importAsset(source, "  licensed by publisher  ", false));
+    }
+
+    expect(assets.map((asset) => asset.kind)).toEqual([
+      "image", "image", "image", "video", "audio", "audio", "audio"
+    ]);
+    expect(assets.slice(0, 3).every((asset) =>
+      asset.width === 1200 && asset.height === 800 && asset.durationMs === null
+    )).toBe(true);
+    expect(assets[3]).toMatchObject({
+      width: 1920, height: 1080, durationMs: 12_500, reusable: false,
+      provenance: "licensed by publisher"
+    });
+    expect(assets.slice(4).every((asset) =>
+      asset.width === null && asset.height === null && asset.durationMs === 12_500
+    )).toBe(true);
+    expect(fixture.repository.listAssets()).toEqual(assets);
+    expect(sources.map(snapshot)).toEqual(before);
+  });
+
+  it("returns typed failures for invalid, unstable, unsupported, and dependency-blocked assets", async () => {
+    const fixture = createFixture();
+    const core = new CoreService(
+      fixture.repository,
+      fixture.service,
+      new JobQueue(fixture.repository)
+    );
+    await expect(core.importAsset(
+      fixture.media("asset-streamless.dat"), "licensed", true
+    )).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(core.importAsset(
+      fixture.media("asset-vp9.dat"), "licensed", true
+    )).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(core.importAsset(
+      fixture.media("asset-flac.dat"), "licensed", true
+    )).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(core.importAsset(
+      fixture.media("malformed.bin"), "licensed", true
+    )).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(core.importAsset(
+      fixture.media("empty-asset.dat", Buffer.alloc(0)), "licensed", true
+    )).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(core.importAsset(
+      join(fixture.directory, "missing-asset.dat"), "licensed", true
+    )).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(core.importAsset(
+      fixture.media("asset-png.dat"), "   ", true
+    )).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    const changing = fixture.media("changing-asset.dat", Buffer.from("before"));
+    const pending = core.importAsset(changing, "licensed", true);
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 30));
+    writeFileSync(changing, "changed while probing");
+    await expect(pending).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    const unavailableFixture = createFixture("definitely-missing-ffprobe");
+    const unavailableCore = new CoreService(
+      unavailableFixture.repository,
+      unavailableFixture.service,
+      new JobQueue(unavailableFixture.repository)
+    );
+    await expect(unavailableCore.importAsset(
+      unavailableFixture.media("asset.png"), "licensed", true
+    )).rejects.toMatchObject({ code: "DEPENDENCY_UNAVAILABLE" });
+  });
+});
+
 function createFixture(ffprobePath?: string) {
   const directory = mkdtempSync(join(tmpdir(), "short-editor-test-"));
   const probe = ffprobePath ?? createFakeProbe(directory);
@@ -178,13 +265,30 @@ import { basename } from "node:path";
 const file = process.argv.at(-1);
 const name = basename(file);
 if (name === "changing.mp4") await new Promise((resolve) => setTimeout(resolve, 100));
+if (name === "changing-asset.dat") await new Promise((resolve) => setTimeout(resolve, 100));
 if (name === "malformed.bin") {
   process.stderr.write("private diagnostic mentioning /do/not/expose/secret.mov");
   process.exit(1);
 }
-const streams = name === "audio-only.m4a"
-  ? [{ codec_type: "audio", codec_name: "aac", duration: "12.5" }]
-  : [{
+const assetCodec = {
+  "asset-png.dat": "png",
+  "asset-jpeg.dat": "mjpeg",
+  "asset-webp.dat": "webp",
+  "asset-vp9.dat": "vp9"
+}[name];
+const audioCodec = {
+  "asset-aac.dat": "aac",
+  "asset-mp3.dat": "mp3",
+  "asset-pcm.dat": "pcm_s16le",
+  "asset-flac.dat": "flac"
+}[name];
+const streams = name === "asset-streamless.dat"
+  ? []
+  : assetCodec
+    ? [{ codec_type: "video", codec_name: assetCodec, width: 1200, height: 800 }]
+    : audioCodec || name === "audio-only.m4a"
+      ? [{ codec_type: "audio", codec_name: audioCodec ?? "aac", duration: "12.5" }]
+      : [{
       codec_type: "video", codec_name: "h264", width: 1920, height: 1080, duration: "12.5"
     }, ...(name === "silent-video.mov" ? [] : [{ codec_type: "audio", codec_name: "aac" }])];
 process.stdout.write(JSON.stringify({ format: { duration: "12.5" }, streams }));

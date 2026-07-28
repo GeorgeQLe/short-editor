@@ -2,8 +2,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import {
+  assetImportInputSchema,
+  compositionSchema,
   contentPackageSchema,
   sourceRangesSchema,
+  templateCloneInputSchema,
+  templateUpdateInputSchema,
   transcriptUpdateSegmentsSchema
 } from "../shared/domain.js";
 
@@ -208,9 +212,23 @@ register("schedule.mark_published", "Mark an entry published and optionally atta
 }, ({ entryId, ...input }) => core(`/schedule/${entryId}/published`, "POST", input));
 
 register("templates.list", "List versioned composition templates.", {}, () => core("/templates"));
+register("templates.clone", "Clone a built-in or user template with direct-parent lineage.", {
+  name: templateCloneInputSchema.shape.name,
+  description: templateCloneInputSchema.shape.description,
+  templateId: z.string().min(1)
+}, ({ templateId, ...input }) => core(`/templates/${templateId}/clone`, "POST", input));
+register("templates.update", "Update a user template using optimistic revision control.", {
+  templateId: z.string().min(1),
+  expectedRevision: templateUpdateInputSchema.shape.expectedRevision,
+  name: templateUpdateInputSchema.shape.name,
+  description: templateUpdateInputSchema.shape.description,
+  composition: compositionSchema.optional()
+}, ({ templateId, ...input }) => core(`/templates/${templateId}`, "PUT", input));
 register("assets.list", "List reusable and per-Short assets.", {}, () => core("/assets"));
-register("assets.import", "Import an image/video asset with a provenance note.", {
-  path: z.string(), provenance: z.string().min(1), reusable: z.boolean().default(true)
+register("assets.import", "Inspect and reference an image, video, or audio asset in place.", {
+  path: assetImportInputSchema.shape.path,
+  provenance: assetImportInputSchema.shape.provenance,
+  reusable: assetImportInputSchema.shape.reusable
 }, (input) => core("/assets/import", "POST", input));
 
 await server.connect(new StdioServerTransport());

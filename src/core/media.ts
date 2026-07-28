@@ -3,7 +3,7 @@ import { createReadStream } from "node:fs";
 import { open, realpath, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { spawn } from "node:child_process";
-import type { Episode, ImportRejectedResult, RelinkSourceResult } from "../shared/domain.js";
+import type { Asset, Episode, ImportRejectedResult, RelinkSourceResult } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
 import type { Repository } from "./repository.js";
 
@@ -33,6 +33,14 @@ export interface InspectedSource {
   fingerprint: string;
   probe: ProbeResult;
   contentHash: string | null;
+}
+
+export interface InspectedAssetSource {
+  sourcePath: string;
+  kind: Extract<Asset["kind"], "image" | "video" | "audio">;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
 }
 
 export class MediaService {
@@ -66,6 +74,78 @@ export class MediaService {
       }
     }
     return response;
+  }
+
+  async inspectAsset(input: string): Promise<InspectedAssetSource> {
+    const submittedPath = resolve(input);
+    let before;
+    let sourcePath: string;
+    try {
+      sourcePath = await realpath(submittedPath);
+      before = await stat(sourcePath);
+    } catch {
+      throw new AppError("NOT_FOUND", "Asset file does not exist or cannot be accessed", 404);
+    }
+    if (!before.isFile()) throw new AppError("VALIDATION_ERROR", "Asset path is not a file", 422);
+    if (before.size === 0) throw new AppError("VALIDATION_ERROR", "Asset file is empty", 422);
+
+    const result = await runJson(this.ffprobePath, [
+      "-v", "error", "-show_entries",
+      "format=duration:stream=codec_type,codec_name,width,height,duration",
+      "-of", "json", sourcePath
+    ]);
+    let after;
+    try {
+      after = await stat(sourcePath);
+    } catch {
+      throw new AppError("VALIDATION_ERROR", "Asset changed while it was being inspected", 422);
+    }
+    if (!sameFileState(before, after)) {
+      throw new AppError("VALIDATION_ERROR", "Asset changed while it was being inspected", 422);
+    }
+    const streams = Array.isArray(result.streams)
+      ? result.streams.filter(isRecord)
+      : [];
+    const video = streams.find((stream) => stream.codec_type === "video");
+    const audio = streams.find((stream) => stream.codec_type === "audio");
+    if (!video && !audio) {
+      throw new AppError("VALIDATION_ERROR", "Asset contains no supported media stream", 422);
+    }
+    const format = isRecord(result.format) ? result.format : {};
+    if (video) {
+      const codec = nonemptyString(video.codec_name)?.toLowerCase() ?? null;
+      const width = positiveInteger(video.width);
+      const height = positiveInteger(video.height);
+      if (width === null || height === null) {
+        throw new AppError("VALIDATION_ERROR", "Asset dimensions are missing or invalid", 422);
+      }
+      if (codec === "png" || codec === "mjpeg" || codec === "webp") {
+        return { sourcePath, kind: "image", width, height, durationMs: null };
+      }
+      if (codec !== "h264") {
+        throw new AppError("VALIDATION_ERROR", "Unsupported asset video codec", 422);
+      }
+      const duration = finitePositive(format.duration) ?? finitePositive(video.duration);
+      if (duration === null) {
+        throw new AppError("VALIDATION_ERROR", "Asset video duration is missing or invalid", 422);
+      }
+      return {
+        sourcePath, kind: "video", width, height,
+        durationMs: Math.max(1, Math.round(duration * 1000))
+      };
+    }
+    const codec = nonemptyString(audio!.codec_name)?.toLowerCase() ?? null;
+    if (codec !== "aac" && codec !== "mp3" && !codec?.startsWith("pcm_")) {
+      throw new AppError("VALIDATION_ERROR", "Unsupported asset audio codec", 422);
+    }
+    const duration = finitePositive(format.duration) ?? finitePositive(audio!.duration);
+    if (duration === null) {
+      throw new AppError("VALIDATION_ERROR", "Asset audio duration is missing or invalid", 422);
+    }
+    return {
+      sourcePath, kind: "audio", width: null, height: null,
+      durationMs: Math.max(1, Math.round(duration * 1000))
+    };
   }
 
   async relinkSource(

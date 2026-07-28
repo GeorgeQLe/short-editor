@@ -501,6 +501,24 @@ const migrations: readonly Migration[] = [
         );
       }
     }
+  },
+  {
+    version: 8,
+    name: "template lineage and asset-bound composition layers",
+    up: (db) => {
+      normalizeCompositionLayers(db, "templates");
+      normalizeCompositionLayers(db, "short_projects");
+      db.prepare(`
+        UPDATE short_projects
+        SET template_lineage_json=json_set(
+          template_lineage_json,
+          '$.templateId',
+          template_id
+        )
+        WHERE json_valid(template_lineage_json)
+          AND json_extract(template_lineage_json, '$.templateId') IS NULL
+      `).run();
+    }
   }
 ];
 
@@ -570,6 +588,41 @@ export function openDatabase(path: string): SqliteDatabase {
   } catch (error) {
     db.close();
     throw error;
+  }
+}
+
+function normalizeCompositionLayers(
+  db: SqliteDatabase,
+  table: "templates" | "short_projects"
+): void {
+  const rows = db.prepare(`SELECT id,composition_json FROM ${table}`).all() as Array<{
+    id: string;
+    composition_json: string;
+  }>;
+  const update = db.prepare(`UPDATE ${table} SET composition_json=? WHERE id=?`);
+  for (const row of rows) {
+    let composition: unknown;
+    try {
+      composition = JSON.parse(row.composition_json);
+    } catch {
+      continue;
+    }
+    if (
+      typeof composition !== "object" ||
+      composition === null ||
+      !Array.isArray((composition as { layers?: unknown }).layers)
+    ) continue;
+    let changed = false;
+    const layers = (composition as { layers: unknown[] }).layers.map((layer) => {
+      if (
+        typeof layer !== "object" ||
+        layer === null ||
+        Object.prototype.hasOwnProperty.call(layer, "assetId")
+      ) return layer;
+      changed = true;
+      return { ...layer, assetId: null };
+    });
+    if (changed) update.run(JSON.stringify({ ...composition, layers }), row.id);
   }
 }
 

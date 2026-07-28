@@ -693,6 +693,22 @@ absorb a downstream task.
   verify the old Short is unchanged. Capture macOS evidence; defer to WIN-03.4.
 - **Evidence / acceptance:** G4 lineage fixtures show a template update changes
   only the clone and future explicit uses, never an existing Short snapshot.
+- **Implemented 2026-07-28:** Composition layers now carry nullable asset
+  bindings, and migration 8 normalizes persisted Template and Short snapshots
+  while materializing the complete selected-template lineage. Persisted
+  built-ins and user templates can be cloned with immediate-parent lineage;
+  user updates enforce CAS and increment version/revision once; Short creation
+  loads any persisted template, validates bound asset kinds, and stores an
+  independent versioned composition snapshot. Asset import canonicalizes and
+  references sources in place, requires explicit reusable/provenance input,
+  performs stable FFprobe inspection, and persists complete PNG/JPEG/WebP,
+  H.264, AAC/MP3/PCM metadata. Strict HTTP and MCP clone/update/import parity is
+  covered by [`tests/template-assets.test.ts`](tests/template-assets.test.ts);
+  migration/contract and media failure/source-preservation coverage lives in
+  [`tests/migrations.test.ts`](tests/migrations.test.ts),
+  [`tests/domain-contracts.test.ts`](tests/domain-contracts.test.ts), and
+  [`tests/media.test.ts`](tests/media.test.ts). Interactive editor and packaged
+  Windows evidence remain assigned to UI-01.3 and WIN-03.4.
 
 ### EDT-03 — Add independent automatic and manual crop tracks
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { starterTemplates } from "../src/shared/templates";
 import {
   analysisArtifactSchema,
+  assetImportInputSchema,
   assetSchema,
   candidateGenerationDiagnosticSchema,
   candidateGenerationInputSchema,
@@ -21,6 +22,8 @@ import {
   shortProjectSchema,
   sourceRangesSchema,
   templateSchema,
+  templateCloneInputSchema,
+  templateUpdateInputSchema,
   timedSegmentsSchema,
   transcriptRevisionSchema,
   utcInstantSchema,
@@ -58,6 +61,7 @@ const composition = {
     id: "video",
     type: "video" as const,
     source: "episode" as const,
+    assetId: null,
     region: { x: 0, y: 0, width: 1, height: 1 },
     fit: "fill" as const,
     cropTrack: []
@@ -175,6 +179,24 @@ describe("SPEC 5.1 entity contracts", () => {
 
   it("keeps shipped templates on the canonical contract", () => {
     starterTemplates.forEach((template) => expect(templateSchema.safeParse(template).success).toBe(true));
+  });
+
+  it("uses strict template and asset mutation contracts", () => {
+    expect(templateCloneInputSchema.parse({ name: "  Clone  " })).toEqual({ name: "Clone" });
+    expect(templateCloneInputSchema.safeParse({ name: "Clone", unknown: true }).success).toBe(false);
+    expect(templateUpdateInputSchema.safeParse({ expectedRevision: 1 }).success).toBe(false);
+    expect(templateUpdateInputSchema.safeParse({
+      expectedRevision: 1, description: "", unknown: true
+    }).success).toBe(false);
+    expect(assetImportInputSchema.parse({
+      path: " /media/a.png ", provenance: " licensed ", reusable: false
+    })).toEqual({ path: "/media/a.png", provenance: "licensed", reusable: false });
+    expect(assetImportInputSchema.safeParse({
+      path: "/media/a.png", provenance: " ", reusable: true
+    }).success).toBe(false);
+    expect(assetImportInputSchema.safeParse({
+      path: "/media/a.png", provenance: "licensed"
+    }).success).toBe(false);
   });
 
   it("represents local, private-network, and cloud provider provenance", () => {

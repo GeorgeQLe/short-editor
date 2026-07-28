@@ -1,10 +1,11 @@
 # Current work
 
-- [ ] EDT-02 — Persist template clones, materialized lineage, and complete
-  assets.
+- [ ] EDT-03 — Add independent automatic and manual crop tracks.
 
 ## Completed
 
+- [x] EDT-02 — Persist template clones, materialized lineage, and complete
+  assets.
 - [x] EDT-01 — Complete the Short timeline and approval lifecycle.
 - [x] TRC-03 — Preserve decisions and accepted copy across Candidate
   regeneration.

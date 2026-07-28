@@ -1,5 +1,29 @@
 # Session history
 
+## 2026-07-28
+
+- Completed EDT-02 with nullable composition asset bindings, migration-backed
+  legacy normalization, immutable built-ins, immediate-parent template clones,
+  exact CAS version/revision increments, and persisted-template Short creation
+  with immutable lineage/composition snapshots.
+- Added canonical source-in-place asset import with explicit reusable and
+  trimmed provenance inputs, stable FFprobe inspection, complete still/video/
+  audio metadata, requested codec support, and typed rejection of missing,
+  empty, changing, malformed, streamless, unsupported, or dependency-blocked
+  sources.
+- Added strict HTTP/MCP template clone/update and asset list/import parity plus
+  contract, migration, lineage, snapshot, asset-binding, codec, source-byte,
+  validation, immutable-state, dependency, and conflict coverage.
+- Adversarial review found and fixed a deferred-validation gap so invalid
+  template asset bindings are rejected before persistence; the template
+  revision remains unchanged after failure.
+- Full `npm test` passes all 29 files and 197 tests; `npm run build`,
+  `git diff --check`, and the focused added-line credential scan pass without
+  warnings.
+- Interactive template/asset workflow evidence remains assigned to UI-01.3 and
+  packaged Windows evidence to WIN-03.4. Promoted EDT-03 as the sole current
+  executable task.
+
 ## 2026-07-27
 
 - Completed EDT-01 with guarded revision-1 Short creation, independent accepted

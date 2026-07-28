@@ -3,12 +3,15 @@ import { timingSafeEqual } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import {
+  assetImportInputSchema,
   candidateContentPackageAcceptInputSchema,
   compositionSchema,
   contentPackageSchema,
   scheduleRulesSchema,
   shortApprovalInputSchema,
   shortTimelineUpdateInputSchema,
+  templateCloneInputSchema,
+  templateUpdateInputSchema,
   transcriptUpdateInputSchema
 } from "../shared/domain.js";
 import { AppError, errorEnvelope, normalizeError } from "../shared/errors.js";
@@ -171,11 +174,26 @@ export function createApi(service: CoreService, desktopToken?: string) {
     return service.approveShort(id.parse(req.params.id), input.expectedRevision);
   }));
   app.get("/v1/templates", (_req, res) => res.json(ok(service.listTemplates())));
+  app.post("/v1/templates/:id/clone", route((req) => {
+    const input = templateCloneInputSchema.parse(req.body);
+    return service.cloneTemplate(
+      z.string().min(1).parse(req.params.id),
+      input.name,
+      input.description
+    );
+  }));
+  app.put("/v1/templates/:id", route((req) => {
+    const input = templateUpdateInputSchema.parse(req.body);
+    const { expectedRevision, ...patch } = input;
+    return service.updateTemplate(
+      z.string().min(1).parse(req.params.id),
+      expectedRevision,
+      patch
+    );
+  }));
   app.get("/v1/assets", (_req, res) => res.json(ok(service.listAssets())));
   app.post("/v1/assets/import", route((req) => {
-    const input = z.object({
-      path: z.string(), provenance: z.string().min(1), reusable: z.boolean().default(true)
-    }).parse(req.body);
+    const input = assetImportInputSchema.parse(req.body);
     return service.importAsset(input.path, input.provenance, input.reusable);
   }));
   app.get("/v1/renders", (req, res) => res.json(ok(service.listRenders(asString(req.query.shortId)))));
