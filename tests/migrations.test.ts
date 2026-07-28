@@ -35,7 +35,7 @@ describe("database migrations", () => {
     for (const table of [
       "watched_folders", "transcript_revisions", "analysis_artifacts", "templates",
       "assets", "artifact_records", "renders", "schedule_rule_sets", "schedule_entries",
-      "cloud_authorizations", "jobs", "relink_comparisons"
+      "cloud_authorizations", "jobs", "relink_comparisons", "candidate_generation_runs"
     ]) expect(tables.has(table), table).toBe(true);
   });
 
@@ -125,6 +125,87 @@ describe("database migrations", () => {
     expect(db.prepare(
       "SELECT 1 FROM schema_migrations WHERE version=?"
     ).get(CURRENT_SCHEMA_VERSION + 1)).toBeUndefined();
+  });
+
+  it("migrates legacy Candidate history and Short copy without demoting accepted data", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "short-editor-candidate-migration-")), "fixture.db");
+    const legacy = new Database(path);
+    migrateDatabase(legacy, databaseMigrations.slice(0, 6));
+    const episodeId = randomUUID();
+    const candidateId = randomUUID();
+    const shortId = randomUUID();
+    const artifactId = randomUUID();
+    const now = "2026-07-27T12:00:00.000Z";
+    legacy.prepare(`
+      INSERT INTO episodes(
+        id,source_path,canonical_path,fingerprint,file_size,modified_at_ms,status,
+        missing,created_at,updated_at
+      ) VALUES(?,?,?,?,?,?,?,0,?,?)
+    `).run(episodeId, "/original.mp4", "/canonical.mp4", "fingerprint", 10, 20, "ready", now, now);
+    legacy.prepare(`
+      INSERT INTO candidates(
+        id,episode_id,start_ms,end_ms,transcript,topic,hook,reason,score,
+        scores_json,duplicate_group,review_status,created_at,generation_artifact_id,
+        transcript_revision,generation_version,provider_provenance_json
+      ) VALUES(?,?,0,30000,'Original transcript','Original topic','Original hook',
+        'Original reason',0.8,?,NULL,'approved',?,?,1,'legacy-v1',NULL)
+    `).run(
+      candidateId,
+      episodeId,
+      JSON.stringify({
+        hook: .8, coherence: .8, payoff: .8, independence: .8, delivery: .8,
+        visualActivity: .8
+      }),
+      now,
+      artifactId
+    );
+    const legacyCopy = {
+      cleanedTranscript: "User copy", rewrite: "Edited", hookVariants: ["Hook"],
+      titles: ["Title"], description: "Description", hashtags: ["legacy"],
+      thumbnailText: "Thumbnail"
+    };
+    legacy.prepare(`
+      INSERT INTO short_projects(
+        id,episode_id,candidate_id,title,source_ranges_json,template_id,
+        composition_json,copy_json,approved,revision,created_at,updated_at
+      ) VALUES(?,?,?,'Legacy Short','[]','fullscreen-speaker-v1','{}',?,1,4,?,?)
+    `).run(shortId, episodeId, candidateId, JSON.stringify(legacyCopy), now, now);
+    legacy.close();
+
+    const upgraded = openDatabase(path);
+    databases.push(upgraded);
+    expect(upgraded.prepare(`
+      SELECT review_status,generation_run_id,revision,state,updated_at
+      FROM candidates WHERE id=?
+    `).get(candidateId)).toEqual({
+      review_status: "approved",
+      generation_run_id: null,
+      revision: 1,
+      state: "active",
+      updated_at: now
+    });
+    const packageRow = upgraded.prepare(`
+      SELECT raw_output_json,accepted_projection_json
+      FROM analysis_artifacts WHERE entity_id=? AND kind='content_package'
+    `).get(candidateId) as {
+      raw_output_json: string;
+      accepted_projection_json: string | null;
+    };
+    expect(JSON.parse(packageRow.raw_output_json)).toMatchObject({
+      cleanedTranscript: "Original transcript",
+      hookVariants: ["Original hook"],
+      titles: ["Original topic"]
+    });
+    expect(packageRow.accepted_projection_json).toBeNull();
+    const short = upgraded.prepare(`
+      SELECT copy_json,copy_state,copy_source,revision FROM short_projects WHERE id=?
+    `).get(shortId) as {
+      copy_json: string; copy_state: string; copy_source: string; revision: number;
+    };
+    expect(JSON.parse(short.copy_json)).toEqual(legacyCopy);
+    expect(short).toMatchObject({
+      copy_state: "accepted", copy_source: "legacy_accepted", revision: 4
+    });
   });
 
   it("keeps foreign-key enforcement active", () => {

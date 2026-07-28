@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type {
   CandidateGenerationDiagnostic,
-  CandidateGenerationResult,
   ClipCandidate,
   ProviderProvenance,
   TranscriptSegment
@@ -65,7 +64,7 @@ const componentWeights: Record<keyof ClipCandidate["scores"], number> = {
 
 export function generateCandidates(
   context: CandidateGenerationContext | AnalysisCandidateGenerationContext
-): CandidateGenerationResult {
+): { candidates: ClipCandidate[]; diagnostic: CandidateGenerationDiagnostic } {
   const requestedCount = Math.min(10, Math.max(5, context.count ?? 8));
   const rejections = { duration: 0, quality: 0, overlap: 0, semanticDuplication: 0 };
   let eligibleWindowCount = 0;
@@ -173,6 +172,7 @@ function candidateFromSegments(
   const text = normalizeWhitespace(segments.map((segment) => segment.text.trim()).join(" "));
   const first = segments[0]!.text.trim();
   const keywords = topKeywords(text);
+  const now = new Date().toISOString();
   return {
     id: randomUUID(), episodeId: context.episodeId,
     startMs: segments[0]!.startMs, endMs: segments.at(-1)!.endMs,
@@ -187,7 +187,11 @@ function candidateFromSegments(
       generationVersion: CANDIDATE_GENERATION_VERSION,
       provider: analysis?.provider ?? null
     },
-    createdAt: new Date().toISOString()
+    generationRunId: null,
+    revision: 1,
+    state: "active",
+    createdAt: now,
+    updatedAt: now
   };
 }
 
@@ -282,7 +286,10 @@ function topKeywords(text: string): string[] {
   return [...counts].sort((a, b) => b[1] - a[1]).map(([word]) => word);
 }
 
-function intersectionRatio(a: ClipCandidate, b: ClipCandidate): number {
+function intersectionRatio(
+  a: Pick<ClipCandidate, "startMs" | "endMs">,
+  b: Pick<ClipCandidate, "startMs" | "endMs">
+): number {
   const overlap = Math.max(0, Math.min(a.endMs, b.endMs) - Math.max(a.startMs, b.startMs));
   return overlap / Math.min(a.endMs - a.startMs, b.endMs - b.startMs);
 }
@@ -293,6 +300,14 @@ function jaccard(a: string, b: string): number {
   const intersection = [...left].filter((word) => right.has(word)).length;
   const union = new Set([...left, ...right]).size;
   return union ? intersection / union : 0;
+}
+
+export function candidatesConflict(
+  left: Pick<ClipCandidate, "startMs" | "endMs" | "transcript">,
+  right: Pick<ClipCandidate, "startMs" | "endMs" | "transcript">
+): boolean {
+  return intersectionRatio(left, right) > 0.35
+    || jaccard(left.transcript, right.transcript) >= 0.88;
 }
 
 function normalizedTokens(text: string): string[] {

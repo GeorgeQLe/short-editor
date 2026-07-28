@@ -38,6 +38,7 @@ export function candidate(episodeId: string, overrides: Partial<ClipCandidate> =
     generationProvenance: {
       artifactId: null, transcriptRevision: 1, generationVersion: "fixture-v1", provider: null
     },
-    createdAt: now, ...overrides
+    generationRunId: null, revision: 1, state: "active",
+    createdAt: now, updatedAt: now, ...overrides
   };
 }

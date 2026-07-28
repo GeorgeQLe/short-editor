@@ -4,6 +4,7 @@ import { extname, resolve } from "node:path";
 import { z } from "zod";
 import {
   type Asset,
+  type ContentPackage,
   candidateGenerationInputSchema,
   type CandidateGenerationInput,
   type Composition,
@@ -17,7 +18,7 @@ import {
 } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
 import { starterTemplates, templateById } from "../shared/templates.js";
-import { generateCandidates } from "./candidates.js";
+import { CANDIDATE_GENERATION_VERSION, generateCandidates } from "./candidates.js";
 import type { Repository } from "./repository.js";
 import type { MediaService } from "./media.js";
 import type { JobQueue } from "./jobs.js";
@@ -580,6 +581,8 @@ export class CoreService {
     this.repository.getEpisode(parsed.episodeId);
     const transcript = this.repository.getAcceptedTranscriptRevision(parsed.episodeId);
     let result;
+    let analysisArtifactId: string | null = null;
+    let provider: ProviderProvenance | null = null;
     if (parsed.mode === "analysis") {
       const artifact = this.repository.getAnalysisArtifact(parsed.analysisArtifactId);
       if (
@@ -608,6 +611,8 @@ export class CoreService {
           422
         );
       }
+      analysisArtifactId = artifact.id;
+      provider = artifact.provenance;
       result = generateCandidates({
         episodeId: parsed.episodeId,
         transcriptRevision: transcript.revision,
@@ -627,12 +632,32 @@ export class CoreService {
         mode: "heuristic"
       });
     }
-    this.repository.replaceCandidates(parsed.episodeId, result.candidates);
-    return result;
+    return this.repository.saveCandidateGeneration({
+      episodeId: parsed.episodeId,
+      transcriptRevision: transcript.revision,
+      mode: parsed.mode,
+      analysisArtifactId,
+      provider,
+      strategy: parsed.strategy,
+      generationVersion: CANDIDATE_GENERATION_VERSION,
+      requestedCount: parsed.count,
+      proposals: result.candidates,
+      diagnostic: result.diagnostic
+    });
   }
   listCandidates(episodeId: string) { return this.repository.listCandidates(episodeId); }
-  reviewCandidate(id: string, status: "approved" | "rejected") {
-    return this.repository.reviewCandidate(id, status);
+  reviewCandidate(id: string, expectedRevision: number, status: "approved" | "rejected") {
+    return this.repository.reviewCandidate(id, expectedRevision, status);
+  }
+  getCandidateContentPackage(id: string) {
+    return this.repository.getCandidateContentPackage(id);
+  }
+  acceptCandidateContentPackage(
+    id: string,
+    expectedRevision: number,
+    contentPackage: ContentPackage
+  ) {
+    return this.repository.acceptCandidateContentPackage(id, expectedRevision, contentPackage);
   }
 
   createShort(candidateId: string, templateId = "fullscreen-speaker-v1"): ShortProject {
@@ -640,6 +665,11 @@ export class CoreService {
     if (candidate.reviewStatus !== "approved") {
       throw new AppError("INVALID_STATE", "Approve the candidate before creating a Short", 409);
     }
+    if (candidate.state !== "active") {
+      throw new AppError("INVALID_STATE", "Superseded Candidate cannot create a Short", 409);
+    }
+    const candidateCopy = this.repository.getCandidateContentPackage(candidateId);
+    const copy = candidateCopy.accepted ?? candidateCopy.proposed;
     const template = templateById(templateId);
     if (!template) throw new AppError("NOT_FOUND", "Template not found", 404);
     const now = new Date().toISOString();
@@ -658,10 +688,9 @@ export class CoreService {
         sourceGainDb: 0, muted: false, fadeInMs: 0, fadeOutMs: 0,
         bedAssetId: null, bedGainDb: null, normalizeLoudness: false
       },
-      copy: {
-        cleanedTranscript: candidate.transcript, rewrite: "", hookVariants: [candidate.hook],
-        titles: [candidate.topic], description: "", hashtags: [], thumbnailText: ""
-      },
+      copy,
+      copyState: candidateCopy.accepted ? "accepted" : "proposed",
+      copySource: candidateCopy.accepted ? "candidate_accepted" : "candidate_proposal",
       approved: false, revision: 1, createdAt: now, updatedAt: now
     });
   }
@@ -670,7 +699,9 @@ export class CoreService {
     return this.repository.updateShort(id, expectedRevision, { composition });
   }
   updateCopy(id: string, expectedRevision: number, copy: ShortProject["copy"]) {
-    return this.repository.updateShort(id, expectedRevision, { copy });
+    return this.repository.updateShort(id, expectedRevision, {
+      copy, copyState: "accepted", copySource: "user_accepted"
+    });
   }
   approveShort(id: string, expectedRevision: number) {
     return this.repository.updateShort(id, expectedRevision, { approved: true });

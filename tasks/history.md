@@ -2,6 +2,80 @@
 
 ## 2026-07-27
 
+- Completed TRC-03 with durable Candidate generation runs, explicit
+  replace-pending and append-pending strategies, retained reviewed decisions,
+  accepted-copy preservation, conflict suppression, and superseded history for
+  stale-write detection.
+- Added immutable proposed and nullable accepted Candidate content packages,
+  optimistic Candidate review/copy revisions, compatible legacy migration,
+  explicit proposed/accepted Short copy lineage, and HTTP/MCP parity. Full
+  `npm test` (27 files, 178 tests), `npm run build`, and `git diff --check`
+  pass without warnings.
+
+### TRC-03 ship manifest
+
+- **User goal:** Preserve reviewed Candidate decisions and accepted user copy
+  across explicit append/replace regeneration while keeping provider proposals
+  separate and concurrency-safe.
+- **Changed files:**
+  `IMPLEMENTATION_PLAN.md`, `SPEC.md`, `src/core/api.ts`,
+  `src/core/candidates.ts`, `src/core/database.ts`,
+  `src/core/repository.ts`, `src/core/service.ts`, `src/mcp/server.ts`,
+  `src/shared/contracts.ts`, `tests/candidate-integration.test.ts`,
+  `tests/candidates.test.ts`, `tests/domain-contracts.test.ts`,
+  `tests/factories.ts`, `tests/migrations.test.ts`,
+  `tests/persistence.test.ts`, `tests/repository.test.ts`,
+  `tests/transcript-editing.test.ts`, `tasks/todo.md`, and
+  `tasks/history.md`.
+- **Per-file purpose:**
+  `IMPLEMENTATION_PLAN.md` records TRC-03 completion evidence;
+  `SPEC.md` reconciles the implementation matrix and changelog;
+  `src/core/api.ts` adds revisioned Candidate review/copy endpoints;
+  `src/core/candidates.ts` exposes shared conflict detection and revisioned
+  proposal defaults; `src/core/database.ts` adds migration 7 and legacy
+  backfill; `src/core/repository.ts` implements atomic generation strategies,
+  lineage, copy acceptance, and Short copy metadata;
+  `src/core/service.ts` binds generation, review, copy, and Short creation;
+  `src/mcp/server.ts` adds typed MCP parity; `src/shared/contracts.ts` defines
+  strategies, runs, revisions, content packages, and copy lineage;
+  `tests/candidate-integration.test.ts` covers end-to-end preservation,
+  conflicts, rollback, and public interfaces; `tests/candidates.test.ts`
+  updates deterministic comparison for revision timestamps;
+  `tests/domain-contracts.test.ts` verifies the new public schemas;
+  `tests/factories.ts` supplies revisioned Candidate fixtures;
+  `tests/migrations.test.ts` proves legacy upgrade behavior;
+  `tests/persistence.test.ts`, `tests/repository.test.ts`, and
+  `tests/transcript-editing.test.ts` update persisted Short fixtures;
+  `tasks/todo.md` closes TRC-03 and promotes EDT-01; and
+  `tasks/history.md` records the session and this manifest.
+- **User-goal mapping:** Atomic append/replace persistence and conflict
+  suppression preserve reviewed rows; accepted projections preserve user copy;
+  Candidate revisions reject stale operations; generation-run and copy-source
+  metadata keep provider output auditable and distinct from accepted edits.
+- **Tests run:** Executable verification: `npm test` passed all 27 files and
+  178 tests; `npm run build` passed application typecheck, Vite production
+  build, and Node TypeScript compilation. Repository verification:
+  `git diff --check` passed. A targeted added-line credential/signature scan
+  found no secret-like additions.
+- **Skipped tests:** Interactive macOS Candidate UI validation and packaged
+  native Windows validation remain assigned to UI-01.2 and WIN-03.3 because
+  this repository boundary has no completed Candidate UI workflow or packaged
+  Windows runtime in the current environment.
+- **Adversarial review:** Reviewed the exact source/migration/API/MCP diff for
+  transaction rollback, legacy acceptance preservation, append/replace
+  conflicts, accepted-copy retention, superseded/stale writes, provider
+  switching, proposal immutability, and public schema parity. No blocking
+  findings remained; dedicated fixtures exercise each high-risk boundary.
+- **Residual risk:** Native SQLite migration and interactive conflict recovery
+  still need packaged Windows/UI evidence at their assigned gates. The
+  deterministic automated suite covers the platform-neutral persistence and
+  interface behavior.
+- **Rollback note:** Revert the TRC-03 feature commit before deploying migration
+  7. After a database has migrated, restore a pre-migration backup rather than
+  attempting a down migration.
+- **Next command:** `$exec` for EDT-01, the Short timeline and approval
+  lifecycle.
+
 - Completed TRC-02 with versioned deterministic Candidate generation, explicit
   heuristic or selected-analysis modes, accepted-transcript revision binding,
   provider/artifact provenance, complete aligned 20–90 second enumeration,

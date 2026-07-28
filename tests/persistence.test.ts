@@ -173,6 +173,8 @@ describe("complete transactional persistence", () => {
         hashtags: ["one"],
         thumbnailText: "thumbnail"
       },
+      copyState: "accepted" as const,
+      copySource: "legacy_accepted" as const,
       approved: false,
       revision: 1,
       createdAt: now,

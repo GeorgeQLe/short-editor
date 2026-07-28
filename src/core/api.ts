@@ -3,7 +3,9 @@ import { timingSafeEqual } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import {
+  candidateContentPackageAcceptInputSchema,
   compositionSchema,
+  contentPackageSchema,
   scheduleRulesSchema,
   transcriptUpdateInputSchema
 } from "../shared/domain.js";
@@ -130,8 +132,19 @@ export function createApi(service: CoreService, desktopToken?: string) {
     return service.generateCandidates(input);
   }));
   app.post("/v1/candidates/:id/review", route((req) => service.reviewCandidate(
-    id.parse(req.params.id), z.enum(["approved", "rejected"]).parse(req.body.status)
+    id.parse(req.params.id),
+    revision.parse(req.body.expectedRevision),
+    z.enum(["approved", "rejected"]).parse(req.body.status)
   )));
+  app.get("/v1/candidates/:id/content-package", route((req) =>
+    service.getCandidateContentPackage(id.parse(req.params.id))
+  ));
+  app.put("/v1/candidates/:id/content-package", route((req) => {
+    const input = candidateContentPackageAcceptInputSchema.parse(req.body);
+    return service.acceptCandidateContentPackage(
+      id.parse(req.params.id), input.expectedRevision, input.contentPackage
+    );
+  }));
   app.post("/v1/shorts", route((req) => {
     const input = z.object({ candidateId: id, templateId: z.string().optional() }).parse(req.body);
     return service.createShort(input.candidateId, input.templateId);
@@ -143,11 +156,7 @@ export function createApi(service: CoreService, desktopToken?: string) {
   app.put("/v1/shorts/:id/copy", route((req) => {
     const project = service.getShort(id.parse(req.params.id));
     return service.updateCopy(project.id, revision.parse(req.body.expectedRevision),
-      project.copy && z.object({
-        cleanedTranscript: z.string(), rewrite: z.string(), hookVariants: z.array(z.string()),
-        titles: z.array(z.string()), description: z.string(), hashtags: z.array(z.string()),
-        thumbnailText: z.string()
-      }).parse(req.body.copy));
+      project.copy && contentPackageSchema.parse(req.body.copy));
   }));
   app.post("/v1/shorts/:id/approve", route((req) => service.approveShort(
     id.parse(req.params.id), revision.parse(req.body.expectedRevision)

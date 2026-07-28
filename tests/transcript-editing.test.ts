@@ -94,6 +94,8 @@ function shortProject(episodeId: string): ShortProject {
       hashtags: [],
       thumbnailText: ""
     },
+    copyState: "accepted",
+    copySource: "legacy_accepted",
     approved: true,
     revision: 4,
     createdAt: now,

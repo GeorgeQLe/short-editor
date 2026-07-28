@@ -1,10 +1,11 @@
 # Current work
 
-- [ ] TRC-03 — Preserve decisions and accepted copy across Candidate
-  regeneration.
+- [ ] EDT-01 — Complete the Short timeline and approval lifecycle.
 
 ## Completed
 
+- [x] TRC-03 — Preserve decisions and accepted copy across Candidate
+  regeneration.
 - [x] TRC-02 — Make Candidate generation deterministic, diagnostic, and
   corpus-tested.
 - [x] TRC-01 — Add accepted transcript revisions and safe editing.

@@ -254,6 +254,8 @@ export const generationProvenanceSchema = z.strictObject({
   generationVersion: z.string().min(1),
   provider: providerProvenanceSchema.nullable()
 });
+export const candidateStates = ["active", "superseded"] as const;
+export const candidateStateSchema = z.enum(candidateStates);
 export const candidateSchema = z.strictObject({
   id: idSchema,
   episodeId: idSchema,
@@ -269,7 +271,11 @@ export const candidateSchema = z.strictObject({
   duplicateGroup: z.string().min(1).nullable(),
   reviewStatus: candidateReviewStatusSchema,
   generationProvenance: generationProvenanceSchema,
-  createdAt: utcInstantSchema
+  generationRunId: idSchema.nullable(),
+  revision: positiveRevisionSchema,
+  state: candidateStateSchema,
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema
 }).superRefine((candidate, context) => {
   if (candidate.endMs <= candidate.startMs) {
     context.addIssue({ code: "custom", path: ["endMs"], message: "Candidate end must be after its start" });
@@ -284,16 +290,20 @@ export type Candidate = z.infer<typeof candidateSchema>;
 export type ClipCandidate = Candidate;
 
 const candidateGenerationCountSchema = z.number().int().min(5).max(10).default(8);
+export const candidateGenerationStrategies = ["replace_pending", "append_pending"] as const;
+export const candidateGenerationStrategySchema = z.enum(candidateGenerationStrategies);
 export const candidateGenerationInputSchema = z.union([
   z.strictObject({
     episodeId: idSchema,
     count: candidateGenerationCountSchema,
+    strategy: candidateGenerationStrategySchema,
     mode: z.literal("analysis"),
     analysisArtifactId: idSchema
   }),
   z.strictObject({
     episodeId: idSchema,
     count: candidateGenerationCountSchema,
+    strategy: candidateGenerationStrategySchema,
     mode: z.literal("heuristic").default("heuristic")
   })
 ]);
@@ -309,7 +319,7 @@ export const candidateGenerationDiagnosticSchema = z.discriminatedUnion("suffici
   }),
   candidateGenerationCountsSchema.extend({
     sufficient: z.literal(false),
-    code: z.literal("INSUFFICIENT_MATERIAL"),
+    code: z.enum(["INSUFFICIENT_MATERIAL", "INSUFFICIENT_NOVEL_MATERIAL"]),
     minimumCandidateCount: z.literal(5),
     eligibleWindowCount: z.number().int().nonnegative(),
     rejectionCounts: z.strictObject({
@@ -344,15 +354,55 @@ export const candidateGenerationDiagnosticSchema = z.discriminatedUnion("suffici
 });
 export type CandidateGenerationDiagnostic =
   z.infer<typeof candidateGenerationDiagnosticSchema>;
+export const candidateGenerationRunSchema = z.strictObject({
+  id: idSchema,
+  episodeId: idSchema,
+  transcriptRevision: positiveRevisionSchema,
+  mode: z.enum(["heuristic", "analysis"]),
+  analysisArtifactId: idSchema.nullable(),
+  provider: providerProvenanceSchema.nullable(),
+  strategy: candidateGenerationStrategySchema,
+  generationVersion: z.string().min(1),
+  requestedCount: z.number().int().min(5).max(10),
+  proposedCount: z.number().int().nonnegative().max(10),
+  insertedCount: z.number().int().nonnegative().max(10),
+  retainedDecisionConflictCount: z.number().int().nonnegative(),
+  retainedPendingConflictCount: z.number().int().nonnegative(),
+  diagnostic: candidateGenerationDiagnosticSchema,
+  createdAt: utcInstantSchema
+});
+export type CandidateGenerationRun = z.infer<typeof candidateGenerationRunSchema>;
 export const candidateGenerationResultSchema = z.strictObject({
   candidates: z.array(candidateSchema).max(10),
-  diagnostic: candidateGenerationDiagnosticSchema
+  diagnostic: candidateGenerationDiagnosticSchema,
+  run: candidateGenerationRunSchema
 }).superRefine((result, context) => {
   if (result.candidates.length !== result.diagnostic.generatedCount) {
     context.addIssue({
       code: "custom",
       path: ["diagnostic", "generatedCount"],
       message: "Generated count must match the Candidate array"
+    });
+  }
+  if (result.run.insertedCount !== result.candidates.length) {
+    context.addIssue({
+      code: "custom",
+      path: ["run", "insertedCount"],
+      message: "Run inserted count must match the Candidate array"
+    });
+  }
+  if (result.run.proposedCount < result.run.insertedCount) {
+    context.addIssue({
+      code: "custom",
+      path: ["run", "proposedCount"],
+      message: "Run proposed count cannot be smaller than inserted count"
+    });
+  }
+  if (JSON.stringify(result.run.diagnostic) !== JSON.stringify(result.diagnostic)) {
+    context.addIssue({
+      code: "custom",
+      path: ["run", "diagnostic"],
+      message: "Run diagnostic must match the generation result"
     });
   }
 });
@@ -401,6 +451,21 @@ export const contentPackageSchema = z.strictObject({
   hashtags: z.array(z.string()),
   thumbnailText: z.string()
 });
+export type ContentPackage = z.infer<typeof contentPackageSchema>;
+export const candidateContentPackageSchema = z.strictObject({
+  candidateId: idSchema,
+  candidateRevision: positiveRevisionSchema,
+  proposalArtifactId: idSchema,
+  proposed: contentPackageSchema,
+  accepted: contentPackageSchema.nullable(),
+  proposalProvenance: providerProvenanceSchema,
+  inputHash: z.string().min(1)
+});
+export type CandidateContentPackage = z.infer<typeof candidateContentPackageSchema>;
+export const candidateContentPackageAcceptInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  contentPackage: contentPackageSchema
+});
 export const captionStateSchema = z.strictObject({
   enabled: z.boolean(),
   segments: z.array(transcriptSegmentSchema),
@@ -437,6 +502,10 @@ export const shortProjectSchema = z.strictObject({
   captions: captionStateSchema,
   audio: audioStateSchema,
   copy: contentPackageSchema,
+  copyState: z.enum(["proposed", "accepted"]),
+  copySource: z.enum([
+    "candidate_proposal", "candidate_accepted", "user_accepted", "legacy_accepted"
+  ]),
   approved: z.boolean(),
   revision: positiveRevisionSchema,
   createdAt: utcInstantSchema,

@@ -403,6 +403,104 @@ const migrations: readonly Migration[] = [
           WHERE kind='episode_analysis' AND state IN ('proposed','accepted');
       `);
     }
+  },
+  {
+    version: 7,
+    name: "candidate generation lineage and accepted copy",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE candidate_generation_runs (
+          id TEXT PRIMARY KEY,
+          episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+          transcript_revision INTEGER NOT NULL CHECK(transcript_revision > 0),
+          mode TEXT NOT NULL CHECK(mode IN ('heuristic','analysis')),
+          analysis_artifact_id TEXT,
+          provider_provenance_json TEXT,
+          strategy TEXT NOT NULL CHECK(strategy IN ('replace_pending','append_pending')),
+          generation_version TEXT NOT NULL,
+          requested_count INTEGER NOT NULL,
+          proposed_count INTEGER NOT NULL,
+          inserted_count INTEGER NOT NULL,
+          retained_decision_conflict_count INTEGER NOT NULL,
+          retained_pending_conflict_count INTEGER NOT NULL,
+          diagnostic_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX candidate_generation_run_episode_idx
+          ON candidate_generation_runs(episode_id, created_at);
+
+        ALTER TABLE candidates ADD COLUMN generation_run_id TEXT
+          REFERENCES candidate_generation_runs(id);
+        ALTER TABLE candidates ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE candidates ADD COLUMN state TEXT NOT NULL DEFAULT 'active'
+          CHECK(state IN ('active','superseded'));
+        ALTER TABLE candidates ADD COLUMN updated_at TEXT;
+        UPDATE candidates SET updated_at=created_at WHERE updated_at IS NULL;
+        CREATE INDEX candidate_episode_state_idx
+          ON candidates(episode_id, state, review_status);
+
+        ALTER TABLE short_projects ADD COLUMN copy_state TEXT NOT NULL DEFAULT 'accepted'
+          CHECK(copy_state IN ('proposed','accepted'));
+        ALTER TABLE short_projects ADD COLUMN copy_source TEXT NOT NULL DEFAULT 'legacy_accepted'
+          CHECK(copy_source IN (
+            'candidate_proposal','candidate_accepted','user_accepted','legacy_accepted'
+          ));
+      `);
+      const legacyCandidates = db.prepare(`
+        SELECT * FROM candidates
+        WHERE NOT EXISTS (
+          SELECT 1 FROM analysis_artifacts a
+          WHERE a.entity_id=candidates.id AND a.owner_type='candidate'
+            AND a.kind='content_package'
+        )
+      `).all() as Record<string, unknown>[];
+      const insertPackage = db.prepare(`
+        INSERT INTO analysis_artifacts(
+          id,entity_id,owner_type,kind,state,provenance_json,input_hash,
+          raw_output_json,accepted_projection_json,created_at
+        ) VALUES(?,?,'candidate','content_package','proposed',?,?,?,NULL,?)
+      `);
+      for (const candidate of legacyCandidates) {
+        const proposed = {
+          cleanedTranscript: String(candidate.transcript),
+          rewrite: "",
+          hookVariants: [String(candidate.hook)],
+          titles: [String(candidate.topic)],
+          description: "",
+          hashtags: [],
+          thumbnailText: ""
+        };
+        const createdAt = String(candidate.created_at);
+        const provenance = candidate.provider_provenance_json
+          ? JSON.parse(String(candidate.provider_provenance_json))
+          : {
+            provider: "short-editor",
+            providerClass: "local",
+            modelId: "legacy-candidate-content-seed",
+            providerVersion: String(candidate.generation_version),
+            optionsVersion: "1",
+            createdAt
+          };
+        const identity = JSON.stringify({
+          transcriptRevision: Number(candidate.transcript_revision),
+          generationRunId: null,
+          generationVersion: String(candidate.generation_version),
+          analysisArtifactId: candidate.generation_artifact_id
+            ? String(candidate.generation_artifact_id)
+            : null,
+          provider: provenance,
+          proposed: normalizeLegacyContentPackageIdentity(proposed)
+        });
+        insertPackage.run(
+          legacyUuid(`candidate-content:${candidate.id}`),
+          String(candidate.id),
+          JSON.stringify(provenance),
+          createHash("sha256").update(identity).digest("hex"),
+          JSON.stringify(proposed),
+          createdAt
+        );
+      }
+    }
   }
 ];
 
@@ -473,6 +571,27 @@ export function openDatabase(path: string): SqliteDatabase {
     db.close();
     throw error;
   }
+}
+
+function normalizeLegacyContentPackageIdentity(content: {
+  cleanedTranscript: string;
+  rewrite: string;
+  hookVariants: string[];
+  titles: string[];
+  description: string;
+  hashtags: string[];
+  thumbnailText: string;
+}) {
+  const normalize = (value: string) => value.trim().replace(/\s+/g, " ");
+  return {
+    cleanedTranscript: normalize(content.cleanedTranscript),
+    rewrite: normalize(content.rewrite),
+    hookVariants: content.hookVariants.map(normalize),
+    titles: content.titles.map(normalize),
+    description: normalize(content.description),
+    hashtags: content.hashtags.map(normalize),
+    thumbnailText: normalize(content.thumbnailText)
+  };
 }
 
 function migrateLegacyTranscripts(db: SqliteDatabase): void {

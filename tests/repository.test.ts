@@ -38,6 +38,7 @@ describe("repository revisions and recovery", () => {
         bedAssetId: null, bedGainDb: null, normalizeLoudness: false
       },
       copy: { cleanedTranscript: "", rewrite: "", hookVariants: [], titles: [], description: "", hashtags: [], thumbnailText: "" },
+      copyState: "accepted", copySource: "legacy_accepted",
       approved: true, revision: 1, createdAt: now, updatedAt: now
     });
     const renderId = crypto.randomUUID();

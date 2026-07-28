@@ -1,14 +1,16 @@
 import type { SqliteDatabase } from "./database.js";
 import type {
-  AnalysisArtifact, Asset, ClipCandidate, Composition, Episode, Job, Render,
+  AnalysisArtifact, Asset, CandidateContentPackage, CandidateGenerationDiagnostic,
+  CandidateGenerationResult, CandidateGenerationRun, ClipCandidate, Composition,
+  ContentPackage, Episode, Job, Render,
   ProviderProvenance, ScheduleEntry, ScheduleRuleSet, ShortProject, Template, TranscriptRevision,
   TranscriptSegment, WatchedFolder
 } from "../shared/domain.js";
 import { analysisArtifactSchema, timedSegmentsSchema } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
-import { compareCandidates } from "./candidates.js";
+import { candidatesConflict, compareCandidates } from "./candidates.js";
 import { assertEpisodeTransition, type RelinkContext } from "../shared/episode-transitions.js";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { validateOwnedRelativePath } from "./artifact-path.js";
 
 type Row = Record<string, unknown>;
@@ -125,7 +127,7 @@ export class Repository {
     const wildcard = `%${search ?? ""}%`;
     const rows = this.db.prepare(`
       SELECT e.*,
-        (SELECT COUNT(*) FROM candidates c WHERE c.episode_id=e.id) candidate_count,
+        (SELECT COUNT(*) FROM candidates c WHERE c.episode_id=e.id AND c.state='active') candidate_count,
         (SELECT COUNT(DISTINCT r.short_id) FROM renders r JOIN short_projects s ON s.id=r.short_id
           WHERE s.episode_id=e.id AND r.state='succeeded') rendered_short_count,
         (SELECT COUNT(*) FROM schedule_entries se WHERE se.episode_id=e.id) scheduled_count
@@ -139,7 +141,7 @@ export class Repository {
   getEpisode(id: string): Episode {
     const row = this.db.prepare(`
       SELECT e.*,
-        (SELECT COUNT(*) FROM candidates c WHERE c.episode_id=e.id) candidate_count,
+        (SELECT COUNT(*) FROM candidates c WHERE c.episode_id=e.id AND c.state='active') candidate_count,
         (SELECT COUNT(DISTINCT r.short_id) FROM renders r JOIN short_projects s ON s.id=r.short_id
           WHERE s.episode_id=e.id AND r.state='succeeded') rendered_short_count,
         (SELECT COUNT(*) FROM schedule_entries se WHERE se.episode_id=e.id) scheduled_count
@@ -591,18 +593,136 @@ export class Repository {
     return mapTranscriptRevision(row);
   }
 
-  replaceCandidates(episodeId: string, candidates: ClipCandidate[]): void {
-    this.db.transaction(() => {
-      this.db.prepare("DELETE FROM candidates WHERE episode_id=? AND review_status='pending'").run(episodeId);
+  saveCandidateGeneration(input: {
+    episodeId: string;
+    transcriptRevision: number;
+    mode: "heuristic" | "analysis";
+    analysisArtifactId: string | null;
+    provider: ProviderProvenance | null;
+    strategy: "replace_pending" | "append_pending";
+    generationVersion: string;
+    requestedCount: number;
+    proposals: ClipCandidate[];
+    diagnostic: CandidateGenerationDiagnostic;
+  }): CandidateGenerationResult {
+    return this.db.transaction(() => {
+      const existing = (this.db.prepare(`
+        SELECT c.*, EXISTS(
+          SELECT 1 FROM analysis_artifacts a
+          WHERE a.entity_id=c.id AND a.owner_type='candidate'
+            AND a.kind='content_package' AND a.accepted_projection_json IS NOT NULL
+        ) has_accepted_copy
+        FROM candidates c WHERE c.episode_id=? AND c.state='active'
+      `).all(input.episodeId) as Row[]).map((row) => ({
+        candidate: mapCandidate(row),
+        hasAcceptedCopy: bool(row.has_accepted_copy)
+      }));
+      const retainedDecisions = existing.filter(
+        ({ candidate, hasAcceptedCopy }) =>
+          candidate.reviewStatus !== "pending" || hasAcceptedCopy
+      ).map(({ candidate }) => candidate);
+      const retainedPending = input.strategy === "append_pending"
+        ? existing.filter(
+          ({ candidate, hasAcceptedCopy }) =>
+            candidate.reviewStatus === "pending" && !hasAcceptedCopy
+        ).map(({ candidate }) => candidate)
+        : [];
+      let retainedDecisionConflictCount = 0;
+      let retainedPendingConflictCount = 0;
+      const novel = input.proposals.filter((proposal) => {
+        if (retainedDecisions.some((candidate) => candidatesConflict(candidate, proposal))) {
+          retainedDecisionConflictCount++;
+          return false;
+        }
+        if (retainedPending.some((candidate) => candidatesConflict(candidate, proposal))) {
+          retainedPendingConflictCount++;
+          return false;
+        }
+        return true;
+      });
+      const now = new Date().toISOString();
+      if (input.strategy === "replace_pending") {
+        this.db.prepare(`
+          UPDATE candidates SET state='superseded',revision=revision+1,updated_at=?
+          WHERE episode_id=? AND state='active' AND review_status='pending'
+            AND NOT EXISTS (
+              SELECT 1 FROM analysis_artifacts a
+              WHERE a.entity_id=candidates.id AND a.owner_type='candidate'
+                AND a.kind='content_package' AND a.accepted_projection_json IS NOT NULL
+            )
+        `).run(now, input.episodeId);
+      }
+      const runId = randomUUID();
+      const diagnostic: CandidateGenerationDiagnostic = novel.length >= 5
+        ? { sufficient: true, requestedCount: input.requestedCount, generatedCount: novel.length }
+        : {
+          ...(input.diagnostic.sufficient
+            ? {
+              sufficient: false as const,
+              code: "INSUFFICIENT_NOVEL_MATERIAL" as const,
+              minimumCandidateCount: 5 as const,
+              requestedCount: input.requestedCount,
+              generatedCount: novel.length,
+              eligibleWindowCount: input.proposals.length,
+              rejectionCounts: {
+                duration: 0, quality: 0, overlap: 0, semanticDuplication: 0
+              }
+            }
+            : { ...input.diagnostic, generatedCount: novel.length }),
+          code: input.diagnostic.sufficient
+            ? "INSUFFICIENT_NOVEL_MATERIAL" as const
+            : input.diagnostic.code
+        };
+      const run: CandidateGenerationRun = {
+        id: runId,
+        episodeId: input.episodeId,
+        transcriptRevision: input.transcriptRevision,
+        mode: input.mode,
+        analysisArtifactId: input.analysisArtifactId,
+        provider: input.provider,
+        strategy: input.strategy,
+        generationVersion: input.generationVersion,
+        requestedCount: input.requestedCount,
+        proposedCount: input.proposals.length,
+        insertedCount: novel.length,
+        retainedDecisionConflictCount,
+        retainedPendingConflictCount,
+        diagnostic,
+        createdAt: now
+      };
+      this.db.prepare(`
+        INSERT INTO candidate_generation_runs(
+          id,episode_id,transcript_revision,mode,analysis_artifact_id,
+          provider_provenance_json,strategy,generation_version,requested_count,
+          proposed_count,inserted_count,retained_decision_conflict_count,
+          retained_pending_conflict_count,diagnostic_json,created_at
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      `).run(
+        run.id, run.episodeId, run.transcriptRevision, run.mode, run.analysisArtifactId,
+        run.provider ? JSON.stringify(run.provider) : null, run.strategy,
+        run.generationVersion, run.requestedCount, run.proposedCount, run.insertedCount,
+        run.retainedDecisionConflictCount, run.retainedPendingConflictCount,
+        JSON.stringify(run.diagnostic), run.createdAt
+      );
       const insert = this.db.prepare(`
         INSERT INTO candidates(id,episode_id,start_ms,end_ms,transcript,topic,hook,reason,
           score,scores_json,duplicate_group,review_status,created_at,generation_artifact_id,
-          transcript_revision,generation_version,provider_provenance_json)
+          transcript_revision,generation_version,provider_provenance_json,generation_run_id,
+          revision,state,updated_at)
         VALUES(@id,@episodeId,@startMs,@endMs,@transcript,@topic,@hook,@reason,
           @score,@scores,@duplicateGroup,@reviewStatus,@createdAt,@artifactId,
-          @transcriptRevision,@generationVersion,@provider)
+          @transcriptRevision,@generationVersion,@provider,@generationRunId,
+          @revision,@state,@updatedAt)
       `);
-      candidates.forEach((candidate) => insert.run({
+      const inserted = novel.map((candidate) => ({
+        ...candidate,
+        generationRunId: runId,
+        revision: 1,
+        state: "active" as const,
+        updatedAt: now
+      }));
+      inserted.forEach((candidate) => {
+        insert.run({
         ...candidate,
         scores: JSON.stringify(candidate.scores),
         artifactId: candidate.generationProvenance.artifactId,
@@ -611,13 +731,88 @@ export class Repository {
         provider: candidate.generationProvenance.provider
           ? JSON.stringify(candidate.generationProvenance.provider)
           : null
-      }));
+        });
+        this.insertCandidateContentPackage(candidate, runId);
+      });
+      return { candidates: inserted, diagnostic, run };
     })();
+  }
+
+  /** Compatibility helper for repository fixtures; production generation uses saveCandidateGeneration. */
+  replaceCandidates(episodeId: string, candidates: ClipCandidate[]): void {
+    this.db.transaction(() => {
+      const now = new Date().toISOString();
+      this.db.prepare(`
+        UPDATE candidates SET state='superseded',revision=revision+1,updated_at=?
+        WHERE episode_id=? AND state='active' AND review_status='pending'
+      `).run(now, episodeId);
+      const insert = this.db.prepare(`
+        INSERT INTO candidates(id,episode_id,start_ms,end_ms,transcript,topic,hook,reason,
+          score,scores_json,duplicate_group,review_status,created_at,generation_artifact_id,
+          transcript_revision,generation_version,provider_provenance_json,generation_run_id,
+          revision,state,updated_at)
+        VALUES(@id,@episodeId,@startMs,@endMs,@transcript,@topic,@hook,@reason,
+          @score,@scores,@duplicateGroup,@reviewStatus,@createdAt,@artifactId,
+          @transcriptRevision,@generationVersion,@provider,@generationRunId,
+          @revision,@state,@updatedAt)
+      `);
+      for (const candidate of candidates) {
+        insert.run({
+          ...candidate,
+          scores: JSON.stringify(candidate.scores),
+          artifactId: candidate.generationProvenance.artifactId,
+          transcriptRevision: candidate.generationProvenance.transcriptRevision,
+          generationVersion: candidate.generationProvenance.generationVersion,
+          provider: candidate.generationProvenance.provider
+            ? JSON.stringify(candidate.generationProvenance.provider)
+            : null
+        });
+        this.insertCandidateContentPackage(candidate, candidate.generationRunId ?? "legacy");
+      }
+    })();
+  }
+
+  private insertCandidateContentPackage(candidate: ClipCandidate, runId: string): void {
+    const proposed: ContentPackage = {
+      cleanedTranscript: candidate.transcript,
+      rewrite: "",
+      hookVariants: [candidate.hook],
+      titles: [candidate.topic],
+      description: "",
+      hashtags: [],
+      thumbnailText: ""
+    };
+    const provenance = candidate.generationProvenance.provider ?? {
+      provider: "short-editor",
+      providerClass: "local" as const,
+      modelId: "candidate-content-seed",
+      providerVersion: candidate.generationProvenance.generationVersion,
+      optionsVersion: "1",
+      createdAt: candidate.createdAt
+    };
+    const identity = JSON.stringify({
+      transcriptRevision: candidate.generationProvenance.transcriptRevision,
+      generationRunId: runId,
+      generationVersion: candidate.generationProvenance.generationVersion,
+      analysisArtifactId: candidate.generationProvenance.artifactId,
+      provider: provenance,
+      proposed: normalizedContentPackageIdentity(proposed)
+    });
+    this.db.prepare(`
+      INSERT INTO analysis_artifacts(
+        id,entity_id,owner_type,kind,state,provenance_json,input_hash,
+        raw_output_json,accepted_projection_json,created_at
+      ) VALUES(?,?,'candidate','content_package','proposed',?,?,?,NULL,?)
+    `).run(
+      randomUUID(), candidate.id, JSON.stringify(provenance),
+      createHash("sha256").update(identity).digest("hex"),
+      JSON.stringify(proposed), candidate.createdAt
+    );
   }
 
   listCandidates(episodeId: string): ClipCandidate[] {
     return (this.db.prepare(
-      "SELECT * FROM candidates WHERE episode_id=?"
+      "SELECT * FROM candidates WHERE episode_id=? AND state='active'"
     ).all(episodeId) as Row[]).map(mapCandidate).sort(compareCandidates);
   }
 
@@ -627,19 +822,91 @@ export class Repository {
     return mapCandidate(row);
   }
 
-  reviewCandidate(id: string, status: "approved" | "rejected"): ClipCandidate {
-    const info = this.db.prepare("UPDATE candidates SET review_status=? WHERE id=?").run(status, id);
-    if (!info.changes) throw new AppError("NOT_FOUND", "Candidate not found", 404);
-    return this.getCandidate(id);
+  reviewCandidate(
+    id: string,
+    expectedRevision: number,
+    status: "approved" | "rejected"
+  ): ClipCandidate {
+    return this.db.transaction(() => {
+      const current = this.getCandidate(id);
+      if (current.revision !== expectedRevision) {
+        throw revisionConflict("Candidate", expectedRevision, current.revision);
+      }
+      if (current.state !== "active") {
+        throw new AppError("INVALID_STATE", "Superseded Candidate cannot be reviewed", 409);
+      }
+      const now = new Date().toISOString();
+      const info = this.db.prepare(`
+        UPDATE candidates SET review_status=?,revision=revision+1,updated_at=?
+        WHERE id=? AND revision=? AND state='active'
+      `).run(status, now, id, expectedRevision);
+      if (!info.changes) throw revisionConflict("Candidate", expectedRevision, current.revision);
+      return this.getCandidate(id);
+    })();
+  }
+
+  getCandidateContentPackage(id: string): CandidateContentPackage {
+    const candidate = this.getCandidate(id);
+    const row = this.db.prepare(`
+      SELECT * FROM analysis_artifacts
+      WHERE entity_id=? AND owner_type='candidate' AND kind='content_package'
+      ORDER BY created_at DESC LIMIT 1
+    `).get(id) as Row | undefined;
+    if (!row) throw new AppError("NOT_FOUND", "Candidate content package not found", 404);
+    return {
+      candidateId: id,
+      candidateRevision: candidate.revision,
+      proposalArtifactId: String(row.id),
+      proposed: json<ContentPackage>(row.raw_output_json),
+      accepted: row.accepted_projection_json
+        ? json<ContentPackage>(row.accepted_projection_json)
+        : null,
+      proposalProvenance: json<ProviderProvenance>(row.provenance_json),
+      inputHash: String(row.input_hash)
+    };
+  }
+
+  acceptCandidateContentPackage(
+    id: string,
+    expectedRevision: number,
+    contentPackage: ContentPackage
+  ): CandidateContentPackage {
+    return this.db.transaction(() => {
+      const current = this.getCandidate(id);
+      if (current.revision !== expectedRevision) {
+        throw revisionConflict("Candidate", expectedRevision, current.revision);
+      }
+      if (current.state !== "active") {
+        throw new AppError("INVALID_STATE", "Superseded Candidate copy cannot be accepted", 409);
+      }
+      const artifact = this.db.prepare(`
+        SELECT id FROM analysis_artifacts
+        WHERE entity_id=? AND owner_type='candidate' AND kind='content_package'
+        ORDER BY created_at DESC LIMIT 1
+      `).get(id) as { id: string } | undefined;
+      if (!artifact) throw new AppError("NOT_FOUND", "Candidate content package not found", 404);
+      this.db.prepare(`
+        UPDATE analysis_artifacts
+        SET accepted_projection_json=?,state='accepted' WHERE id=?
+      `).run(JSON.stringify(contentPackage), artifact.id);
+      const now = new Date().toISOString();
+      const changed = this.db.prepare(`
+        UPDATE candidates SET revision=revision+1,updated_at=?
+        WHERE id=? AND revision=? AND state='active'
+      `).run(now, id, expectedRevision);
+      if (!changed.changes) throw revisionConflict("Candidate", expectedRevision, current.revision);
+      return this.getCandidateContentPackage(id);
+    })();
   }
 
   createShort(project: ShortProject): ShortProject {
     this.db.prepare(`
       INSERT INTO short_projects(id,episode_id,candidate_id,title,source_ranges_json,
         template_id,composition_json,copy_json,approved,revision,created_at,updated_at,
-        template_lineage_json,captions_json,audio_json)
+        template_lineage_json,captions_json,audio_json,copy_state,copy_source)
       VALUES(@id,@episodeId,@candidateId,@title,@sourceRanges,@templateId,@composition,
-        @copy,@approved,@revision,@createdAt,@updatedAt,@templateLineage,@captions,@audio)
+        @copy,@approved,@revision,@createdAt,@updatedAt,@templateLineage,@captions,@audio,
+        @copyState,@copySource)
     `).run({
       ...project, sourceRanges: JSON.stringify(project.sourceRanges),
       composition: JSON.stringify(project.composition), copy: JSON.stringify(project.copy),
@@ -665,6 +932,8 @@ export class Repository {
     sourceRanges?: ShortProject["sourceRanges"];
     captions?: ShortProject["captions"];
     audio?: ShortProject["audio"];
+    copyState?: ShortProject["copyState"];
+    copySource?: ShortProject["copySource"];
   }): ShortProject {
     return this.db.transaction(() => {
       const current = this.getShort(id);
@@ -682,18 +951,21 @@ export class Repository {
       const next = {
         ...current,
         ...patch,
+        copyState: patch.copy !== undefined ? (patch.copyState ?? "accepted") : current.copyState,
+        copySource: patch.copy !== undefined ? (patch.copySource ?? "user_accepted") : current.copySource,
         approved: renderAffecting ? false : (patch.approved ?? current.approved),
         revision: current.revision + 1,
         updatedAt: new Date().toISOString()
       };
       const update = this.db.prepare(`
         UPDATE short_projects SET title=?,source_ranges_json=?,composition_json=?,captions_json=?,
-          audio_json=?,copy_json=?,approved=?,revision=?,updated_at=?
+          audio_json=?,copy_json=?,copy_state=?,copy_source=?,approved=?,revision=?,updated_at=?
         WHERE id=? AND revision=?
       `).run(
         next.title, JSON.stringify(next.sourceRanges), JSON.stringify(next.composition),
         JSON.stringify(next.captions), JSON.stringify(next.audio), JSON.stringify(next.copy),
-        next.approved ? 1 : 0, next.revision, next.updatedAt, id, expectedRevision
+        next.copyState, next.copySource, next.approved ? 1 : 0, next.revision,
+        next.updatedAt, id, expectedRevision
       );
       if (!update.changes) throw revisionConflict("Short", expectedRevision, current.revision);
       if (renderAffecting) {
@@ -1188,7 +1460,11 @@ function mapCandidate(row: Row): ClipCandidate {
         ? json<ClipCandidate["generationProvenance"]["provider"]>(row.provider_provenance_json)
         : null
     },
-    createdAt: String(row.created_at)
+    generationRunId: row.generation_run_id ? String(row.generation_run_id) : null,
+    revision: Number(row.revision),
+    state: row.state as ClipCandidate["state"],
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at)
   };
 }
 
@@ -1205,8 +1481,23 @@ function mapShort(row: Row): ShortProject {
     captions: json<ShortProject["captions"]>(row.captions_json),
     audio: json<ShortProject["audio"]>(row.audio_json),
     copy: JSON.parse(String(row.copy_json)),
+    copyState: row.copy_state as ShortProject["copyState"],
+    copySource: row.copy_source as ShortProject["copySource"],
     approved: bool(row.approved), revision: Number(row.revision),
     createdAt: String(row.created_at), updatedAt: String(row.updated_at)
+  };
+}
+
+function normalizedContentPackageIdentity(content: ContentPackage): ContentPackage {
+  const normalize = (value: string) => value.trim().replace(/\s+/g, " ");
+  return {
+    cleanedTranscript: normalize(content.cleanedTranscript),
+    rewrite: normalize(content.rewrite),
+    hookVariants: content.hookVariants.map(normalize),
+    titles: content.titles.map(normalize),
+    description: normalize(content.description),
+    hashtags: content.hashtags.map(normalize),
+    thumbnailText: normalize(content.thumbnailText)
   };
 }
 

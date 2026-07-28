@@ -575,10 +575,13 @@ absorb a downstream task.
   exceeding the respective 100%/80%/60%/75% thresholds. Full `npm test`
   (27 files, 171 tests), `npm run build`, and `git diff --check` pass.
   Interactive macOS and native Windows evidence remains assigned to
-  UI-01.2/WIN-03.3; append/replace strategies and reviewed-decision conflict
-  handling remain TRC-03.
+  UI-01.2/WIN-03.3. Append/replace strategies and reviewed-decision conflict
+  handling are completed by TRC-03 below.
 
 ### TRC-03 — Preserve decisions and accepted copy across regeneration
+
+- **Status:** Implemented 2026-07-27. Interactive Candidate UI validation remains
+  assigned to UI-01.2/WIN-03.3.
 
 - **SPEC / gates:** 2.2, 5.3, 6.3–6.4; G3, G5.
 - **Prerequisites / unblocks:** TRC-02 and PRO-05 for cloud paths; unblocks robust
@@ -604,6 +607,22 @@ absorb a downstream task.
   a stale edit and inspect recovery. Capture macOS evidence; defer to WIN-03.3.
 - **Evidence / acceptance:** Before/after fixture proves all reviewed decisions
   and user edits persist while new proposals remain visibly pending.
+- **Completion evidence (2026-07-27):** Migration 7 adds durable
+  `candidate_generation_runs`, Candidate run/revision/state lineage, immutable
+  proposed and nullable accepted Candidate content-package artifacts, and
+  accepted/proposed Short copy state/source metadata. Generation now requires
+  `replace_pending` or `append_pending`, suppresses temporal/semantic conflicts
+  against retained decisions (and active pending proposals for append), keeps
+  superseded rows for stale-write detection, and returns run counts plus an
+  explicit `INSUFFICIENT_NOVEL_MATERIAL` diagnostic. Candidate review and
+  whole-package acceptance/edit use optimistic revisions through service, HTTP,
+  and MCP. [`tests/migrations.test.ts`](tests/migrations.test.ts) and
+  [`tests/candidate-integration.test.ts`](tests/candidate-integration.test.ts)
+  cover upgrade compatibility, both strategies, reviewed/accepted retention,
+  provider switches, rollback, proposal immutability, Short seeding, public
+  schemas, and both mutation orders around regeneration. Full `npm test`
+  (27 files, 178 tests), `npm run build`, the Candidate corpus gate, and
+  `git diff --check` pass. UI-01.2/WIN-03.3 retain the interactive/native proof.
 
 ## Milestone 5 — Editing, templates, assets, crops, captions, and audio
 

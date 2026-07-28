@@ -100,7 +100,7 @@ describe("SPEC 5.1 entity contracts", () => {
       scores: { hook: .8, coherence: .8, payoff: .8, independence: .8, delivery: .8, visualActivity: .8 },
       duplicateGroup: null, reviewStatus: "approved",
       generationProvenance: { artifactId: null, transcriptRevision: 1, generationVersion: "v1", provider: provenance },
-      createdAt: now
+      generationRunId: null, revision: 1, state: "active", createdAt: now, updatedAt: now
     }],
     ["ShortProject", shortProjectSchema, {
       id: shortId, episodeId, candidateId, title: "Contracts",
@@ -119,6 +119,7 @@ describe("SPEC 5.1 entity contracts", () => {
         cleanedTranscript: "Complete thought.", rewrite: "", hookVariants: ["Hook"],
         titles: ["Title"], description: "", hashtags: [], thumbnailText: "Contracts"
       },
+      copyState: "accepted", copySource: "candidate_accepted",
       approved: true, revision: 1, createdAt: now, updatedAt: now
     }],
     ["Template", templateSchema, {
@@ -186,17 +187,24 @@ describe("SPEC 5.1 entity contracts", () => {
 describe("Candidate generation contracts", () => {
   it("defaults to heuristic mode and requires an artifact in analysis mode", () => {
     const episodeId = id();
-    expect(candidateGenerationInputSchema.parse({ episodeId })).toEqual({
+    expect(candidateGenerationInputSchema.safeParse({ episodeId }).success).toBe(false);
+    expect(candidateGenerationInputSchema.parse({
+      episodeId,
+      strategy: "replace_pending"
+    })).toEqual({
       episodeId,
       count: 8,
-      mode: "heuristic"
+      mode: "heuristic",
+      strategy: "replace_pending"
     });
     expect(candidateGenerationInputSchema.safeParse({
       episodeId,
+      strategy: "replace_pending",
       mode: "analysis"
     }).success).toBe(false);
     expect(candidateGenerationInputSchema.parse({
       episodeId,
+      strategy: "append_pending",
       mode: "analysis",
       analysisArtifactId: id()
     })).toMatchObject({ count: 8, mode: "analysis" });

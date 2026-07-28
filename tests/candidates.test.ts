@@ -9,7 +9,9 @@ import type { TranscriptSegment } from "../src/shared/domain";
 import { segments } from "./factories";
 
 const deterministic = (value: ReturnType<typeof generateCandidates>) =>
-  value.candidates.map(({ id: _id, createdAt: _createdAt, ...candidate }) => candidate);
+  value.candidates.map(({
+    id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...candidate
+  }) => candidate);
 
 function timedSegments(durations: number[], texts?: string[]): TranscriptSegment[] {
   let cursor = 0;

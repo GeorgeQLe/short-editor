@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { transcriptUpdateSegmentsSchema } from "../shared/domain.js";
+import { contentPackageSchema, transcriptUpdateSegmentsSchema } from "../shared/domain.js";
 
 const coreUrl = process.env.SHORT_EDITOR_CORE_URL ?? "http://127.0.0.1:43120/v1";
 const server = new McpServer({ name: "short-editor", version: "1.0.0" });
@@ -147,12 +147,20 @@ register("candidates.list", "List ranked highlight candidates for an episode.", 
 register("candidates.generate", "Generate 5–10 sentence-aligned, deduplicated candidates.", {
   episodeId: uuid,
   count: z.number().int().min(5).max(10).optional(),
+  strategy: z.enum(["replace_pending", "append_pending"]),
   mode: z.enum(["heuristic", "analysis"]).default("heuristic"),
   analysisArtifactId: uuid.optional()
 }, (input) => core("/candidates/generate", "POST", input));
 register("candidates.review", "Approve or reject a candidate.", {
-  candidateId: uuid, status: z.enum(["approved", "rejected"])
-}, ({ candidateId, status }) => core(`/candidates/${candidateId}/review`, "POST", { status }));
+  candidateId: uuid, expectedRevision, status: z.enum(["approved", "rejected"])
+}, ({ candidateId, ...input }) => core(`/candidates/${candidateId}/review`, "POST", input));
+register("candidates.get_content_package", "Read immutable proposed and accepted Candidate copy.", {
+  candidateId: uuid
+}, ({ candidateId }) => core(`/candidates/${candidateId}/content-package`));
+register("candidates.accept_content_package", "Atomically accept or edit a complete Candidate copy package.", {
+  candidateId: uuid, expectedRevision, contentPackage: contentPackageSchema
+}, ({ candidateId, ...input }) =>
+  core(`/candidates/${candidateId}/content-package`, "PUT", input));
 
 register("shorts.create", "Create a non-destructive Short project from an approved candidate.", {
   candidateId: uuid, templateId: z.string().optional()
@@ -163,7 +171,7 @@ register("shorts.update_composition", "Update composition using optimistic revis
   shortId: uuid, expectedRevision, composition: z.record(z.string(), z.unknown())
 }, ({ shortId, ...input }) => core(`/shorts/${shortId}/composition`, "PUT", input));
 register("shorts.update_copy", "Update accepted copy without overwriting other fields.", {
-  shortId: uuid, expectedRevision, copy: z.record(z.string(), z.unknown())
+  shortId: uuid, expectedRevision, copy: contentPackageSchema
 }, ({ shortId, ...input }) => core(`/shorts/${shortId}/copy`, "PUT", input));
 
 register("renders.start", "Queue a render for an approved, current Short revision.", {
