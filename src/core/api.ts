@@ -2,7 +2,11 @@ import cors from "cors";
 import { timingSafeEqual } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
-import { compositionSchema, scheduleRulesSchema, transcriptSegmentSchema } from "../shared/domain.js";
+import {
+  compositionSchema,
+  scheduleRulesSchema,
+  transcriptUpdateInputSchema
+} from "../shared/domain.js";
 import { AppError, errorEnvelope, normalizeError } from "../shared/errors.js";
 import {
   candidateGenerateInput,
@@ -102,9 +106,22 @@ export function createApi(service: CoreService, desktopToken?: string) {
   app.get("/v1/analysis/:episodeId/artifacts", route((req) =>
     service.listAnalysisArtifacts(id.parse(req.params.episodeId))
   ));
-  app.put("/v1/analysis/:episodeId/transcript", route((req) => service.setTranscript(
-    id.parse(req.params.episodeId), z.array(transcriptSegmentSchema).parse(req.body.segments)
-  )));
+  app.get("/v1/analysis/:episodeId/transcript", route((req) => {
+    const requestedRevision = asString(req.query.revision);
+    return service.getTranscript(
+      id.parse(req.params.episodeId),
+      requestedRevision === undefined ? undefined : revision.parse(Number(requestedRevision))
+    );
+  }));
+  app.put("/v1/analysis/:episodeId/transcript", route((req) => {
+    const input = transcriptUpdateInputSchema.parse(req.body);
+    return service.updateTranscript(
+      id.parse(req.params.episodeId),
+      input.expectedRevision,
+      input.language,
+      input.segments
+    );
+  }));
   app.get("/v1/jobs", (_req, res) => res.json(ok(service.listJobs())));
   app.post("/v1/jobs/:id/cancel", route((req) => service.cancelJob(id.parse(req.params.id))));
   app.get("/v1/candidates", route((req) => service.listCandidates(id.parse(req.query.episodeId))));

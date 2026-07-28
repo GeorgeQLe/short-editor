@@ -4,7 +4,7 @@ import type {
   ProviderProvenance, ScheduleEntry, ScheduleRuleSet, ShortProject, Template, TranscriptRevision,
   TranscriptSegment, WatchedFolder
 } from "../shared/domain.js";
-import { analysisArtifactSchema } from "../shared/domain.js";
+import { analysisArtifactSchema, timedSegmentsSchema } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
 import { assertEpisodeTransition, type RelinkContext } from "../shared/episode-transitions.js";
 import { randomUUID } from "node:crypto";
@@ -329,9 +329,9 @@ export class Repository {
     return row ? mapRelinkComparison(row) : undefined;
   }
 
-  replaceTranscript(episodeId: string, segments: TranscriptSegment[]): void {
+  replaceTranscript(episodeId: string, segments: TranscriptSegment[]): TranscriptRevision {
     const now = new Date().toISOString();
-    this.replaceTranscriptWithProvenance(episodeId, segments, "und", {
+    return this.replaceTranscriptWithProvenance(episodeId, segments, "und", {
       provider: "manual",
       providerClass: "local",
       modelId: "manual",
@@ -348,34 +348,156 @@ export class Repository {
     provenance: ProviderProvenance
   ): TranscriptRevision {
     return this.db.transaction(() => {
-      const episode = this.getEpisode(episodeId);
-      if (episode.status === "source_missing") {
-        throw new AppError("INVALID_STATE", "Cannot replace a transcript while its source is missing", 409);
-      }
-      this.db.prepare("DELETE FROM transcript_segments WHERE episode_id=?").run(episodeId);
-      const insert = this.db.prepare(`
-        INSERT INTO transcript_segments(id,episode_id,start_ms,end_ms,text,words_json,speaker,confidence)
-        VALUES(@id,@episodeId,@startMs,@endMs,@text,@words,@speaker,@confidence)
-      `);
-      for (const segment of segments) insert.run({
-        ...segment, episodeId, words: JSON.stringify(segment.words)
-      });
       const latest = this.db.prepare(
         "SELECT COALESCE(MAX(revision),0) revision FROM transcript_revisions WHERE episode_id=?"
       ).get(episodeId) as { revision: number };
+      return this.acceptTranscriptRevision(
+        episodeId,
+        latest.revision,
+        language,
+        segments,
+        provenance
+      );
+    })();
+  }
+
+  updateAcceptedTranscript(
+    episodeId: string,
+    expectedRevision: number,
+    language: string,
+    segments: TranscriptSegment[]
+  ): TranscriptRevision {
+    return this.db.transaction(() => {
+      const episode = this.getEpisode(episodeId);
+      if (episode.missing) {
+        throw new AppError(
+          "SOURCE_MISSING",
+          "Cannot edit a transcript while its source media is missing",
+          409,
+          { episodeId }
+        );
+      }
+      this.getTranscriptRevision(episodeId);
+      const now = new Date().toISOString();
+      return this.acceptTranscriptRevision(episodeId, expectedRevision, language, segments, {
+        provider: "manual",
+        providerClass: "local",
+        modelId: "manual-edit",
+        providerVersion: "1",
+        optionsVersion: "full-snapshot-v1",
+        createdAt: now
+      });
+    })();
+  }
+
+  acceptTranscriptRevision(
+    episodeId: string,
+    expectedRevision: number,
+    language: string,
+    segments: TranscriptSegment[],
+    provenance: ProviderProvenance
+  ): TranscriptRevision {
+    return this.db.transaction(() => {
+      const episode = this.getEpisode(episodeId);
+      if (episode.missing) {
+        throw new AppError(
+          "SOURCE_MISSING",
+          "Cannot edit a transcript while its source media is missing",
+          409,
+          { episodeId }
+        );
+      }
+      const currentRow = this.db.prepare(`
+        SELECT * FROM transcript_revisions
+        WHERE episode_id=? AND accepted_state='accepted'
+        LIMIT 1
+      `).get(episodeId) as Row | undefined;
+      const actualRevision = currentRow ? Number(currentRow.revision) : 0;
+      if (actualRevision !== expectedRevision) {
+        throw revisionConflict("Transcript", expectedRevision, actualRevision);
+      }
+      if (language.trim().length < 2) {
+        throw new AppError("VALIDATION_ERROR", "Transcript language must not be empty", 422);
+      }
+
+      const parsed = timedSegmentsSchema.safeParse(segments);
+      if (!parsed.success) {
+        throw new AppError("VALIDATION_ERROR", "Invalid transcript snapshot", 422,
+          parsed.error.issues.map(({ path, message }) => ({ path, message })));
+      }
+      if (new Set(parsed.data.map((segment) => segment.id)).size !== parsed.data.length) {
+        throw new AppError("VALIDATION_ERROR", "Transcript segment IDs must be unique", 422);
+      }
+      if (episode.durationMs !== null) {
+        const outside = parsed.data.findIndex((segment) => segment.endMs > episode.durationMs!);
+        if (outside !== -1) {
+          throw new AppError("VALIDATION_ERROR", "Transcript timing exceeds Episode duration", 422, [{
+            path: ["segments", outside, "endMs"],
+            message: "Segment timing must be within the Episode duration"
+          }]);
+        }
+      }
+
       const now = new Date().toISOString();
       const revision: TranscriptRevision = {
         id: randomUUID(),
         episodeId,
-        revision: latest.revision + 1,
-        language,
-        segments,
+        revision: actualRevision + 1,
+        language: language.trim(),
+        segments: parsed.data,
         provenance,
         acceptedState: "accepted",
         createdAt: now,
         updatedAt: now
       };
-      this.saveTranscriptRevision(revision, latest.revision);
+
+      this.db.prepare(`
+        UPDATE transcript_revisions SET accepted_state='superseded',updated_at=?
+        WHERE episode_id=? AND accepted_state='accepted'
+      `).run(now, episodeId);
+      this.db.prepare(`
+        INSERT INTO transcript_revisions(
+          id,episode_id,revision,language,segments_json,provenance_json,
+          accepted_state,created_at,updated_at
+        ) VALUES(@id,@episodeId,@revision,@language,@segments,@provenance,
+          'accepted',@createdAt,@updatedAt)
+      `).run({
+        ...revision,
+        segments: JSON.stringify(revision.segments),
+        provenance: JSON.stringify(revision.provenance)
+      });
+
+      this.db.prepare("DELETE FROM transcript_segments WHERE episode_id=?").run(episodeId);
+      const insert = this.db.prepare(`
+        INSERT INTO transcript_segments(id,episode_id,start_ms,end_ms,text,words_json,speaker,confidence)
+        VALUES(@id,@episodeId,@startMs,@endMs,@text,@words,@speaker,@confidence)
+      `);
+      for (const segment of revision.segments) insert.run({
+        ...segment,
+        episodeId,
+        words: JSON.stringify(segment.words)
+      });
+
+      this.db.prepare(`
+        UPDATE analysis_artifacts SET state='superseded'
+        WHERE entity_id=? AND owner_type='episode' AND kind='episode_analysis'
+          AND state IN ('proposed','accepted')
+      `).run(episodeId);
+      this.db.prepare(`
+        UPDATE short_projects SET approved=0,revision=revision+1,updated_at=?
+        WHERE episode_id=?
+      `).run(now, episodeId);
+      this.db.prepare(`
+        UPDATE renders SET state='stale',updated_at=?
+        WHERE state='succeeded' AND short_id IN (
+          SELECT id FROM short_projects WHERE episode_id=?
+        )
+      `).run(now, episodeId);
+      this.db.prepare(`
+        UPDATE schedule_entries
+        SET needs_rerender=1,revision=revision+1,updated_at=?
+        WHERE episode_id=? AND status<>'published'
+      `).run(now, episodeId);
       return revision;
     })();
   }
@@ -443,6 +565,28 @@ export class Repository {
       ORDER BY revision DESC LIMIT 1
     `).get(episodeId) as Row | undefined;
     if (!row) throw new AppError("INVALID_STATE", "Episode has no accepted transcript", 409);
+    return mapTranscriptRevision(row);
+  }
+
+  getTranscriptRevision(episodeId: string, revision?: number): TranscriptRevision {
+    this.getEpisode(episodeId);
+    const row = revision === undefined
+      ? this.db.prepare(`
+        SELECT * FROM transcript_revisions
+        WHERE episode_id=? AND accepted_state='accepted'
+        LIMIT 1
+      `).get(episodeId) as Row | undefined
+      : this.db.prepare(`
+        SELECT * FROM transcript_revisions WHERE episode_id=? AND revision=?
+      `).get(episodeId, revision) as Row | undefined;
+    if (!row) {
+      throw new AppError(
+        "NOT_FOUND",
+        revision === undefined ? "Accepted transcript not found" : "Transcript revision not found",
+        404,
+        revision === undefined ? { episodeId } : { episodeId, revision }
+      );
+    }
     return mapTranscriptRevision(row);
   }
 

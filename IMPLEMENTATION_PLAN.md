@@ -516,6 +516,17 @@ absorb a downstream task.
   schedule effects. Capture macOS evidence; deferred to UI-01.2 and WIN-03.3.
 - **Evidence / acceptance:** History remains queryable, one accepted projection
   is unambiguous, and downstream work binds to an explicit transcript revision.
+- **Implementation evidence (2026-07-27):** [`src/core/repository.ts`](src/core/repository.ts),
+  [`src/core/service.ts`](src/core/service.ts), [`src/core/api.ts`](src/core/api.ts),
+  [`src/mcp/server.ts`](src/mcp/server.ts), and
+  [`src/shared/contracts.ts`](src/shared/contracts.ts) implement immutable
+  accepted snapshots, exact/current reads, full-snapshot optimistic edits,
+  timing/order validation, manual provenance, privacy-safe errors, and atomic
+  analysis/Short/Render/schedule invalidation. [`tests/transcript-editing.test.ts`](tests/transcript-editing.test.ts)
+  covers repository, HTTP, and MCP behavior including nullable no-diarization
+  data, 1,001 segments, stale clients, history, and published-entry/raw-artifact
+  preservation. Full tests/build/diff checks pass; interactive macOS and native
+  Windows proof remains assigned to UI-01.2/WIN-03.3.
 
 ### TRC-02 — Make Candidate generation deterministic, diagnostic, and corpus-tested
 

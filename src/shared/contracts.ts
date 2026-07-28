@@ -119,15 +119,15 @@ export const providerProvenanceSchema = z.strictObject({
 export type ProviderProvenance = z.infer<typeof providerProvenanceSchema>;
 
 export const transcriptWordSchema = timeRangeSchema.extend({
-  text: z.string().min(1),
+  text: z.string().refine((text) => text.trim().length > 0, "Word text must not be empty"),
   confidence: confidenceSchema.optional(),
-  speaker: z.string().min(1).optional()
+  speaker: z.string().min(1).nullable().optional()
 });
 export type TranscriptWord = z.infer<typeof transcriptWordSchema>;
 
 export const transcriptSegmentSchema = timeRangeSchema.extend({
   id: idSchema,
-  text: z.string().min(1),
+  text: z.string().refine((text) => text.trim().length > 0, "Segment text must not be empty"),
   words: z.array(transcriptWordSchema),
   speaker: z.string().min(1).nullable(),
   confidence: confidenceSchema.nullable()
@@ -152,6 +152,55 @@ export const timedSegmentsSchema = z.array(transcriptSegmentSchema).min(1).super
     }
   }
 });
+
+export const transcriptUpdateSegmentSchema = timeRangeSchema.extend({
+  id: idSchema,
+  text: z.string().refine((text) => text.trim().length > 0, "Segment text must not be empty"),
+  words: z.array(transcriptWordSchema).nullable().optional().transform((words) => words ?? []),
+  speaker: z.string().min(1).nullable().optional().transform((speaker) => speaker ?? null),
+  confidence: confidenceSchema.nullable().optional().transform((confidence) => confidence ?? null)
+}).superRefine((segment, context) => {
+  let priorEnd = segment.startMs;
+  segment.words.forEach((word, index) => {
+    if (word.startMs < segment.startMs || word.endMs > segment.endMs) {
+      context.addIssue({
+        code: "custom",
+        path: ["words", index],
+        message: "Word timing must be within its segment"
+      });
+    }
+    if (word.startMs < priorEnd) {
+      context.addIssue({
+        code: "custom",
+        path: ["words", index, "startMs"],
+        message: "Words must be ordered and non-overlapping"
+      });
+    }
+    priorEnd = word.endMs;
+  });
+});
+
+export const transcriptUpdateSegmentsSchema = z.array(transcriptUpdateSegmentSchema)
+  .min(1)
+  .superRefine((segments, context) => {
+    for (let index = 1; index < segments.length; index++) {
+      if (segments[index]!.startMs < segments[index - 1]!.endMs) {
+        context.addIssue({
+          code: "custom",
+          path: [index, "startMs"],
+          message: "Segments must be ordered and non-overlapping"
+        });
+      }
+    }
+  });
+
+export const transcriptUpdateInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  language: z.string().trim().min(2),
+  segments: transcriptUpdateSegmentsSchema
+});
+export type TranscriptUpdateInput = z.infer<typeof transcriptUpdateInputSchema>;
+
 export const transcriptAcceptedStates = ["proposed", "accepted", "superseded"] as const;
 export const transcriptAcceptedStateSchema = z.enum(transcriptAcceptedStates);
 export const transcriptRevisionSchema = z.strictObject({

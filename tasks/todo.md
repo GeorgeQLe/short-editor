@@ -1,9 +1,11 @@
 # Current work
 
-- [ ] TRC-01 — Add accepted transcript revisions and safe editing.
+- [ ] TRC-02 — Make Candidate generation deterministic, diagnostic, and
+  corpus-tested.
 
 ## Completed
 
+- [x] TRC-01 — Add accepted transcript revisions and safe editing.
 - [x] PRO-05 — Implement OpenAI adapters, provenance, and cache identity.
 - [x] PRO-04 — Add Windows-protected credentials and persisted cloud
   authorization.

@@ -17,6 +17,8 @@ The current vertical slice includes:
   reporting, bounded cancellation/restart, and typed provider-operation results;
 - installed-model-only faster-whisper English transcription with normalized
   segment/word timing, explicit absent diarization, and local provenance;
+- immutable accepted transcript revisions with safe text/timing/speaker edits,
+  optimistic conflicts, exact history reads, and downstream invalidation;
 - configurable Ollama analysis plus explicitly authorized OpenAI transcription,
   diarization, and strict structured analysis with no silent model fallback;
 - versioned starter composition templates;

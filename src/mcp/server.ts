@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { transcriptUpdateSegmentsSchema } from "../shared/domain.js";
 
 const coreUrl = process.env.SHORT_EDITOR_CORE_URL ?? "http://127.0.0.1:43120/v1";
 const server = new McpServer({ name: "short-editor", version: "1.0.0" });
@@ -16,11 +17,14 @@ async function core(path: string, method: Method = "GET", body?: unknown): Promi
   });
   const payload = await response.json() as {
     data?: unknown;
-    error?: { code?: string; message?: string };
+    error?: { code?: string; message?: string; details?: unknown };
   };
   if (!response.ok) {
+    const details = payload.error?.details == null
+      ? ""
+      : ` ${JSON.stringify(payload.error.details)}`;
     throw new Error(
-      `${payload.error?.code ?? "CORE_ERROR"}: ${payload.error?.message ?? "Core request failed"}`
+      `${payload.error?.code ?? "CORE_ERROR"}: ${payload.error?.message ?? "Core request failed"}${details}`
     );
   }
   return payload.data;
@@ -113,6 +117,25 @@ register(
   "Report installed faster-whisper models and local transcription capabilities.",
   {},
   () => core("/analysis/local-transcription/status")
+);
+register(
+  "analysis.get_transcript",
+  "Get the currently accepted transcript or one exact immutable revision.",
+  { episodeId: uuid, revision: expectedRevision.optional() },
+  ({ episodeId, revision }) => core(
+    `/analysis/${episodeId}/transcript${revision === undefined ? "" : `?revision=${revision}`}`
+  )
+);
+register(
+  "analysis.update_transcript",
+  "Accept a complete transcript snapshot using optimistic revision control.",
+  {
+    episodeId: uuid,
+    expectedRevision,
+    language: z.string().trim().min(2),
+    segments: transcriptUpdateSegmentsSchema
+  },
+  ({ episodeId, ...input }) => core(`/analysis/${episodeId}/transcript`, "PUT", input)
 );
 register("jobs.list", "List durable jobs, progress, stages, and errors.", {},
   () => core("/jobs"));

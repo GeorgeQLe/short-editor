@@ -512,8 +512,22 @@ export class CoreService {
     })).digest("hex")}`;
   }
 
-  setTranscript(episodeId: string, segments: TranscriptSegment[]) {
-    return this.storeTranscript(episodeId, segments);
+  getTranscript(episodeId: string, revision?: number) {
+    return this.repository.getTranscriptRevision(episodeId, revision);
+  }
+
+  updateTranscript(
+    episodeId: string,
+    expectedRevision: number,
+    language: string,
+    segments: TranscriptSegment[]
+  ) {
+    return this.repository.updateAcceptedTranscript(
+      episodeId,
+      expectedRevision,
+      language,
+      segments
+    );
   }
 
   storeGeneratedTranscript(
@@ -533,8 +547,10 @@ export class CoreService {
   ) {
     return this.repository.transaction(() => {
       let episode = this.repository.getEpisode(episodeId);
-      if (episode.status === "source_missing") {
-        throw new AppError("INVALID_STATE", "Cannot transcribe an Episode with missing source media", 409);
+      if (episode.missing) {
+        throw new AppError("SOURCE_MISSING", "Cannot transcribe an Episode with missing source media", 409, {
+          episodeId
+        });
       }
       if (episode.status === "ready") {
         episode = this.repository.updateEpisodeStatus(episodeId, "analyzing");
@@ -550,9 +566,9 @@ export class CoreService {
         ? this.repository.replaceTranscriptWithProvenance(
           episodeId, segments, language, provenance
         )
-        : (this.repository.replaceTranscript(episodeId, segments), undefined);
+        : this.repository.replaceTranscript(episodeId, segments);
       this.repository.updateEpisodeStatus(episodeId, "ready");
-      return revision ?? segments;
+      return revision;
     });
   }
 

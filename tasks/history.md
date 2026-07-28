@@ -2,6 +2,22 @@
 
 ## 2026-07-27
 
+- Completed TRC-01 with immutable accepted transcript snapshots, exact/current
+  revision reads, full-snapshot optimistic edits, manual-edit provenance, and
+  validation for nonempty text plus ordered/bounded segment and word timing.
+- Added atomic transcript-dependent invalidation: accepted/proposed Episode
+  analysis is superseded, Short approval is cleared with a revision increment,
+  successful Renders become stale, and non-published schedule entries require
+  rerendering while published entries and raw transcript artifacts are
+  preserved.
+- Added typed HTTP and MCP transcript read/update operations with structured
+  conflict, validation, missing-source, and not-found errors that do not echo
+  transcript text.
+- Added repository, HTTP, and MCP fixtures covering manual corrections,
+  nullable no-diarization data, 1,001 segments, stale clients, invalid timing,
+  dependent invalidation, exact history, and privacy. Full `npm test` (25 files,
+  160 tests), `npm run build`, credential-signature scan, and `git diff --check`
+  pass.
 - Completed PRO-05 with an Electron-owned OpenAI HTTP adapter and a typed
   child-process bridge; plaintext credentials remain confined to Electron and
   inherited OpenAI credential environment variables are stripped from the core.
