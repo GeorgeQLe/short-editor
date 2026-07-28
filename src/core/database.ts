@@ -573,6 +573,29 @@ const migrations: readonly Migration[] = [
       ALTER TABLE renders ADD COLUMN sidecar_path TEXT;
       CREATE INDEX renders_preflight_idx ON renders(preflight_id);
     `)
+  },
+  {
+    version: 14,
+    name: "normalized render determinism evidence",
+    up: (db) => db.exec(`
+      ALTER TABLE renders ADD COLUMN determinism_json TEXT CHECK(
+        determinism_json IS NULL OR json_valid(determinism_json)
+      );
+      CREATE INDEX renders_determinism_identity_idx
+        ON renders(
+          json_extract(determinism_json, '$.identityHash'),
+          state,
+          created_at,
+          id
+        )
+        WHERE determinism_json IS NOT NULL;
+      UPDATE renders
+      SET state='stale',
+          error_code='INVALID_STATE',
+          error_message='Rerender required: this output predates normalized determinism evidence.',
+          updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      WHERE state='succeeded';
+    `)
   }
 ];
 

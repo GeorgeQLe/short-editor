@@ -108,6 +108,7 @@ function render(shortId: string, state: Render["state"] = "succeeded"): Render {
     outputPath: null,
     sidecarPath: null,
     validation: null,
+    determinism: null,
     state,
     error: null,
     contentHash: null,

@@ -933,6 +933,47 @@ export const renderValidationResultSchema = z.strictObject({
   validatedAt: utcInstantSchema
 });
 export type RenderValidationResult = z.infer<typeof renderValidationResultSchema>;
+export const RENDER_DETERMINISM_VERSION = "render-determinism-v1" as const;
+const sha256DigestSchema = z.string().regex(/^[0-9a-f]{64}$/);
+const normalizedStreamEvidenceSchema = z.strictObject({
+  sha256: sha256DigestSchema,
+  byteCount: z.number().int().positive()
+});
+export const renderDeterminismComparisons = ["baseline", "matched", "mismatch"] as const;
+export const renderDeterminismComparisonSchema = z.enum(renderDeterminismComparisons);
+export const renderDeterminismSchema = z.strictObject({
+  version: z.literal(RENDER_DETERMINISM_VERSION),
+  algorithm: z.literal("sha256"),
+  video: normalizedStreamEvidenceSchema.extend({
+    pixelFormat: z.literal("yuv420p"),
+    width: z.literal(1080),
+    height: z.literal(1920)
+  }),
+  audio: normalizedStreamEvidenceSchema.extend({
+    sampleFormat: z.literal("s16le"),
+    sampleRate: z.literal(48_000),
+    channels: z.literal(2)
+  }),
+  identityHash: sha256DigestSchema,
+  comparison: renderDeterminismComparisonSchema,
+  referenceRenderId: idSchema.nullable()
+}).superRefine((evidence, context) => {
+  if (evidence.comparison === "baseline" && evidence.referenceRenderId !== null) {
+    context.addIssue({
+      code: "custom",
+      path: ["referenceRenderId"],
+      message: "Baseline evidence cannot reference another Render"
+    });
+  }
+  if (evidence.comparison !== "baseline" && evidence.referenceRenderId === null) {
+    context.addIssue({
+      code: "custom",
+      path: ["referenceRenderId"],
+      message: "Compared evidence must reference the baseline Render"
+    });
+  }
+});
+export type RenderDeterminism = z.infer<typeof renderDeterminismSchema>;
 export const renderSchema = z.strictObject({
   id: idSchema,
   shortId: idSchema,
@@ -947,6 +988,7 @@ export const renderSchema = z.strictObject({
   outputPath: z.string().min(1).nullable(),
   sidecarPath: z.string().min(1).nullable(),
   validation: renderValidationResultSchema.nullable(),
+  determinism: renderDeterminismSchema.nullable(),
   state: renderStateSchema,
   error: z.strictObject({ code: apiErrorCodeSchema, message: z.string().min(1) }).nullable(),
   contentHash: nullableNonempty,

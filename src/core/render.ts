@@ -4,8 +4,16 @@ import { access, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { Job, RenderValidationResult } from "../shared/domain.js";
-import { renderValidationResultSchema } from "../shared/domain.js";
+import type {
+  Job,
+  Render,
+  RenderDeterminism,
+  RenderValidationResult
+} from "../shared/domain.js";
+import {
+  RENDER_DETERMINISM_VERSION,
+  renderValidationResultSchema
+} from "../shared/domain.js";
 import { AppError, normalizeError } from "../shared/errors.js";
 import type { ArtifactStore, ExternalArtifactReservation } from "./artifact-store.js";
 import { generateCaptionSidecars, type CaptionEngine } from "./captions.js";
@@ -17,6 +25,7 @@ import {
   type RenderSnapshot
 } from "./render-preflight.js";
 import type { Repository, StoredArtifact } from "./repository.js";
+import { canonicalJson } from "./analysis-cache.js";
 
 export interface RenderValidation {
   valid: boolean;
@@ -66,6 +75,9 @@ export interface RenderJobPayload {
   sidecarFormat: "srt" | "webvtt" | null;
 }
 
+export type PendingRenderDeterminism =
+  Omit<RenderDeterminism, "comparison" | "referenceRenderId">;
+
 export class CompositionRenderer {
   constructor(
     private readonly repository: Repository,
@@ -76,6 +88,11 @@ export class CompositionRenderer {
       ffmpegPath?: string;
       ffprobePath?: string;
       runVersion?: (binary: string) => Promise<string>;
+      normalize?: (
+        path: string,
+        ffmpegPath: string,
+        durationMs: number
+      ) => Promise<Omit<PendingRenderDeterminism, "identityHash">>;
     } = {}
   ) {}
 
@@ -95,6 +112,9 @@ export class CompositionRenderer {
     let reservation: ExternalArtifactReservation | undefined;
     const finalizedArtifacts: StoredArtifact[] = [];
     let workingDirectory: string | undefined;
+    let typedValidation: RenderValidationResult | null = null;
+    let normalized: Omit<PendingRenderDeterminism, "identityHash"> | null = null;
+    let completedEncoder: Render["encoder"] | null = null;
     try {
       const stored = this.repository.getRenderPreflight(payload.preflightId);
       const snapshot = renderSnapshotSchema.parse(stored.snapshot);
@@ -147,12 +167,29 @@ export class CompositionRenderer {
         throw staleRender(payload.projectRevision, project.revision);
       }
       this.jobs.progress(job.id, 0.9, "validating output");
-      let typedValidation!: RenderValidationResult;
+      const ffmpegBuildHash = await mediaDependencyBuildHash(ffmpegPath);
+      completedEncoder = {
+        ...render.encoder,
+        settings: {
+          ...(render.encoder.settings as Record<string, unknown>),
+          ffmpegBuildHash,
+          ffprobeVersion: snapshot.dependencyVersions.ffprobe,
+          graphVersion: RENDER_GRAPH_VERSION,
+          graphHash: graph.graphHash,
+          filterScriptHash: graph.graphHash
+        }
+      };
       const artifact = await this.artifacts.finalizeExternal(reservation, async (path) => {
         typedValidation = await validateRenderContract(path, ffprobePath);
         if (!typedValidation.valid) {
           throw new AppError("VALIDATION_ERROR", "Rendered media failed output validation", 422);
         }
+        this.jobs.progress(job.id, 0.93, "normalizing determinism evidence");
+        normalized = await (this.options.normalize ?? normalizeRender)(
+          path,
+          ffmpegPath,
+          typedValidation.durationMs!
+        );
       });
       finalizedArtifacts.push(artifact);
       reservation = undefined;
@@ -190,20 +227,19 @@ export class CompositionRenderer {
         this.repository.transitionRender(render.id, "running", { state: "cancelled" });
         return;
       }
+      if (typedValidation === null || normalized === null || completedEncoder === null) {
+        throw new AppError("INTERNAL_ERROR", "Render evidence was not completed");
+      }
+      const normalizedEvidence = normalized as Omit<PendingRenderDeterminism, "identityHash">;
       const completed = this.repository.completeRenderAttempt(render.id, payload.projectRevision, {
         outputPath: artifact.relativePath,
         sidecarPath,
         validation: typedValidation,
         contentHash: artifact.contentHash,
-        encoder: {
-          ...render.encoder,
-          settings: {
-            ...(render.encoder.settings as Record<string, unknown>),
-            ffprobeVersion: snapshot.dependencyVersions.ffprobe,
-            graphVersion: RENDER_GRAPH_VERSION,
-            graphHash: graph.graphHash,
-            filterScriptHash: graph.graphHash
-          }
+        encoder: completedEncoder,
+        determinism: {
+          ...normalizedEvidence,
+          identityHash: renderDeterminismIdentity(render.decisionHash!, completedEncoder)
         }
       });
       if (completed.state === "stale") {
@@ -214,6 +250,17 @@ export class CompositionRenderer {
         throw staleRender(
           payload.projectRevision,
           this.repository.getShort(payload.shortId).revision
+        );
+      }
+      if (completed.state === "failed") {
+        for (const finalized of finalizedArtifacts.reverse()) {
+          this.artifacts.discardFinalized(finalized);
+        }
+        finalizedArtifacts.length = 0;
+        throw new AppError(
+          "ARTIFACT_CORRUPT",
+          "Normalized render content does not match the established baseline",
+          422
         );
       }
       finalizedArtifacts.length = 0;
@@ -228,6 +275,8 @@ export class CompositionRenderer {
         const normalized = normalizeError(error);
         this.repository.transitionRender(render.id, "running", {
           state: this.jobs.cancellationRequested(job.id) ? "cancelled" : "failed",
+          ...(typedValidation === null ? {} : { validation: typedValidation }),
+          ...(completedEncoder === null ? {} : { encoder: completedEncoder }),
           error: this.jobs.cancellationRequested(job.id)
             ? { code: "JOB_CANCELLED", message: "Render was cancelled" }
             : { code: normalized.code, message: safeRenderError(normalized) }
@@ -261,6 +310,110 @@ export class CompositionRenderer {
       );
     }
   }
+}
+
+export function renderDeterminismIdentity(
+  decisionHash: string,
+  encoder: Render["encoder"]
+): string {
+  return createHash("sha256").update(canonicalJson({
+    version: RENDER_DETERMINISM_VERSION,
+    decisionHash,
+    encoder
+  })).digest("hex");
+}
+
+export async function normalizeRender(
+  path: string,
+  ffmpegPath = process.env.SHORT_EDITOR_FFMPEG ?? "ffmpeg",
+  durationMs = 180_000
+): Promise<Omit<PendingRenderDeterminism, "identityHash">> {
+  const videoBytesPerFrame = 1080 * 1920 * 3 / 2;
+  const videoLimit = Math.ceil(durationMs / 1000 * 31 + 2) * videoBytesPerFrame;
+  const audioLimit = Math.ceil((durationMs + 1_000) / 1000 * 48_000 * 2 * 2);
+  try {
+    const video = await hashDecodedStream(ffmpegPath, [
+      "-v", "error", "-nostdin", "-threads", "1", "-i", path,
+      "-map", "0:v:0", "-map_metadata", "-1", "-map_chapters", "-1",
+      "-an", "-sn", "-dn", "-vf", "format=pix_fmts=yuv420p",
+      "-fps_mode", "passthrough", "-bitexact", "-f", "rawvideo", "pipe:1"
+    ], videoLimit);
+    const audio = await hashDecodedStream(ffmpegPath, [
+      "-v", "error", "-nostdin", "-threads", "1", "-i", path,
+      "-map", "0:a:0", "-map_metadata", "-1", "-map_chapters", "-1",
+      "-vn", "-sn", "-dn", "-ac", "2", "-ar", "48000",
+      "-c:a", "pcm_s16le", "-bitexact", "-f", "s16le", "pipe:1"
+    ], audioLimit);
+    return {
+      version: RENDER_DETERMINISM_VERSION,
+      algorithm: "sha256",
+      video: {
+        pixelFormat: "yuv420p",
+        width: 1080,
+        height: 1920,
+        ...video
+      },
+      audio: {
+        sampleFormat: "s16le",
+        sampleRate: 48_000,
+        channels: 2,
+        ...audio
+      }
+    };
+  } catch {
+    throw new AppError(
+      "ARTIFACT_CORRUPT",
+      "Render normalization failed",
+      422
+    );
+  }
+}
+
+function hashDecodedStream(
+  binary: string,
+  args: string[],
+  byteLimit: number
+): Promise<{ sha256: string; byteCount: number }> {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(binary, args, {
+      shell: false,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    const hash = createHash("sha256");
+    let byteCount = 0;
+    let stderrBytes = 0;
+    let settled = false;
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      if (child.exitCode === null) child.kill("SIGKILL");
+      reject(new Error("normalization failed"));
+    };
+    child.stdout.on("data", (chunk: Buffer) => {
+      if (settled) return;
+      byteCount += chunk.byteLength;
+      if (byteCount > byteLimit || !Number.isSafeInteger(byteCount)) {
+        fail();
+        return;
+      }
+      hash.update(chunk);
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderrBytes = Math.min(64_000, stderrBytes + chunk.byteLength);
+    });
+    child.on("error", fail);
+    child.on("close", (code) => {
+      void stderrBytes;
+      if (settled) return;
+      settled = true;
+      if (code !== 0 || byteCount === 0) {
+        reject(new Error("normalization failed"));
+        return;
+      }
+      resolvePromise({ sha256: hash.digest("hex"), byteCount });
+    });
+  });
 }
 
 async function validateRenderContract(
@@ -339,6 +492,11 @@ async function dependencyVersion(binary: string): Promise<string> {
   const version = parseDependencyVersion(result.stdout);
   if (!version) throw new AppError("DEPENDENCY_UNAVAILABLE", "Media dependency version is unavailable", 503);
   return version;
+}
+
+async function mediaDependencyBuildHash(binary: string): Promise<string> {
+  const result = await runProcess(binary, ["-version"], 64_000);
+  return `sha256:${createHash("sha256").update(result.stdout).digest("hex")}`;
 }
 
 function runFfmpeg(

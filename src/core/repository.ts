@@ -3,11 +3,13 @@ import type {
   AnalysisArtifact, Asset, CandidateContentPackage, CandidateGenerationDiagnostic,
   CandidateGenerationResult, CandidateGenerationRun, ClipCandidate, Composition,
   ContentPackage, Episode, Job, Render, RenderPreflightResult,
+  RenderDeterminism,
   ProviderProvenance, ScheduleEntry, ScheduleRuleSet, ShortProject, Template, TranscriptRevision,
   TranscriptSegment, WatchedFolder
 } from "../shared/domain.js";
 import {
   analysisArtifactSchema,
+  renderDeterminismSchema,
   renderPreflightResultSchema,
   sourceRangesSchema,
   timedSegmentsSchema
@@ -1301,16 +1303,25 @@ export class Repository {
     if (render.outputPath !== null) {
       render = { ...render, outputPath: validateOwnedRelativePath(render.outputPath) };
     }
+    if (render.determinism !== null) {
+      render = {
+        ...render,
+        determinism: renderDeterminismSchema.parse(render.determinism)
+      };
+    }
     this.db.prepare(`
       INSERT INTO renders(
-        id,short_id,project_revision,preflight_id,output_path,sidecar_path,encoder_json,validation_json,state,
+        id,short_id,project_revision,preflight_id,output_path,sidecar_path,encoder_json,validation_json,
+        determinism_json,state,
         error_code,error_message,content_hash,decision_hash,attempt,created_at,updated_at
-      ) VALUES(@id,@shortId,@projectRevision,@preflightId,@outputPath,@sidecarPath,@encoder,@validation,@state,
+      ) VALUES(@id,@shortId,@projectRevision,@preflightId,@outputPath,@sidecarPath,@encoder,@validation,
+        @determinism,@state,
         @errorCode,@errorMessage,@contentHash,@decisionHash,@attempt,@createdAt,@updatedAt)
     `).run({
       ...render,
       encoder: JSON.stringify(render.encoder),
       validation: render.validation === null ? null : JSON.stringify(render.validation),
+      determinism: render.determinism === null ? null : JSON.stringify(render.determinism),
       errorCode: render.error?.code ?? null,
       errorMessage: render.error?.message ?? null,
       attempt
@@ -1383,6 +1394,7 @@ export class Repository {
         outputPath: null,
         sidecarPath: null,
         validation: null,
+        determinism: null,
         state: "queued",
         error: null,
         contentHash: null,
@@ -1426,7 +1438,7 @@ export class Repository {
     patch: Partial<Pick<
       Render,
       "state" | "outputPath" | "sidecarPath" | "validation" | "error" |
-      "contentHash" | "decisionHash" | "encoder"
+      "contentHash" | "decisionHash" | "encoder" | "determinism"
     >>
   ): Render {
     return this.transaction(() => {
@@ -1444,15 +1456,19 @@ export class Repository {
           : patch.sidecarPath === null ? null : validateOwnedRelativePath(patch.sidecarPath),
         updatedAt: new Date().toISOString()
       };
+      if (next.determinism !== null) {
+        next.determinism = renderDeterminismSchema.parse(next.determinism);
+      }
       const result = this.db.prepare(`
         UPDATE renders SET output_path=?,sidecar_path=?,encoder_json=?,validation_json=?,
-          state=?,error_code=?,error_message=?,content_hash=?,decision_hash=?,updated_at=?
+          determinism_json=?,state=?,error_code=?,error_message=?,content_hash=?,decision_hash=?,updated_at=?
         WHERE id=? AND state=?
       `).run(
         next.outputPath,
         next.sidecarPath,
         JSON.stringify(next.encoder),
         next.validation === null ? null : JSON.stringify(next.validation),
+        next.determinism === null ? null : JSON.stringify(next.determinism),
         next.state,
         next.error?.code ?? null,
         next.error?.message ?? null,
@@ -1472,26 +1488,77 @@ export class Repository {
   completeRenderAttempt(
     id: string,
     expectedRevision: number,
-    patch: Pick<
+    patch: Omit<Pick<
       Render,
       "outputPath" | "sidecarPath" | "validation" | "contentHash" | "encoder"
-    >
+    >, "validation"> & {
+      validation: NonNullable<Render["validation"]>;
+      determinism: Omit<RenderDeterminism, "comparison" | "referenceRenderId">;
+    }
   ): Render {
-    return this.transaction(() => {
+    return this.db.transaction(() => {
       const render = this.getRender(id);
       if (render.state !== "running") {
         throw new AppError("INVALID_STATE", "Render is not running", 409);
       }
       const project = this.getShort(render.shortId);
       if (project.revision !== expectedRevision || !project.approved) {
-        return this.transitionRender(id, "running", { state: "stale" });
+        return this.transitionRender(id, "running", {
+          state: "stale",
+          validation: patch.validation,
+          encoder: patch.encoder
+        });
+      }
+      if (!patch.validation.valid) {
+        throw new AppError("VALIDATION_ERROR", "Render completion requires passing validation", 422);
+      }
+      const referenceRow = this.db.prepare(`
+        SELECT * FROM renders
+        WHERE id<>? AND state='succeeded'
+          AND json_extract(determinism_json, '$.identityHash')=?
+        ORDER BY
+          CASE json_extract(determinism_json, '$.comparison')
+            WHEN 'baseline' THEN 0 ELSE 1
+          END,
+          created_at,
+          id
+        LIMIT 1
+      `).get(id, patch.determinism.identityHash) as Row | undefined;
+      const reference = referenceRow ? mapRender(referenceRow) : null;
+      const matches = reference === null || (
+        reference.determinism !== null &&
+        reference.determinism.video.sha256 === patch.determinism.video.sha256 &&
+        reference.determinism.video.byteCount === patch.determinism.video.byteCount &&
+        reference.determinism.audio.sha256 === patch.determinism.audio.sha256 &&
+        reference.determinism.audio.byteCount === patch.determinism.audio.byteCount
+      );
+      const determinism = renderDeterminismSchema.parse({
+        ...patch.determinism,
+        comparison: reference === null ? "baseline" : matches ? "matched" : "mismatch",
+        referenceRenderId: reference?.id ?? null
+      });
+      if (!matches) {
+        return this.transitionRender(id, "running", {
+          outputPath: null,
+          sidecarPath: null,
+          validation: patch.validation,
+          determinism,
+          contentHash: null,
+          encoder: patch.encoder,
+          state: "failed",
+          error: {
+            code: "ARTIFACT_CORRUPT",
+            message: "Normalized render content does not match the established baseline"
+          }
+        });
       }
       return this.transitionRender(id, "running", {
         ...patch,
+        determinism,
         state: "succeeded",
         error: null
       });
-    });
+    }).immediate();
   }
 
   insertRenderPreflight(
@@ -2004,6 +2071,9 @@ function mapRender(row: Row): Render {
     outputPath: row.output_path ? String(row.output_path) : null,
     sidecarPath: row.sidecar_path ? String(row.sidecar_path) : null,
     validation: row.validation_json ? json<Render["validation"]>(row.validation_json) : null,
+    determinism: row.determinism_json
+      ? renderDeterminismSchema.parse(json<unknown>(row.determinism_json))
+      : null,
     state: row.state as Render["state"],
     error: row.error_code
       ? { code: row.error_code as NonNullable<Render["error"]>["code"], message: String(row.error_message) }

@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] RND-03 — Gate Render success on normalized determinism evidence.
+- [ ] RND-04 — Add safe cancellation, retry attempts, and crash recovery.
 
 ## Completed
 
+- [x] RND-03 — Gate Render success on normalized determinism evidence.
 - [x] RND-02 — Compose originals with an explicit FFmpeg graph.
 - [x] RND-01 — Build typed preflight from an immutable revision snapshot.
 - [x] EDT-05 — Implement deterministic source and bed audio decisions.

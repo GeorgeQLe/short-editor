@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { providerProvenanceSchema, renderValidationResultSchema, scoreBreakdownSchema } from "./contracts.js";
+import {
+  providerProvenanceSchema,
+  renderDeterminismSchema,
+  renderValidationResultSchema,
+  scoreBreakdownSchema
+} from "./contracts.js";
 import { idSchema, positiveRevisionSchema } from "./validators.js";
 
 const base = <T extends string>(type: T) => ({
@@ -70,7 +75,8 @@ export const candidatesJobResultSchema = z.strictObject({
 });
 export const renderJobResultSchema = z.strictObject({
   ...base("render"), shortId: idSchema, projectRevision: positiveRevisionSchema,
-  renderId: idSchema, validation: renderValidationResultSchema
+  renderId: idSchema, validation: renderValidationResultSchema,
+  determinism: renderDeterminismSchema.nullable()
 });
 export const watchedFolderScanJobResultSchema = z.strictObject({
   ...base("watched_folder_scan"), folderId: idSchema,

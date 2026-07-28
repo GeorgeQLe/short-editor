@@ -16,6 +16,7 @@ import {
   jobSchema,
   normalizedRectangleSchema,
   providerProvenanceSchema,
+  renderDeterminismSchema,
   renderSchema,
   scheduleEntrySchema,
   scheduleRuleSetSchema,
@@ -155,6 +156,21 @@ describe("SPEC 5.1 entity contracts", () => {
         valid: true, findings: [], width: 1080, height: 1920, durationMs: 30_000,
         videoCodec: "h264", audioCodec: "aac", validatedAt: now
       },
+      determinism: {
+        version: "render-determinism-v1",
+        algorithm: "sha256",
+        video: {
+          pixelFormat: "yuv420p", width: 1080, height: 1920,
+          sha256: "a".repeat(64), byteCount: 1
+        },
+        audio: {
+          sampleFormat: "s16le", sampleRate: 48_000, channels: 2,
+          sha256: "b".repeat(64), byteCount: 1
+        },
+        identityHash: "c".repeat(64),
+        comparison: "baseline",
+        referenceRenderId: null
+      },
       state: "succeeded", error: null, contentHash: "abc", decisionHash: "def",
       createdAt: now, updatedAt: now
     }],
@@ -264,6 +280,39 @@ describe("Candidate generation contracts", () => {
 });
 
 describe("reusable state validators", () => {
+  it("strictly validates normalized Render determinism evidence", () => {
+    const evidence = {
+      version: "render-determinism-v1",
+      algorithm: "sha256",
+      video: {
+        pixelFormat: "yuv420p", width: 1080, height: 1920,
+        sha256: "a".repeat(64), byteCount: 10
+      },
+      audio: {
+        sampleFormat: "s16le", sampleRate: 48_000, channels: 2,
+        sha256: "b".repeat(64), byteCount: 20
+      },
+      identityHash: "c".repeat(64),
+      comparison: "baseline",
+      referenceRenderId: null
+    };
+    expect(renderDeterminismSchema.parse(evidence)).toEqual(evidence);
+    expect(renderDeterminismSchema.safeParse({
+      ...evidence,
+      video: { ...evidence.video, sha256: "not-a-hash" }
+    }).success).toBe(false);
+    expect(renderDeterminismSchema.safeParse({
+      ...evidence,
+      comparison: "matched"
+    }).success).toBe(false);
+    expect(renderDeterminismSchema.safeParse({
+      ...evidence,
+      comparison: "mismatch",
+      referenceRenderId: id(),
+      extra: true
+    }).success).toBe(false);
+  });
+
   it("rejects invalid IDs, non-Z instants, invalid zones, and zero revisions", () => {
     expect(episodeSchema.safeParse({ id: "not-an-id" }).success).toBe(false);
     expect(utcInstantSchema.safeParse("2026-07-27T12:00:00-04:00").success).toBe(false);

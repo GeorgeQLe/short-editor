@@ -908,6 +908,11 @@ bootstrap render handling, and `tests/render.test.ts`.
 
 ### RND-03 — Gate Render success on validation and determinism
 
+**Status: Complete (2026-07-28).** Implemented by the versioned strict
+determinism contract, migration 14, streaming canonical FFmpeg normalization,
+serialized repository baseline comparison, mismatch cleanup, scheduling
+eligibility enforcement, and real-media/contract/migration coverage.
+
 - **SPEC / gates:** 3.2, 5.1–5.3, 6.9; G6.
 - **Prerequisites / unblocks:** RND-02; unblocks scheduling and final packaging
   validation.

@@ -36,6 +36,21 @@ describe("versioned job messages", () => {
       valid: true, findings: [], width: 1080, height: 1920, durationMs: 1_000,
       videoCodec: "h264", audioCodec: "aac", validatedAt: now
     };
+    const determinism = {
+      version: "render-determinism-v1" as const,
+      algorithm: "sha256" as const,
+      video: {
+        pixelFormat: "yuv420p" as const, width: 1080 as const, height: 1920 as const,
+        sha256: "a".repeat(64), byteCount: 1
+      },
+      audio: {
+        sampleFormat: "s16le" as const, sampleRate: 48_000 as const, channels: 2 as const,
+        sha256: "b".repeat(64), byteCount: 1
+      },
+      identityHash: "c".repeat(64),
+      comparison: "baseline" as const,
+      referenceRenderId: null
+    };
     const score = { hook: 1, coherence: 1, payoff: 1, independence: 1, delivery: 1, visualActivity: 1 };
     const results = [
       {
@@ -53,7 +68,7 @@ describe("versioned job messages", () => {
       { apiVersion: "v1", type: "candidates", episodeId, candidateIds: [id()], scores: [score], diagnostic: null },
       {
         apiVersion: "v1", type: "render", shortId: id(), projectRevision: 1,
-        renderId: id(), validation
+        renderId: id(), validation, determinism
       },
       {
         apiVersion: "v1", type: "watched_folder_scan", folderId: id(),

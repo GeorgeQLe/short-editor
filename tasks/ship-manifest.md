@@ -1,5 +1,115 @@
 # Ship manifest
 
+## RND-03 shipping boundary — 2026-07-28
+
+### User goal
+
+Gate Render success on persisted normalized frame/audio determinism evidence,
+using the first equivalent successful attempt as an immutable baseline.
+
+### Changed files
+
+`IMPLEMENTATION_PLAN.md`, `SPEC.md`, `src/core/database.ts`,
+`src/core/render.ts`, `src/core/repository.ts`, `src/core/service.ts`,
+`src/shared/contracts.ts`, `src/shared/job-messages.ts`, `tasks/history.md`,
+`tasks/ship-manifest.md`, `tasks/todo.md`, `tests/domain-contracts.test.ts`,
+`tests/job-messages.test.ts`, `tests/migrations.test.ts`,
+`tests/render.test.ts`, and `tests/transcript-editing.test.ts`.
+
+Generated `.agents/skillpacks/`, `.claude/`, and `.codex/` local artifacts are
+unrelated and excluded.
+
+### Per-file purpose
+
+- `src/shared/contracts.ts` defines strict versioned normalized evidence and
+  adds it to the Render entity; `src/shared/job-messages.ts` adds the same typed
+  boundary to Render job results.
+- `src/core/database.ts` adds migration 14 evidence storage, lookup indexing,
+  and safe demotion of legacy successes that lack evidence.
+- `src/core/render.ts` stream-hashes canonical decoded video/audio, binds the
+  completed FFmpeg/graph provenance into identity, and removes mismatch output.
+- `src/core/repository.ts` persists and validates evidence and serializes
+  baseline/match/mismatch completion in an immediate transaction.
+- `src/core/service.ts` permits scheduling only from a current approved Render
+  with `baseline` or `matched` evidence.
+- `tests/domain-contracts.test.ts` and `tests/job-messages.test.ts` prove strict
+  public evidence schemas; `tests/migrations.test.ts` proves migration 14 and
+  every prior upgrade path.
+- `tests/render.test.ts` proves identity changes, normalization redaction, real
+  repeated rendering, metadata independence, separate pixel/audio mismatch
+  detection, cleanup, and prior-output immutability.
+- `tests/transcript-editing.test.ts` updates the existing strict Render fixture
+  for the new nullable evidence field.
+- `SPEC.md` and `IMPLEMENTATION_PLAN.md` record the completed RND-03 contract
+  and retain RND-04/WIN-03.6/UI-01.4 as explicit later work.
+- `tasks/todo.md` promotes RND-04; `tasks/history.md` records implementation and
+  executable evidence; this manifest records the exact shipping boundary.
+
+### User-goal mapping
+
+The shared contracts and migration make evidence durable and inspectable. The
+renderer produces canonical stream evidence with the captured executable, while
+the repository transaction establishes one immutable equivalent-attempt
+baseline and rejects divergent output. Scheduling enforcement prevents a
+validation-only or mismatched Render from becoming downstream publish input.
+Contract, migration, and real-media tests exercise each layer of that path.
+
+### Tests run
+
+- Executable verification: `npm test` passed all 36 files and 256 tests,
+  including the real FFmpeg baseline, repeat-match, and mismatch-cleanup path.
+- Executable verification: `npm run build` passed TypeScript typecheck, Vite
+  production build, and Node TypeScript compilation without warnings.
+- Repository verification: `git diff --check` passed.
+- Security verification: a focused added-line scan found no private-key,
+  credential, token, password, or API-key signatures.
+
+### Skipped tests
+
+- Native Windows NSIS packaging and packaged release-FFmpeg/font behavior were
+  skipped because the current host is macOS; WIN-03.6 owns that release gate.
+- Human visual/audio inspection and interactive attempt history were skipped
+  because this change is the core determinism gate; UI-01.4 owns the workflow
+  and visible/audible acceptance.
+- Crash recovery and retry-lineage fault injection were skipped because RND-04
+  is the promoted task that owns those state transitions.
+- No lint script exists in `package.json`; typecheck, the full Vitest suite,
+  production build, diff hygiene, and focused security scan are the available
+  executable gates.
+
+### Adversarial review
+
+A failure-oriented changed-file review served as the equivalent review lane
+because no repository-local `quality-sweep` or `expert-review` command is
+installed. It traced malformed evidence, migration compatibility, concurrent
+baseline selection, stale revisions, mismatching video or audio, cancellation
+between finalization and completion, sidecar/output/artifact rollback,
+normalization byte bounds and error redaction, scheduling eligibility, and
+unchanged prior successes. The implementation already covers these paths with
+strict parsing, an immediate completion transaction, bounded no-shell FFmpeg
+decoding, guarded state transitions, and real-media cleanup assertions. No
+blocking finding remains.
+
+### Residual risk
+
+The real-media fixture proves the macOS FFmpeg path and exact-build identity,
+but does not prove the packaged Windows binary or human audiovisual quality;
+WIN-03.6 and UI-01.4 own those checks. A process crash after media finalization
+but before database completion may require startup reconciliation, and attempt
+retry lineage is not yet user-facing; RND-04 is the concrete next task.
+
+### Rollback note
+
+Revert the RND-03 commit before deploying migration 14. After migration 14 has
+run, restore a pre-migration backup rather than attempting a down migration.
+Legacy output paths are retained by the migration, and failed new attempts
+remove only their own artifact files and records.
+
+### Next command
+
+Run `npx skillpacks install exec-loop` from the project shell before invoking
+`$exec` for RND-04 cancellation, retries, and crash recovery.
+
 ## RND-02 shipping boundary — 2026-07-28
 
 ### User goal

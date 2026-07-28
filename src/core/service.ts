@@ -1191,6 +1191,7 @@ export class CoreService {
         SELECT 1 FROM renders r JOIN short_projects s ON s.id=r.short_id
         WHERE r.id=? AND r.short_id=? AND r.state='succeeded' AND r.project_revision=s.revision
           AND s.approved=1
+          AND json_extract(r.determinism_json, '$.comparison') IN ('baseline','matched')
       `).get(item.renderId, item.shortId);
       if (!eligible) throw new AppError(
         "INVALID_STATE", `Short ${item.shortId} needs an approved current validated render`, 409

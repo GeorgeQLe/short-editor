@@ -2,6 +2,25 @@
 
 ## 2026-07-28
 
+- Completed RND-03 with strict `render-determinism-v1` evidence: canonical
+  1080×1920 `yuv420p` video and signed-16-bit 48 kHz stereo PCM SHA-256 hashes
+  and byte counts, plus a canonical identity over the decision snapshot,
+  normalization version, completed graph/encoder provenance, and exact FFmpeg
+  build. Render list/start and job-result schemas expose nullable/required
+  evidence at their existing boundaries.
+- Migration 14 adds `renders.determinism_json` and the equivalent-attempt lookup
+  index, demoting pre-evidence successes to actionable `stale` rows while
+  retaining legacy output paths. Atomic immediate completion selects the
+  earliest successful baseline, records later matches, or retains mismatch
+  evidence while failing with `ARTIFACT_CORRUPT`; the new MP4, sidecar, and
+  artifact records are rolled back without changing prior success.
+- Streaming FFmpeg normalization excludes metadata, subtitles, and container
+  structure and caps decoded output and process diagnostics. Real-media tests
+  prove repeat matches, remux/metadata independence, independent pixel/sample
+  detection, normalization/mismatch cleanup, prior-output immutability, strict
+  contracts, and upgrades from every prior schema. Full verification passes 36
+  files and 256 tests; RND-04 is promoted for retry lineage and recovery.
+
 - Completed RND-02 with strict snapshot-bound `renders.start` contracts requiring
   an explicit passing preflight, migration 13 Render bindings, and atomic
   queued Render/job creation. Render state now advances through guarded

@@ -129,6 +129,52 @@ describe("database migrations", () => {
     ).get(CURRENT_SCHEMA_VERSION + 1)).toBeUndefined();
   });
 
+  it("demotes pre-RND-03 successes while preserving their legacy outputs", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "short-editor-determinism-migration-")), "fixture.db");
+    const legacy = new Database(path);
+    migrateDatabase(legacy, databaseMigrations.slice(0, 13));
+    const episodeId = randomUUID();
+    const shortId = randomUUID();
+    const renderId = randomUUID();
+    const now = "2026-07-27T12:00:00.000Z";
+    legacy.prepare(`
+      INSERT INTO episodes(
+        id,source_path,canonical_path,fingerprint,file_size,modified_at_ms,status,
+        missing,created_at,updated_at
+      ) VALUES(?,?,?,?,?,?,?,0,?,?)
+    `).run(episodeId, "/original.mp4", "/canonical.mp4", "fingerprint", 10, 20, "ready", now, now);
+    legacy.prepare(`
+      INSERT INTO short_projects(
+        id,episode_id,candidate_id,title,source_ranges_json,template_id,
+        composition_json,copy_json,approved,revision,created_at,updated_at
+      ) VALUES(?,?,NULL,'Legacy Short','[{"startMs":0,"endMs":1000}]',
+        'fullscreen-speaker-v1','{}','{}',1,1,?,?)
+    `).run(shortId, episodeId, now, now);
+    legacy.prepare(`
+      INSERT INTO renders(
+        id,short_id,project_revision,output_path,sidecar_path,encoder_json,
+        validation_json,state,content_hash,decision_hash,created_at,updated_at
+      ) VALUES(?,?,1,'artifacts/renders/legacy/final.mp4',
+        'artifacts/renders/legacy/captions.srt','{}','{}','succeeded',
+        'sha256:legacy','sha256:decision',?,?)
+    `).run(renderId, shortId, now, now);
+    legacy.close();
+
+    const upgraded = openDatabase(path);
+    databases.push(upgraded);
+    expect(upgraded.prepare(`
+      SELECT state,output_path,sidecar_path,determinism_json,error_code,error_message
+      FROM renders WHERE id=?
+    `).get(renderId)).toEqual({
+      state: "stale",
+      output_path: "artifacts/renders/legacy/final.mp4",
+      sidecar_path: "artifacts/renders/legacy/captions.srt",
+      determinism_json: null,
+      error_code: "INVALID_STATE",
+      error_message: "Rerender required: this output predates normalized determinism evidence."
+    });
+  });
+
   it("migrates legacy Candidate history and Short copy without demoting accepted data", () => {
     const path = join(mkdtempSync(join(tmpdir(), "short-editor-candidate-migration-")), "fixture.db");
     const legacy = new Database(path);

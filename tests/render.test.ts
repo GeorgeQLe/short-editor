@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
   mkdtempSync,
+  existsSync,
   readFileSync,
   rmSync,
   statSync
@@ -17,12 +18,17 @@ import {
   buildRenderGraph,
   RENDER_GRAPH_VERSION
 } from "../src/core/render-composition";
-import { CompositionRenderer } from "../src/core/render";
+import {
+  CompositionRenderer,
+  normalizeRender,
+  renderDeterminismIdentity
+} from "../src/core/render";
 import {
   RenderPreflightService,
   renderSnapshotSchema
 } from "../src/core/render-preflight";
 import { Repository } from "../src/core/repository";
+import { AppError } from "../src/shared/errors";
 import {
   renderStartRequestSchema,
   renderStartResultSchema,
@@ -166,6 +172,23 @@ describe("explicit FFmpeg render contracts and graph", () => {
     expect(renderStartRequestSchema.safeParse({ ...request, extra: true }).success).toBe(false);
   });
 
+  it("binds determinism identity to decisions and completed encoder provenance", () => {
+    const encoder = {
+      ffmpegVersion: "8.0",
+      videoCodec: "libx264",
+      audioCodec: "aac",
+      settings: { graphVersion: "graph-v1", graphHash: "sha256:one" }
+    };
+    const identity = renderDeterminismIdentity("sha256:decision", encoder);
+    expect(identity).toMatch(/^[0-9a-f]{64}$/);
+    expect(renderDeterminismIdentity("sha256:decision", encoder)).toBe(identity);
+    expect(renderDeterminismIdentity("sha256:other", encoder)).not.toBe(identity);
+    expect(renderDeterminismIdentity("sha256:decision", {
+      ...encoder,
+      settings: { ...encoder.settings, graphHash: "sha256:two" }
+    })).not.toBe(identity);
+  });
+
   it.each([0, 1, 2])(
     "builds starter template %i deterministically without shell interpolation",
     (templateIndex) => {
@@ -182,12 +205,23 @@ describe("explicit FFmpeg render contracts and graph", () => {
     expect(first.outputArgs).toContain("+faststart");
     expect(first.outputArgs).toContain("pipe:1");
   });
+
+  it("bounds and redacts normalization subprocess failures", async () => {
+    await expect(normalizeRender(
+      "/private/secret/render.mp4",
+      "/private/secret/missing-ffmpeg",
+      1_000
+    )).rejects.toMatchObject({
+      code: "ARTIFACT_CORRUPT",
+      message: "Render normalization failed"
+    });
+  });
 });
 
 describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32")(
   "real FFmpeg composition",
   () => {
-    it("renders, validates, hashes, and finalizes a snapshot-bound MP4 and sidecar", async () => {
+    it("establishes and matches normalized evidence while cleaning failed attempts", async () => {
       const directory = mkdtempSync(join(tmpdir(), "short-editor-render-"));
       directories.push(directory);
       const sourcePath = join(directory, "source with spaces.mp4");
@@ -317,7 +351,188 @@ describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32
       });
       expect((completed.encoder.settings as Record<string, unknown>).graphVersion)
         .toBe(RENDER_GRAPH_VERSION);
+      expect((completed.encoder.settings as Record<string, unknown>).ffmpegBuildHash)
+        .toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(completed.determinism).toMatchObject({
+        version: "render-determinism-v1",
+        algorithm: "sha256",
+        comparison: "baseline",
+        referenceRenderId: null,
+        video: { pixelFormat: "yuv420p", width: 1080, height: 1920 },
+        audio: { sampleFormat: "s16le", sampleRate: 48_000, channels: 2 }
+      });
+      expect(completed.determinism?.video.sha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(completed.determinism?.audio.sha256).toMatch(/^[0-9a-f]{64}$/);
+      const baselineBytes = readFileSync(store.resolveOwnedPath(completed.outputPath!));
+      const baselinePath = store.resolveOwnedPath(completed.outputPath!);
+      const remuxPath = join(directory, "metadata-remux.mp4");
+      execFileSync("ffmpeg", [
+        "-hide_banner", "-loglevel", "error", "-i", baselinePath,
+        "-map", "0", "-c", "copy", "-metadata", "title=Different container metadata", remuxPath
+      ]);
+      const remuxEvidence = await normalizeRender(remuxPath, "ffmpeg", 1_000);
+      expect(remuxEvidence.video).toEqual(completed.determinism!.video);
+      expect(remuxEvidence.audio).toEqual(completed.determinism!.audio);
+
+      const changedVideoPath = join(directory, "changed-video.mp4");
+      execFileSync("ffmpeg", [
+        "-hide_banner", "-loglevel", "error", "-i", baselinePath,
+        "-vf", "eq=brightness=0.05", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-c:a", "copy", changedVideoPath
+      ]);
+      const changedVideo = await normalizeRender(changedVideoPath, "ffmpeg", 1_000);
+      expect(changedVideo.video.sha256).not.toBe(completed.determinism!.video.sha256);
+      expect(changedVideo.audio).toEqual(completed.determinism!.audio);
+
+      const changedAudioPath = join(directory, "changed-audio.mp4");
+      execFileSync("ffmpeg", [
+        "-hide_banner", "-loglevel", "error", "-i", baselinePath,
+        "-c:v", "copy", "-af", "volume=0.5", "-c:a", "aac", changedAudioPath
+      ]);
+      const changedAudio = await normalizeRender(changedAudioPath, "ffmpeg", 1_000);
+      expect(changedAudio.video).toEqual(completed.determinism!.video);
+      expect(changedAudio.audio.sha256).not.toBe(completed.determinism!.audio.sha256);
+
+      const runAttempt = async (
+        sidecarFormat: "srt" | "webvtt" | null,
+        renderer = new CompositionRenderer(repository, store, jobs, captions)
+      ) => {
+        const attempt = repository.startRenderAttempt({
+          shortId: project.id,
+          expectedRevision: 1,
+          preflightId: preflight.id,
+          sidecarFormat
+        });
+        const storedPayload = repository.db.prepare(
+          "SELECT payload_json FROM jobs WHERE id=?"
+        ).get(attempt.job.id) as { payload_json: string };
+        await renderer.render(attempt.job, JSON.parse(storedPayload.payload_json));
+        return repository.getRender(attempt.render.id);
+      };
+
+      const matched = await runAttempt(null);
+      expect(matched).toMatchObject({
+        state: "succeeded",
+        determinism: {
+          comparison: "matched",
+          referenceRenderId: completed.id,
+          identityHash: completed.determinism!.identityHash,
+          video: completed.determinism!.video,
+          audio: completed.determinism!.audio
+        }
+      });
+
+      const mismatchingStart = repository.startRenderAttempt({
+        shortId: project.id,
+        expectedRevision: 1,
+        preflightId: preflight.id,
+        sidecarFormat: "srt"
+      });
+      const mismatchPayload = repository.db.prepare(
+        "SELECT payload_json FROM jobs WHERE id=?"
+      ).get(mismatchingStart.job.id) as { payload_json: string };
+      const baselineEvidence = completed.determinism!;
+      await expect(new CompositionRenderer(repository, store, jobs, captions, {
+        normalize: async () => ({
+          version: "render-determinism-v1",
+          algorithm: "sha256",
+          video: {
+            ...baselineEvidence.video,
+            sha256: baselineEvidence.video.sha256.replace(/^./, (value) => value === "0" ? "1" : "0")
+          },
+          audio: baselineEvidence.audio
+        })
+      }).render(mismatchingStart.job, JSON.parse(mismatchPayload.payload_json)))
+        .rejects.toMatchObject({ code: "ARTIFACT_CORRUPT" });
+      const mismatched = repository.getRender(mismatchingStart.render.id);
+      expect(mismatched).toMatchObject({
+        state: "failed",
+        outputPath: null,
+        sidecarPath: null,
+        contentHash: null,
+        error: { code: "ARTIFACT_CORRUPT" },
+        determinism: {
+          comparison: "mismatch",
+          referenceRenderId: completed.id
+        }
+      });
+      expect(existsSync(join(
+        directory,
+        `artifacts/renders/${mismatchingStart.render.id}/final.mp4`
+      ))).toBe(false);
+      expect(repository.listArtifactRecords().filter(
+        (artifact) => artifact.ownerId === mismatchingStart.render.id
+      )).toEqual([]);
+      expect(readFileSync(store.resolveOwnedPath(completed.outputPath!))).toEqual(baselineBytes);
+
+      const audioMismatchStart = repository.startRenderAttempt({
+        shortId: project.id,
+        expectedRevision: 1,
+        preflightId: preflight.id,
+        sidecarFormat: null
+      });
+      repository.transitionRender(audioMismatchStart.render.id, "queued", { state: "running" });
+      const audioMismatch = repository.completeRenderAttempt(
+        audioMismatchStart.render.id,
+        1,
+        {
+          outputPath: `artifacts/renders/${audioMismatchStart.render.id}/final.mp4`,
+          sidecarPath: null,
+          validation: completed.validation!,
+          contentHash: "sha256:attempt",
+          encoder: completed.encoder,
+          determinism: {
+            version: baselineEvidence.version,
+            algorithm: baselineEvidence.algorithm,
+            identityHash: baselineEvidence.identityHash,
+            video: baselineEvidence.video,
+            audio: {
+              ...baselineEvidence.audio,
+              sha256: baselineEvidence.audio.sha256.replace(
+                /^./,
+                (value) => value === "0" ? "1" : "0"
+              )
+            }
+          }
+        }
+      );
+      expect(audioMismatch).toMatchObject({
+        state: "failed",
+        outputPath: null,
+        contentHash: null,
+        error: { code: "ARTIFACT_CORRUPT" },
+        determinism: {
+          comparison: "mismatch",
+          referenceRenderId: completed.id
+        }
+      });
+
+      const normalizationStart = repository.startRenderAttempt({
+        shortId: project.id,
+        expectedRevision: 1,
+        preflightId: preflight.id,
+        sidecarFormat: null
+      });
+      const normalizationPayload = repository.db.prepare(
+        "SELECT payload_json FROM jobs WHERE id=?"
+      ).get(normalizationStart.job.id) as { payload_json: string };
+      await expect(new CompositionRenderer(repository, store, jobs, captions, {
+        normalize: async () => {
+          throw new AppError("ARTIFACT_CORRUPT", "Render normalization failed", 422);
+        }
+      }).render(normalizationStart.job, JSON.parse(normalizationPayload.payload_json)))
+        .rejects.toMatchObject({ code: "ARTIFACT_CORRUPT" });
+      expect(repository.getRender(normalizationStart.render.id)).toMatchObject({
+        state: "failed",
+        validation: { valid: true },
+        determinism: null,
+        outputPath: null,
+        error: { code: "ARTIFACT_CORRUPT", message: "Render normalization failed" }
+      });
+      expect(repository.listArtifactRecords().filter(
+        (artifact) => artifact.ownerId === normalizationStart.render.id
+      )).toEqual([]);
       expect(createHash("sha256").update(readFileSync(sourcePath)).digest("hex")).toBe(sourceHash);
-    }, 90_000);
+    }, 150_000);
   }
 );
