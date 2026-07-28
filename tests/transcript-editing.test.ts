@@ -98,6 +98,7 @@ function render(shortId: string, state: Render["state"] = "succeeded"): Render {
     id: randomUUID(),
     shortId,
     projectRevision: 4,
+    preflightId: null,
     encoder: {
       ffmpegVersion: "7",
       videoCodec: "h264",
@@ -105,6 +106,7 @@ function render(shortId: string, state: Render["state"] = "succeeded"): Render {
       settings: {}
     },
     outputPath: null,
+    sidecarPath: null,
     validation: null,
     state,
     error: null,

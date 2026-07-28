@@ -1303,9 +1303,9 @@ export class Repository {
     }
     this.db.prepare(`
       INSERT INTO renders(
-        id,short_id,project_revision,output_path,encoder_json,validation_json,state,
+        id,short_id,project_revision,preflight_id,output_path,sidecar_path,encoder_json,validation_json,state,
         error_code,error_message,content_hash,decision_hash,attempt,created_at,updated_at
-      ) VALUES(@id,@shortId,@projectRevision,@outputPath,@encoder,@validation,@state,
+      ) VALUES(@id,@shortId,@projectRevision,@preflightId,@outputPath,@sidecarPath,@encoder,@validation,@state,
         @errorCode,@errorMessage,@contentHash,@decisionHash,@attempt,@createdAt,@updatedAt)
     `).run({
       ...render,
@@ -1323,6 +1323,175 @@ export class Repository {
       ? this.db.prepare("SELECT * FROM renders WHERE short_id=? ORDER BY created_at").all(shortId)
       : this.db.prepare("SELECT * FROM renders ORDER BY created_at").all();
     return (rows as Row[]).map(mapRender);
+  }
+
+  getRender(id: string): Render {
+    const row = this.db.prepare("SELECT * FROM renders WHERE id=?").get(id) as Row | undefined;
+    if (!row) throw new AppError("NOT_FOUND", "Render not found", 404);
+    return mapRender(row);
+  }
+
+  startRenderAttempt(input: {
+    shortId: string;
+    expectedRevision: number;
+    preflightId: string;
+    sidecarFormat: "srt" | "webvtt" | null;
+  }): { render: Render; job: Job } {
+    return this.transaction(() => {
+      const project = this.getShort(input.shortId);
+      if (project.revision !== input.expectedRevision) {
+        throw revisionConflict("Short", input.expectedRevision, project.revision);
+      }
+      if (!project.approved) {
+        throw new AppError("INVALID_STATE", "Approve the Short before rendering", 409);
+      }
+      const preflight = this.getRenderPreflight(input.preflightId).result;
+      if (
+        preflight.status !== "passed" ||
+        preflight.shortId !== input.shortId ||
+        preflight.revision !== input.expectedRevision
+      ) {
+        throw new AppError(
+          "INVALID_STATE",
+          "Render preflight must be passing and match the approved Short revision",
+          409
+        );
+      }
+      const now = new Date().toISOString();
+      const render: Render = {
+        id: randomUUID(),
+        shortId: input.shortId,
+        projectRevision: input.expectedRevision,
+        preflightId: input.preflightId,
+        encoder: {
+          ffmpegVersion: preflight.dependencyVersions.ffmpeg!,
+          videoCodec: "libx264",
+          audioCodec: "aac",
+          settings: {
+            graphVersion: "ffmpeg-composition-v1",
+            width: 1080,
+            height: 1920,
+            frameRate: 30,
+            pixelFormat: "yuv420p",
+            crf: 18,
+            preset: "medium",
+            audioSampleRate: 48_000,
+            audioChannels: 2,
+            audioBitrate: "192k"
+          }
+        },
+        outputPath: null,
+        sidecarPath: null,
+        validation: null,
+        state: "queued",
+        error: null,
+        contentHash: null,
+        decisionHash: preflight.snapshotHash,
+        createdAt: now,
+        updatedAt: now
+      };
+      const job: Job = {
+        id: randomUUID(),
+        type: "render",
+        entityId: input.shortId,
+        provider: "local",
+        state: "queued",
+        progress: 0,
+        stage: "queued",
+        attempts: 0,
+        errorCode: null,
+        errorMessage: null,
+        cancelRequested: false,
+        payloadReference: `render:${render.id}`,
+        createdAt: now,
+        updatedAt: now
+      };
+      this.insertRender(render);
+      this.insertJob(job, {
+        apiVersion: "v1",
+        type: "render",
+        shortId: input.shortId,
+        projectRevision: input.expectedRevision,
+        renderId: render.id,
+        preflightId: input.preflightId,
+        sidecarFormat: input.sidecarFormat
+      });
+      return { render, job };
+    });
+  }
+
+  transitionRender(
+    id: string,
+    from: Render["state"] | readonly Render["state"][],
+    patch: Partial<Pick<
+      Render,
+      "state" | "outputPath" | "sidecarPath" | "validation" | "error" |
+      "contentHash" | "decisionHash" | "encoder"
+    >>
+  ): Render {
+    return this.transaction(() => {
+      const current = this.getRender(id);
+      const allowed = Array.isArray(from) ? from : [from];
+      if (!allowed.includes(current.state)) {
+        throw new AppError("INVALID_STATE", "Render state transition is no longer valid", 409);
+      }
+      const next: Render = {
+        ...current,
+        ...patch,
+        outputPath: patch.outputPath === undefined ? current.outputPath
+          : patch.outputPath === null ? null : validateOwnedRelativePath(patch.outputPath),
+        sidecarPath: patch.sidecarPath === undefined ? current.sidecarPath
+          : patch.sidecarPath === null ? null : validateOwnedRelativePath(patch.sidecarPath),
+        updatedAt: new Date().toISOString()
+      };
+      const result = this.db.prepare(`
+        UPDATE renders SET output_path=?,sidecar_path=?,encoder_json=?,validation_json=?,
+          state=?,error_code=?,error_message=?,content_hash=?,decision_hash=?,updated_at=?
+        WHERE id=? AND state=?
+      `).run(
+        next.outputPath,
+        next.sidecarPath,
+        JSON.stringify(next.encoder),
+        next.validation === null ? null : JSON.stringify(next.validation),
+        next.state,
+        next.error?.code ?? null,
+        next.error?.message ?? null,
+        next.contentHash,
+        next.decisionHash,
+        next.updatedAt,
+        id,
+        current.state
+      );
+      if (!result.changes) {
+        throw new AppError("INVALID_STATE", "Render state transition lost a concurrent update", 409);
+      }
+      return next;
+    });
+  }
+
+  completeRenderAttempt(
+    id: string,
+    expectedRevision: number,
+    patch: Pick<
+      Render,
+      "outputPath" | "sidecarPath" | "validation" | "contentHash" | "encoder"
+    >
+  ): Render {
+    return this.transaction(() => {
+      const render = this.getRender(id);
+      if (render.state !== "running") {
+        throw new AppError("INVALID_STATE", "Render is not running", 409);
+      }
+      const project = this.getShort(render.shortId);
+      if (project.revision !== expectedRevision || !project.approved) {
+        return this.transitionRender(id, "running", { state: "stale" });
+      }
+      return this.transitionRender(id, "running", {
+        ...patch,
+        state: "succeeded",
+        error: null
+      });
+    });
   }
 
   insertRenderPreflight(
@@ -1525,6 +1694,10 @@ export class Repository {
     this.db.prepare(
       "UPDATE artifact_records SET state='corrupt' WHERE id=? AND state IN ('temporary','complete')"
     ).run(id);
+  }
+
+  deleteArtifactRecord(id: string): void {
+    this.db.prepare("DELETE FROM artifact_records WHERE id=?").run(id);
   }
 
   grantCloudAuthorization(authorization: CloudAuthorization): CloudAuthorization {
@@ -1826,8 +1999,10 @@ function mapRender(row: Row): Render {
     id: String(row.id),
     shortId: String(row.short_id),
     projectRevision: Number(row.project_revision),
+    preflightId: row.preflight_id ? String(row.preflight_id) : null,
     encoder: json<Render["encoder"]>(row.encoder_json),
     outputPath: row.output_path ? String(row.output_path) : null,
+    sidecarPath: row.sidecar_path ? String(row.sidecar_path) : null,
     validation: row.validation_json ? json<Render["validation"]>(row.validation_json) : null,
     state: row.state as Render["state"],
     error: row.error_code

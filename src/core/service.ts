@@ -25,6 +25,7 @@ import {
   compositionSchema,
   captionUpdateInputSchema,
   audioUpdateInputSchema,
+  renderStartRequestSchema,
   watchedFolderConfigurationInputSchema
 } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
@@ -1180,13 +1181,8 @@ export class CoreService {
   listRenderPreflights(shortId?: string) {
     return this.repository.listRenderPreflights(shortId);
   }
-  startRender(shortId: string, expectedRevision: number) {
-    const project = this.repository.getShort(shortId);
-    if (project.revision !== expectedRevision) {
-      throw new AppError("REVISION_CONFLICT", "Short revision is stale", 409);
-    }
-    if (!project.approved) throw new AppError("INVALID_STATE", "Approve the Short before rendering", 409);
-    return this.jobs.enqueue({ type: "render", entityId: shortId, payload: { revision: expectedRevision } });
+  startRenderAttempt(input: unknown) {
+    return this.repository.startRenderAttempt(renderStartRequestSchema.parse(input));
   }
   validateRender(path: string) { return validateRender(path); }
   draftSchedule(shorts: SchedulableShort[], rules: ScheduleRules) {

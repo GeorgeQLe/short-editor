@@ -13,8 +13,15 @@ import type {
   ShortProject
 } from "../shared/domain.js";
 import {
+  assetSchema,
+  audioDecisionSchema,
+  compositionSchema,
+  episodeSchema,
   renderPreflightFindingSchema,
-  renderPreflightResultSchema
+  renderPreflightResultSchema,
+  sourceRangesSchema,
+  templateLineageSchema,
+  shortProjectSchema
 } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
 import { canonicalJson } from "./analysis-cache.js";
@@ -34,6 +41,63 @@ export const MAXIMUM_RENDER_DURATION_MS = 180_000;
 export const CONTENT_ID_WARNING_THRESHOLD_MS = 60_000;
 export const YOUTUBE_CONTENT_ID_HELP_URL =
   "https://support.google.com/youtube/answer/15424877?hl=en";
+
+const fileStateSchema = z.strictObject({
+  size: z.number().int().nonnegative(),
+  modifiedAtMs: z.number().nonnegative()
+});
+const capturedFileSchema = z.strictObject({
+  path: z.string().min(1),
+  before: fileStateSchema.nullable(),
+  after: fileStateSchema.nullable(),
+  contentHash: z.string().regex(/^[0-9a-f]{64}$/).nullable(),
+  media: z.strictObject({
+    durationMs: z.number().int().positive().nullable(),
+    width: z.number().int().positive().nullable(),
+    height: z.number().int().positive().nullable(),
+    videoCodec: z.string().min(1).nullable(),
+    audioCodec: z.string().min(1).nullable()
+  }).nullable()
+});
+export const renderSnapshotSchema = z.strictObject({
+  version: z.literal(RENDER_SNAPSHOT_VERSION),
+  short: shortProjectSchema,
+  template: z.strictObject({
+    lineage: templateLineageSchema,
+    materializedComposition: compositionSchema
+  }),
+  sourceRanges: sourceRangesSchema,
+  output: z.strictObject({
+    width: z.literal(1080),
+    height: z.literal(1920),
+    videoCodec: z.literal("h264"),
+    audioCodec: z.literal("aac"),
+    container: z.literal("mp4"),
+    maximumDurationMs: z.literal(MAXIMUM_RENDER_DURATION_MS),
+    durationMs: z.number().int().positive()
+  }),
+  decisions: z.strictObject({
+    captions: z.strictObject({
+      engineVersion: z.string().min(1),
+      analysis: z.unknown().nullable()
+    }),
+    crops: z.strictObject({
+      generatorVersion: z.string().min(1),
+      smoothingVersion: z.string().min(1),
+      layers: z.array(z.unknown())
+    }),
+    audio: audioDecisionSchema.nullable()
+  }),
+  resources: z.strictObject({
+    episode: z.strictObject({ identity: episodeSchema, file: capturedFileSchema }),
+    assets: z.array(z.strictObject({ identity: assetSchema, file: capturedFileSchema }))
+  }),
+  dependencyVersions: z.strictObject({
+    ffmpeg: z.string().min(1).nullable(),
+    ffprobe: z.string().min(1).nullable()
+  })
+});
+export type RenderSnapshot = z.infer<typeof renderSnapshotSchema>;
 
 type FindingDefinition = Omit<RenderPreflightFinding, "code" | "details">;
 
@@ -191,7 +255,7 @@ export class RenderPreflightService {
     }
 
     const dependencyVersions = { ffmpeg, ffprobe };
-    const snapshot = {
+    const snapshot = renderSnapshotSchema.parse({
       version: RENDER_SNAPSHOT_VERSION,
       short: project,
       template: {
@@ -231,7 +295,7 @@ export class RenderPreflightService {
         assets: assets.map(({ asset, file }) => ({ identity: asset, file }))
       },
       dependencyVersions
-    };
+    });
     const snapshotHash = hashCanonicalSnapshot(snapshot);
     const createdAt = (this.options.now ?? (() => new Date().toISOString()))();
     const orderedFindings = normalizeRenderPreflightFindings(findings);

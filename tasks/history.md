@@ -2,6 +2,33 @@
 
 ## 2026-07-28
 
+- Completed RND-02 with strict snapshot-bound `renders.start` contracts requiring
+  an explicit passing preflight, migration 13 Render bindings, and atomic
+  queued Render/job creation. Render state now advances through guarded
+  `queued → running → succeeded|failed|cancelled|stale` transitions.
+- Added deterministic `ffmpeg-composition-v1` filter scripts for ordered source
+  trims/concatenation, stored-order layers, fit/fill, independent interpolated
+  crops, reusable still/video assets, packaged-Inter caption burn-in with timed
+  word highlighting, source gain/fades, continuous bed playback, 48 kHz stereo
+  mixing, and silence fallback. FFmpeg is spawned without a shell using an
+  argument array, `-nostdin`, a filter-script file, capped/redacted stderr, and
+  parsed progress timestamps.
+- Extended artifact staging for external producers with exclusive temporary
+  paths, validation, streaming SHA-256, fsync, atomic rename, collision
+  rejection, and cleanup. Render completion now rechecks dependencies and every
+  captured input before and after encoding, enforces current-revision approval,
+  ffprobes H.264/AAC 1080×1920 positive-duration output, persists graph/encoder
+  provenance and hashes, and optionally finalizes regenerated SRT/WebVTT beside
+  the MP4. Added deterministic graph/contract and compact real-media coverage,
+  including spaced paths and unchanged-source proof. Promoted RND-03.
+- Full verification passes 36 test files and 251 tests, including a real
+  FFmpeg-rendered MP4/sidecar fixture, plus the production build and diff/secret
+  hygiene. Failure-oriented review traced graph determinism, input/dependency
+  identity, cancellation, stale revisions, validation, artifact rollback, and
+  transport binding with no blocking finding. Native Windows packaging, UI
+  visual/audio acceptance, and advanced queued-cancel, retry, and crash
+  recovery remain assigned to WIN-03.6, UI-01.4, and RND-04.
+
 - Completed RND-01 with strict `{ shortId, expectedRevision }` preflight,
   canonical `render-snapshot-v1` SHA-256 identity, migration 12 immutable audit
   records, a centralized typed finding registry, and independent

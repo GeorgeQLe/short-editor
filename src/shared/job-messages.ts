@@ -31,7 +31,10 @@ export const candidatesJobPayloadSchema = z.strictObject({
 export const renderJobPayloadSchema = z.strictObject({
   ...base("render"),
   shortId: idSchema,
-  projectRevision: positiveRevisionSchema
+  projectRevision: positiveRevisionSchema,
+  renderId: idSchema,
+  preflightId: idSchema,
+  sidecarFormat: z.enum(["srt", "webvtt"]).nullable()
 });
 export const watchedFolderScanJobPayloadSchema = z.strictObject({
   ...base("watched_folder_scan"),

@@ -875,6 +875,11 @@ remain RND-01/RND-02; interactive controls remain UI-01.3.
 
 ### RND-02 — Compose originals with an explicit FFmpeg graph
 
+**Status: Complete (2026-07-28).** Implemented by
+`src/core/render-composition.ts`, `src/core/render.ts`, migration 13, the
+external-producer artifact staging boundary, strict HTTP/MCP start contracts,
+bootstrap render handling, and `tests/render.test.ts`.
+
 - **SPEC / gates:** 2.3, 4.1, 5.3, 6.5–6.9; G4–G6.
 - **Prerequisites / unblocks:** RND-01; unblocks RND-03 and RND-04.
 - **Behavior:** Generate an explicit filter graph from the immutable snapshot;
@@ -906,10 +911,9 @@ remain RND-01/RND-02; interactive controls remain UI-01.3.
 - **SPEC / gates:** 3.2, 5.1–5.3, 6.9; G6.
 - **Prerequisites / unblocks:** RND-02; unblocks scheduling and final packaging
   validation.
-- **Behavior:** Persist a Render attempt bound to one Short revision and mark it
-  `succeeded` only after ffprobe confirms playable video/audio, 1080×1920,
-  H.264/AAC, positive duration, and ≤180 seconds. Store validation, output/hash,
-  encoder/FFmpeg provenance, and normalized determinism hashes.
+- **Behavior:** Extend RND-02's snapshot-bound, ffprobe-validated Render attempt
+  with normalized frame/audio determinism hashes and repeated-render gating for
+  identical inputs, decisions, settings, and FFmpeg build.
 - **Non-goals:** A standalone path validator cannot transition an unrelated
   Render or rebind revisions.
 - **Changes:** Complete Render repository/lifecycle, validation typed details,

@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] RND-02 — Compose originals with an explicit FFmpeg graph.
+- [ ] RND-03 — Gate Render success on normalized determinism evidence.
 
 ## Completed
 
+- [x] RND-02 — Compose originals with an explicit FFmpeg graph.
 - [x] RND-01 — Build typed preflight from an immutable revision snapshot.
 - [x] EDT-05 — Implement deterministic source and bed audio decisions.
 - [x] EDT-04 — Implement caption data, editing, layout checks, and sidecars.

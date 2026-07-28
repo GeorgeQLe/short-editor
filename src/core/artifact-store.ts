@@ -13,6 +13,8 @@ import {
   unlinkSync,
   writeFileSync
 } from "node:fs";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { AppError } from "../shared/errors.js";
 import type { Repository, StoredArtifact } from "./repository.js";
@@ -33,6 +35,12 @@ export interface ArtifactReconciliation {
   quarantinedTemporaryFiles: string[];
   quarantinedArtifactFiles: string[];
   corruptArtifactIds: string[];
+}
+
+export interface ExternalArtifactReservation {
+  readonly write: Omit<ArtifactWrite, "bytes" | "validate">;
+  readonly finalPath: string;
+  readonly temporaryPath: string;
 }
 
 export class ArtifactStore {
@@ -69,6 +77,92 @@ export class ArtifactStore {
 
   finalize(write: ArtifactWrite): StoredArtifact {
     return this.finalizeBatch([write], (artifacts) => artifacts[0]!).value;
+  }
+
+  reserveExternal(
+    write: Omit<ArtifactWrite, "bytes" | "validate">
+  ): ExternalArtifactReservation {
+    const finalPath = this.resolveOwnedPath(write.relativePath);
+    if (existsSync(finalPath) || this.pendingPaths.has(finalPath)) {
+      throw new AppError("INVALID_STATE", "An artifact already exists at that path", 409);
+    }
+    this.pendingPaths.add(finalPath);
+    try {
+      mkdirSync(dirname(finalPath), { recursive: true });
+      const temporaryPath = `${finalPath}.${randomUUID()}.tmp`;
+      const descriptor = openSync(temporaryPath, "wx");
+      closeSync(descriptor);
+      return { write, finalPath, temporaryPath };
+    } catch (error) {
+      this.pendingPaths.delete(finalPath);
+      if (error instanceof AppError) throw error;
+      throw new AppError("INTERNAL_ERROR", "Artifact staging failed");
+    }
+  }
+
+  async finalizeExternal(
+    reservation: ExternalArtifactReservation,
+    validate: (temporaryPath: string) => void | Promise<void>
+  ): Promise<StoredArtifact> {
+    const { write, finalPath, temporaryPath } = reservation;
+    try {
+      await validate(temporaryPath);
+      const descriptor = openSync(temporaryPath, "r");
+      try {
+        fsyncSync(descriptor);
+      } finally {
+        closeSync(descriptor);
+      }
+      const [contentHash, file] = await Promise.all([
+        hashFile(temporaryPath),
+        stat(temporaryPath)
+      ]);
+      const artifact: StoredArtifact = {
+        id: randomUUID(),
+        kind: write.kind,
+        ownerType: write.ownerType,
+        ownerId: write.ownerId,
+        ownerRevision: write.ownerRevision ?? null,
+        relativePath: validateOwnedRelativePath(write.relativePath),
+        contentHash,
+        byteLength: file.size,
+        producerVersion: write.producerVersion,
+        state: "complete",
+        createdAt: new Date().toISOString()
+      };
+      renameSync(temporaryPath, finalPath);
+      syncDirectory(dirname(finalPath));
+      try {
+        this.repository.saveArtifactRecord(artifact);
+      } catch (error) {
+        if (existsSync(finalPath)) unlinkSync(finalPath);
+        syncDirectory(dirname(finalPath));
+        throw error;
+      }
+      return artifact;
+    } catch (error) {
+      if (existsSync(temporaryPath)) unlinkSync(temporaryPath);
+      if (error instanceof AppError) throw error;
+      throw new AppError("INTERNAL_ERROR", "Artifact creation failed");
+    } finally {
+      this.pendingPaths.delete(finalPath);
+    }
+  }
+
+  discardExternal(reservation: ExternalArtifactReservation): void {
+    if (existsSync(reservation.temporaryPath)) unlinkSync(reservation.temporaryPath);
+    this.pendingPaths.delete(reservation.finalPath);
+  }
+
+  discardFinalized(artifact: StoredArtifact): void {
+    const path = this.resolveOwnedPath(artifact.relativePath);
+    this.repository.transaction(() => {
+      this.repository.deleteArtifactRecord(artifact.id);
+      if (existsSync(path)) {
+        unlinkSync(path);
+        syncDirectory(dirname(path));
+      }
+    });
   }
 
   finalizeBatch<T>(
@@ -205,6 +299,17 @@ export class ArtifactStore {
 
 export function sha256(bytes: Uint8Array): string {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+async function hashFile(path: string): Promise<string> {
+  const hash = createHash("sha256");
+  await new Promise<void>((resolvePromise, reject) => {
+    const stream = createReadStream(path);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", resolvePromise);
+    stream.on("error", reject);
+  });
+  return `sha256:${hash.digest("hex")}`;
 }
 
 function writeExclusiveAndSync(path: string, bytes: Uint8Array): void {

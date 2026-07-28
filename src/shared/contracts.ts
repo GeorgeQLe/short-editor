@@ -932,10 +932,12 @@ export const renderValidationResultSchema = z.strictObject({
   audioCodec: nullableNonempty,
   validatedAt: utcInstantSchema
 });
+export type RenderValidationResult = z.infer<typeof renderValidationResultSchema>;
 export const renderSchema = z.strictObject({
   id: idSchema,
   shortId: idSchema,
   projectRevision: positiveRevisionSchema,
+  preflightId: idSchema.nullable(),
   encoder: z.strictObject({
     ffmpegVersion: z.string().min(1),
     videoCodec: z.string().min(1),
@@ -943,6 +945,7 @@ export const renderSchema = z.strictObject({
     settings: jsonValueSchema
   }),
   outputPath: z.string().min(1).nullable(),
+  sidecarPath: z.string().min(1).nullable(),
   validation: renderValidationResultSchema.nullable(),
   state: renderStateSchema,
   error: z.strictObject({ code: apiErrorCodeSchema, message: z.string().min(1) }).nullable(),
@@ -952,6 +955,20 @@ export const renderSchema = z.strictObject({
   updatedAt: utcInstantSchema
 });
 export type Render = z.infer<typeof renderSchema>;
+
+export const renderSidecarFormatSchema = z.enum(["srt", "webvtt"]).nullable();
+export const renderStartRequestSchema = z.strictObject({
+  shortId: idSchema,
+  expectedRevision: positiveRevisionSchema,
+  preflightId: idSchema,
+  sidecarFormat: renderSidecarFormatSchema.default(null)
+});
+export type RenderStartRequest = z.infer<typeof renderStartRequestSchema>;
+export const renderStartResultSchema = z.strictObject({
+  render: renderSchema,
+  job: z.lazy(() => jobSchema)
+});
+export type RenderStartResult = z.infer<typeof renderStartResultSchema>;
 
 export const renderPreflightFindingCodes = [
   "SHORT_NOT_APPROVED",

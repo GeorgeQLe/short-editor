@@ -10,6 +10,8 @@ import {
   cropDetectionObservationSchema,
   renderPreflightRequestSchema,
   renderPreflightResultSchema,
+  renderStartRequestSchema,
+  renderStartResultSchema,
   sourceRangesSchema,
   templateCloneInputSchema,
   templateUpdateInputSchema,
@@ -257,9 +259,29 @@ register("shorts.remove_manual_crop", "Remove one UUID-addressed manual crop or 
     input
   ));
 
-register("renders.start", "Queue a render for an approved, current Short revision.", {
-  shortId: uuid, expectedRevision
-}, (input) => core("/renders/start", "POST", input));
+server.registerTool("renders.start", {
+  description: "Queue a snapshot-bound render from an explicit passing preflight.",
+  inputSchema: {
+    shortId: renderStartRequestSchema.shape.shortId,
+    expectedRevision: renderStartRequestSchema.shape.expectedRevision,
+    preflightId: renderStartRequestSchema.shape.preflightId,
+    sidecarFormat: renderStartRequestSchema.shape.sidecarFormat
+  },
+  outputSchema: renderStartResultSchema
+}, async (input) => {
+  try {
+    const value = renderStartResultSchema.parse(await core("/renders/start", "POST", input));
+    return { ...result(value), structuredContent: value };
+  } catch (error) {
+    return {
+      isError: true,
+      content: [{
+        type: "text" as const,
+        text: error instanceof Error ? error.message : String(error)
+      }]
+    };
+  }
+});
 server.registerTool("renders.preflight", {
   description: "Validate and persist one immutable Short revision render snapshot without creating output.",
   inputSchema: {

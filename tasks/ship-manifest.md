@@ -1,5 +1,139 @@
 # Ship manifest
 
+## RND-02 shipping boundary — 2026-07-28
+
+### User goal
+
+Compose one immutable approved Short revision from original sources with an
+explicit FFmpeg graph, validate and atomically finalize its MP4 and optional
+caption sidecar, and expose a strict snapshot-bound render-start contract.
+
+### Changed files
+
+`IMPLEMENTATION_PLAN.md`, `SPEC.md`, `src/core/api.ts`,
+`src/core/artifact-store.ts`, `src/core/bootstrap.ts`, `src/core/database.ts`,
+`src/core/render-composition.ts`, `src/core/render-preflight.ts`,
+`src/core/render.ts`, `src/core/repository.ts`, `src/core/service.ts`,
+`src/mcp/server.ts`, `src/shared/contracts.ts`,
+`src/shared/job-messages.ts`, `tasks/history.md`,
+`tasks/ship-manifest.md`, `tasks/todo.md`,
+`tests/domain-contracts.test.ts`, `tests/job-messages.test.ts`,
+`tests/render.test.ts`, and `tests/transcript-editing.test.ts`.
+
+Generated `.agents/skillpacks/`, `.claude/`, and `.codex/` local artifacts are
+unrelated and excluded from the commit. No path under `.claude/skills/` or
+`.codex/skills/` is tracked. `.agents/project.json` remains tracked and
+unchanged. There are no earlier unpushed commits or unrelated tracked changes
+in the shipping boundary.
+
+### Per-file purpose
+
+- `src/core/render-composition.ts` builds the deterministic explicit filter
+  script and direct FFmpeg argument vector for ordered source ranges, template
+  layers, fit/fill, independent crops, captions, source audio, bed audio, and
+  fixed H.264/AAC output settings.
+- `src/core/render.ts` executes FFmpeg without a shell, reports progress,
+  validates captured inputs and dependency versions before and after encoding,
+  ffprobes output, redacts process errors, and coordinates cancellation, stale
+  revisions, artifact cleanup, and successful completion.
+- `src/core/artifact-store.ts` adds exclusive external-producer reservations,
+  streaming hashes, validation, fsync/rename finalization, and rollback of
+  finalized artifacts.
+- `src/core/database.ts` adds migration 13 bindings from Render attempts to
+  immutable preflights plus optional sidecar paths.
+- `src/core/repository.ts` atomically creates matching Render/job rows and
+  guards Render state transitions and final current-revision approval.
+- `src/core/render-preflight.ts` persists and validates the complete typed
+  render snapshot needed by the renderer.
+- `src/core/bootstrap.ts` installs the render job handler.
+- `src/shared/contracts.ts` and `src/shared/job-messages.ts` define strict
+  Render, start request/result, sidecar, and job payload shapes.
+- `src/core/service.ts`, `src/core/api.ts`, and `src/mcp/server.ts` expose the
+  same preflight-bound start operation through core, HTTP, and MCP.
+- `tests/render.test.ts` covers strict starts, all starter-template graphs,
+  deterministic special/spaced-path arguments, a real composed MP4 and WebVTT
+  sidecar, output validation/provenance, and unchanged source bytes. The three
+  other test files update existing strict Render/job fixtures.
+- `SPEC.md` and `IMPLEMENTATION_PLAN.md` record the implemented RND-02 boundary
+  and defer determinism comparison, retry/recovery, UI acceptance, and native
+  evidence to their owning tasks.
+- `tasks/todo.md`, `tasks/history.md`, and `tasks/ship-manifest.md` close RND-02,
+  preserve its evidence, and promote RND-03.
+
+### User-goal mapping
+
+The graph builder converts the immutable RND-01 snapshot into the required
+original-source video/audio composition. The executor, external artifact
+boundary, migration, and guarded repository lifecycle ensure only a current,
+approved, ffprobe-valid result becomes successful. Shared contracts and
+HTTP/MCP adapters require the exact passing preflight. The focused graph and
+real-media tests prove the executable path, while project/task documentation
+routes the intentionally deferred determinism and recovery scope.
+
+### Tests run
+
+- Executable verification: `npm test` passed all 36 test files and 251 tests,
+  including `tests/render.test.ts` and its real FFmpeg composition.
+- Executable verification: `npm run build` passed application typecheck, Vite
+  production build, and Node TypeScript compilation.
+- Repository verification: `git diff --check` passed without warnings.
+- Security verification: the focused changed-path private-key/token signature
+  scan found no secret-like content.
+
+### Skipped tests
+
+- Native Windows NSIS packaging and packaged FFmpeg/font behavior were skipped
+  because the current host is macOS; WIN-03.6 owns that release evidence.
+- UI progress, visible/audible composition review, and interactive cancellation
+  were skipped because UI-01.4 owns the render workflow and Computer Use
+  acceptance. The core boundary is instead covered by deterministic graph
+  assertions and a real locally rendered H.264/AAC fixture.
+- Disk-full fault injection, queued-cancel reconciliation, retry lineage, and
+  crash recovery were not used as RND-02 success proof because RND-04 owns those
+  advanced interruption/recovery guarantees. RND-02 verifies exclusive output,
+  validation cleanup, stale-revision cleanup, and running-process cancellation
+  boundaries in its implementation review.
+- No lint command exists in `package.json`; TypeScript compilation, the full
+  Vitest suite, production build, and diff hygiene are the available executable
+  gates.
+
+### Adversarial review
+
+A failure-oriented changed-file review served as the equivalent review lane
+because no repository-local `quality-sweep` or `expert-review` command is
+installed. It traced snapshot/job/Render binding, passing-preflight enforcement,
+revision races before and after artifact finalization, input byte and dependency
+changes, no-shell path handling, filter ordering, crop time bases, audio
+concatenation and bed looping, stderr bounds/redaction, cancellation, ffprobe
+validation, sidecar rollback, artifact-record/file consistency, migration
+compatibility, and HTTP/MCP strictness.
+
+Migration upgrades are covered from every prior schema version by
+`tests/migrations.test.ts`, and the real-media test exercises migration 13
+through a current database. No blocking finding remains.
+
+### Residual risk
+
+The macOS fixture proves a real one-second speaker render, captions when the
+installed FFmpeg supports `drawtext`, source audio, sidecar finalization, and
+unchanged original bytes. It does not replace native Windows packaging or
+human visual/audio judgment across every media shape. Advanced queued
+cancellation, retry attempts, crash recovery, and normalized repeated-render
+comparison remain explicit RND-04, WIN-03.6, UI-01.4, and RND-03 work rather
+than hidden assumptions in this boundary.
+
+### Rollback note
+
+Revert the RND-02 feature commit before deploying migration 13. After a database
+has migrated, restore a pre-migration backup rather than attempting a down
+migration. Generated Render artifacts can be discarded with their artifact
+records; original source files are never modified.
+
+### Next command
+
+Run `npx skillpacks install exec-loop` from the project shell before invoking
+`$exec` for RND-03 normalized determinism evidence.
+
 ## RND-01 shipping boundary — 2026-07-28
 
 ### User goal

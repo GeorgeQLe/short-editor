@@ -37,6 +37,7 @@ import type {
   OpenAiProvider
 } from "./openai-provider.js";
 import { analysisCacheIdentity } from "./analysis-cache.js";
+import { CompositionRenderer, type RenderJobPayload } from "./render.js";
 
 export function createCore(
   databasePath?: string,
@@ -63,6 +64,7 @@ export function createCore(
   const localVisualSampling = new LocalVisualSampler(worker);
   const ollamaAnalysis = new OllamaAnalysisProvider(worker);
   let service!: CoreService;
+  let renderer!: CompositionRenderer;
   const runner = new JobRunner(jobs, {
     probe: async (job) => {
       jobs.progress(job.id, 0.2, "probing media");
@@ -357,7 +359,8 @@ export function createCore(
       await media.hashEpisode(job.entityId!);
     },
     watched_folder_scan: async (job, payload) => watchedFolders.scan(job, payload),
-    source_reconcile: async (job) => watchedFolders.reconcile(job)
+    source_reconcile: async (job) => watchedFolders.reconcile(job),
+    render: async (job, payload) => renderer.render(job, payload as RenderJobPayload)
   });
   service = new CoreService(
     repository,
@@ -374,6 +377,12 @@ export function createCore(
     localVisualSampling,
     activeCredentialHandles,
     openAiProvider
+  );
+  renderer = new CompositionRenderer(
+    repository,
+    artifacts,
+    jobs,
+    service.captionEngine
   );
   runner.start();
   void watchedFolders.start();

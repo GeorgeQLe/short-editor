@@ -564,6 +564,15 @@ const migrations: readonly Migration[] = [
           SELECT RAISE(ABORT, 'render preflights are immutable');
         END;
     `)
+  },
+  {
+    version: 13,
+    name: "snapshot-bound render attempts",
+    up: (db) => db.exec(`
+      ALTER TABLE renders ADD COLUMN preflight_id TEXT REFERENCES render_preflights(id);
+      ALTER TABLE renders ADD COLUMN sidecar_path TEXT;
+      CREATE INDEX renders_preflight_idx ON renders(preflight_id);
+    `)
   }
 ];
 

@@ -17,7 +17,10 @@ describe("versioned job messages", () => {
       { apiVersion: "v1", type: "hash", episodeId },
       { apiVersion: "v1", type: "analyze", episodeId, provider: "local", transcriptRevision: 1 },
       { apiVersion: "v1", type: "candidates", episodeId, transcriptRevision: 1, count: 8 },
-      { apiVersion: "v1", type: "render", shortId: id(), projectRevision: 1 },
+      {
+        apiVersion: "v1", type: "render", shortId: id(), projectRevision: 1,
+        renderId: id(), preflightId: id(), sidecarFormat: null
+      },
       { apiVersion: "v1", type: "watched_folder_scan", folderId: id(), reason: "manual" },
       { apiVersion: "v1", type: "source_reconcile", reason: "periodic" }
     ];

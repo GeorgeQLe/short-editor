@@ -14,6 +14,7 @@ import {
   manualCropMoveInputSchema,
   manualCropRemoveInputSchema,
   renderPreflightRequestSchema,
+  renderStartRequestSchema,
   scheduleRulesSchema,
   shortApprovalInputSchema,
   shortTimelineUpdateInputSchema,
@@ -256,8 +257,7 @@ export function createApi(service: CoreService, desktopToken?: string) {
     return service.preflightRender(input.shortId, input.expectedRevision);
   }));
   app.post("/v1/renders/start", route((req) => {
-    const input = z.object({ shortId: id, expectedRevision: revision }).parse(req.body);
-    return service.startRender(input.shortId, input.expectedRevision);
+    return service.startRenderAttempt(renderStartRequestSchema.parse(req.body));
   }));
   app.post("/v1/renders/validate", route((req) => service.validateRender(
     z.object({ path: z.string() }).parse(req.body).path
