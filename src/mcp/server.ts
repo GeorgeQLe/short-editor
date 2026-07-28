@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import {
   assetImportInputSchema,
+  captionUpdateInputSchema,
   compositionSchema,
   contentPackageSchema,
   cropDetectionObservationSchema,
@@ -182,6 +183,13 @@ register("shorts.update_composition", "Update composition using optimistic revis
 register("shorts.update_timeline", "Update ordered Episode source ranges using optimistic revision control.", {
   shortId: uuid, expectedRevision, sourceRanges: sourceRangesSchema
 }, ({ shortId, ...input }) => core(`/shorts/${shortId}/timeline`, "PUT", input));
+register("shorts.update_captions", "Update independent captions and generate revisioned SRT/WebVTT sidecars.", {
+  shortId: uuid,
+  expectedRevision,
+  enabled: captionUpdateInputSchema.shape.enabled,
+  cues: captionUpdateInputSchema.shape.cues,
+  style: captionUpdateInputSchema.shape.style
+}, ({ shortId, ...input }) => core(`/shorts/${shortId}/captions`, "PUT", input));
 register("shorts.update_copy", "Update accepted copy without overwriting other fields.", {
   shortId: uuid, expectedRevision, copy: contentPackageSchema
 }, ({ shortId, ...input }) => core(`/shorts/${shortId}/copy`, "PUT", input));

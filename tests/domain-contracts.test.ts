@@ -29,6 +29,7 @@ import {
   utcInstantSchema,
   watchedFolderSchema
 } from "../src/shared/domain";
+import { captionState } from "./factories";
 
 const id = () => randomUUID();
 const now = "2026-07-27T16:00:00.000Z";
@@ -117,10 +118,13 @@ describe("SPEC 5.1 entity contracts", () => {
       sourceRanges: [{ startMs: 0, endMs: 30_000 }], templateId: "speaker-v1",
       templateLineage: { templateId: "speaker-v1", templateVersion: 1, parentTemplateId: null },
       composition,
-      captions: {
-        enabled: true, segments: [segment],
-        style: { fontFamily: "Arial", fontSize: 60, color: "#fff", highlightColor: "#ff0" }
-      },
+      captions: captionState([{
+        id: segment.id,
+        startMs: segment.startMs,
+        endMs: segment.endMs,
+        text: segment.text,
+        words: segment.words.map(({ startMs, endMs, text }) => ({ startMs, endMs, text }))
+      }]),
       audio: {
         sourceGainDb: 0, muted: false, fadeInMs: 50, fadeOutMs: 50,
         bedAssetId: null, bedGainDb: null, normalizeLoudness: false

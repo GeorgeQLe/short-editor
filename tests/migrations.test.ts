@@ -11,6 +11,7 @@ import {
   MigrationError,
   openDatabase
 } from "../src/core/database";
+import { starterTemplates } from "../src/shared/templates";
 
 const databases: Database.Database[] = [];
 afterEach(() => databases.splice(0).forEach((db) => db.open && db.close()));
@@ -291,6 +292,102 @@ describe("database migrations", () => {
       parentTemplateId: null,
       templateId: "fullscreen-speaker-v1"
     });
+  });
+
+  it("migrates legacy caption segments and Arial/Inter styles without losing cue data", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "short-editor-caption-migration-")), "fixture.db");
+    const legacy = new Database(path);
+    migrateDatabase(legacy, databaseMigrations.slice(0, 9));
+    const episodeId = randomUUID();
+    const shortId = randomUUID();
+    const cueId = randomUUID();
+    const now = "2026-07-28T12:00:00.000Z";
+    legacy.prepare(`
+      INSERT INTO episodes(
+        id,source_path,canonical_path,fingerprint,file_size,modified_at_ms,status,
+        missing,created_at,updated_at
+      ) VALUES(?,?,?,?,?,?,?,0,?,?)
+    `).run(episodeId, "/original.mp4", "/canonical.mp4", "fingerprint", 10, 20, "ready", now, now);
+    const legacyCaptions = {
+      enabled: true,
+      segments: [{
+        id: cueId,
+        startMs: 100,
+        endMs: 1_000,
+        text: "Preserve\nthis",
+        words: [{
+          startMs: 100,
+          endMs: 500,
+          text: "Preserve",
+          confidence: 0.9,
+          speaker: "speaker"
+        }],
+        speaker: "speaker",
+        confidence: 0.9
+      }],
+      style: {
+        fontFamily: "Arial",
+        fontSize: 72,
+        color: "#eeeeee",
+        highlightColor: "#ff0000"
+      }
+    };
+    legacy.prepare(`
+      INSERT INTO short_projects(
+        id,episode_id,candidate_id,title,source_ranges_json,template_id,
+        composition_json,copy_json,approved,revision,created_at,updated_at,
+        template_lineage_json,captions_json,audio_json,copy_state,copy_source
+      ) VALUES(?,?,NULL,'Legacy captions','[{"startMs":0,"endMs":2000}]',
+        'fullscreen-speaker-v1',?,'{}',0,3,?,?,?,?,?,'accepted','legacy_accepted')
+    `).run(
+      shortId,
+      episodeId,
+      JSON.stringify(starterTemplates[0]!.composition),
+      now,
+      now,
+      JSON.stringify({ templateVersion: 1, parentTemplateId: null }),
+      JSON.stringify(legacyCaptions),
+      JSON.stringify({
+        sourceGainDb: 0,
+        muted: false,
+        fadeInMs: 0,
+        fadeOutMs: 0,
+        bedAssetId: null,
+        bedGainDb: null,
+        normalizeLoudness: false
+      })
+    );
+    legacy.close();
+
+    const upgraded = openDatabase(path);
+    databases.push(upgraded);
+    const row = upgraded.prepare(
+      "SELECT captions_json,revision FROM short_projects WHERE id=?"
+    ).get(shortId) as { captions_json: string; revision: number };
+    expect(JSON.parse(row.captions_json)).toEqual({
+      enabled: true,
+      cues: [{
+        id: cueId,
+        startMs: 100,
+        endMs: 1_000,
+        text: "Preserve\nthis",
+        words: [{ startMs: 100, endMs: 500, text: "Preserve" }]
+      }],
+      style: {
+        fontFamily: "Inter",
+        fontWeight: 400,
+        fontSizePx: 72,
+        position: { x: 0.5, y: 0.78 },
+        maxWidth: 0.82,
+        textColor: "#eeeeee",
+        highlightColor: "#ff0000",
+        outline: { color: "#000000", widthPx: 4 },
+        background: { color: "#00000000", paddingPx: 12, cornerRadiusPx: 8 }
+      },
+      warnings: [],
+      sidecars: { srt: null, webvtt: null }
+    });
+    expect(row.revision).toBe(3);
   });
 
   it("keeps foreign-key enforcement active", () => {

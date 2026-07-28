@@ -68,49 +68,77 @@ export class ArtifactStore {
   }
 
   finalize(write: ArtifactWrite): StoredArtifact {
-    const finalPath = this.resolveOwnedPath(write.relativePath);
-    if (existsSync(finalPath) || this.pendingPaths.has(finalPath)) {
-      throw new AppError("INVALID_STATE", "An artifact already exists at that path", 409);
+    return this.finalizeBatch([write], (artifacts) => artifacts[0]!).value;
+  }
+
+  finalizeBatch<T>(
+    writes: readonly ArtifactWrite[],
+    commit: (artifacts: StoredArtifact[]) => T
+  ): { artifacts: StoredArtifact[]; value: T } {
+    if (!writes.length) {
+      throw new AppError("VALIDATION_ERROR", "Artifact batch must not be empty", 422);
     }
-    this.pendingPaths.add(finalPath);
-    const temporaryPath = `${finalPath}.${randomUUID()}.tmp`;
-    let renamed = false;
-    let committed = false;
+    const staged = writes.map((write) => ({
+      write,
+      finalPath: this.resolveOwnedPath(write.relativePath),
+      temporaryPath: "",
+      renamed: false
+    }));
+    if (new Set(staged.map(({ finalPath }) => finalPath)).size !== staged.length) {
+      throw new AppError("VALIDATION_ERROR", "Artifact batch paths must be unique", 422);
+    }
+    for (const item of staged) {
+      if (existsSync(item.finalPath) || this.pendingPaths.has(item.finalPath)) {
+        throw new AppError("INVALID_STATE", "An artifact already exists at that path", 409);
+      }
+    }
+    for (const item of staged) {
+      this.pendingPaths.add(item.finalPath);
+      item.temporaryPath = `${item.finalPath}.${randomUUID()}.tmp`;
+    }
     try {
-      mkdirSync(dirname(finalPath), { recursive: true });
-      writeExclusiveAndSync(temporaryPath, write.bytes);
-      write.validate?.(temporaryPath);
-      const bytes = readFileSync(temporaryPath);
       const now = new Date().toISOString();
-      const artifact: StoredArtifact = {
-        id: randomUUID(),
-        kind: write.kind,
-        ownerType: write.ownerType,
-        ownerId: write.ownerId,
-        ownerRevision: write.ownerRevision ?? null,
-        relativePath: validateOwnedRelativePath(write.relativePath),
-        contentHash: sha256(bytes),
-        byteLength: bytes.byteLength,
-        producerVersion: write.producerVersion,
-        state: "complete",
-        createdAt: now
-      };
-      renameSync(temporaryPath, finalPath);
-      renamed = true;
-      syncDirectory(dirname(finalPath));
-      this.repository.saveArtifactRecord(artifact);
-      committed = true;
-      return artifact;
+      const artifacts = staged.map(({ write, finalPath, temporaryPath }) => {
+        mkdirSync(dirname(finalPath), { recursive: true });
+        writeExclusiveAndSync(temporaryPath, write.bytes);
+        write.validate?.(temporaryPath);
+        const bytes = readFileSync(temporaryPath);
+        return {
+          id: randomUUID(),
+          kind: write.kind,
+          ownerType: write.ownerType,
+          ownerId: write.ownerId,
+          ownerRevision: write.ownerRevision ?? null,
+          relativePath: validateOwnedRelativePath(write.relativePath),
+          contentHash: sha256(bytes),
+          byteLength: bytes.byteLength,
+          producerVersion: write.producerVersion,
+          state: "complete" as const,
+          createdAt: now
+        };
+      });
+      for (const item of staged) {
+        renameSync(item.temporaryPath, item.finalPath);
+        item.renamed = true;
+        syncDirectory(dirname(item.finalPath));
+      }
+      const value = this.repository.transaction(() => {
+        artifacts.forEach((artifact) => this.repository.saveArtifactRecord(artifact));
+        return commit(artifacts);
+      });
+      return { artifacts, value };
     } catch (error) {
-      if (existsSync(temporaryPath)) unlinkSync(temporaryPath);
-      if (renamed && !committed && existsSync(finalPath)) {
-        unlinkSync(finalPath);
-        syncDirectory(dirname(finalPath));
+      for (const item of staged) {
+        if (existsSync(item.temporaryPath)) unlinkSync(item.temporaryPath);
+        if (item.renamed && existsSync(item.finalPath)) {
+          unlinkSync(item.finalPath);
+          syncDirectory(dirname(item.finalPath));
+        }
       }
       if (error instanceof AppError) throw error;
       throw new AppError("INTERNAL_ERROR", "Artifact creation failed");
     } finally {
-      this.pendingPaths.delete(finalPath);
+      staged.forEach(({ finalPath }) => this.pendingPaths.delete(finalPath));
     }
   }
 

@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   assetImportInputSchema,
   candidateContentPackageAcceptInputSchema,
+  captionUpdateInputSchema,
   compositionSchema,
   contentPackageSchema,
   cropReanalysisInputSchema,
@@ -168,6 +169,12 @@ export function createApi(service: CoreService, desktopToken?: string) {
       id.parse(req.params.id), input.expectedRevision, input.sourceRanges
     );
   }));
+  app.put("/v1/shorts/:id/captions", route((req) =>
+    service.updateCaptions(
+      id.parse(req.params.id),
+      captionUpdateInputSchema.parse(req.body)
+    )
+  ));
   app.put("/v1/shorts/:id/copy", route((req) => {
     const project = service.getShort(id.parse(req.params.id));
     return service.updateCopy(project.id, revision.parse(req.body.expectedRevision),

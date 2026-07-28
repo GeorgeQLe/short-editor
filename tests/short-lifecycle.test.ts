@@ -122,12 +122,12 @@ describe("Short creation", () => {
         endMs: expect.any(Number)
       }]
     });
-    expect(project.captions.segments.length).toBeGreaterThan(0);
-    expect(project.captions.segments.every((segment) =>
+    expect(project.captions.cues.length).toBeGreaterThan(0);
+    expect(project.captions.cues.every((segment) =>
       segment.startMs >= project.sourceRanges[0]!.startMs
       && segment.endMs <= project.sourceRanges[0]!.endMs
     )).toBe(true);
-    project.captions.segments[0]!.text = "independent snapshot";
+    project.captions.cues[0]!.text = "independent snapshot";
     expect(accepted.segments[0]!.text).not.toBe("independent snapshot");
   });
 

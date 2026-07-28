@@ -576,16 +576,113 @@ export const candidateContentPackageAcceptInputSchema = z.strictObject({
   expectedRevision: positiveRevisionSchema,
   contentPackage: contentPackageSchema
 });
-export const captionStateSchema = z.strictObject({
-  enabled: z.boolean(),
-  segments: z.array(transcriptSegmentSchema),
-  style: z.strictObject({
-    fontFamily: z.string().min(1),
-    fontSize: z.number().positive(),
-    color: z.string().min(1),
-    highlightColor: z.string().min(1)
+const captionColorSchema = z.string().regex(
+  /^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/,
+  "Caption colors must use #RRGGBB or #RRGGBBAA"
+);
+export const captionWordSchema = timeRangeSchema.extend({
+  text: z.string().refine((text) => text.trim().length > 0, "Word text must not be empty")
+});
+export type CaptionWord = z.infer<typeof captionWordSchema>;
+export const captionCueSchema = timeRangeSchema.extend({
+  id: idSchema,
+  text: z.string().refine((text) => text.trim().length > 0, "Cue text must not be empty"),
+  words: z.array(captionWordSchema)
+}).superRefine((cue, context) => {
+  let priorEnd = cue.startMs;
+  cue.words.forEach((word, index) => {
+    if (word.startMs < cue.startMs || word.endMs > cue.endMs) {
+      context.addIssue({
+        code: "custom", path: ["words", index],
+        message: "Word timing must be within its cue"
+      });
+    }
+    if (word.startMs < priorEnd) {
+      context.addIssue({
+        code: "custom", path: ["words", index, "startMs"],
+        message: "Words must be ordered and non-overlapping"
+      });
+    }
+    priorEnd = word.endMs;
+  });
+});
+export type CaptionCue = z.infer<typeof captionCueSchema>;
+export const captionCuesSchema = z.array(captionCueSchema).superRefine((cues, context) => {
+  const seen = new Set<string>();
+  cues.forEach((cue, index) => {
+    if (seen.has(cue.id)) {
+      context.addIssue({
+        code: "custom", path: [index, "id"], message: "Caption cue IDs must be unique"
+      });
+    }
+    seen.add(cue.id);
+  });
+});
+export const captionStyleSchema = z.strictObject({
+  fontFamily: z.literal("Inter"),
+  fontWeight: z.union([z.literal(400), z.literal(700)]),
+  fontSizePx: z.number().int().min(12).max(200),
+  position: z.strictObject({
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1)
+  }),
+  maxWidth: z.number().min(0.1).max(1),
+  textColor: captionColorSchema,
+  highlightColor: captionColorSchema,
+  outline: z.strictObject({
+    color: captionColorSchema,
+    widthPx: z.number().min(0).max(20)
+  }),
+  background: z.strictObject({
+    color: captionColorSchema,
+    paddingPx: z.number().min(0).max(100),
+    cornerRadiusPx: z.number().min(0).max(100)
   })
 });
+export type CaptionStyle = z.infer<typeof captionStyleSchema>;
+export const captionWarningCodes = [
+  "CAPTION_OVERFLOW",
+  "CAPTION_SAFE_AREA",
+  "CAPTION_MISSING_GLYPH",
+  "CAPTION_SHORT_CUE",
+  "CAPTION_OVERLAP",
+  "CAPTION_OUTSIDE_SOURCE_RANGE"
+] as const;
+export const captionWarningCodeSchema = z.enum(captionWarningCodes);
+export type CaptionWarningCode = z.infer<typeof captionWarningCodeSchema>;
+export const captionWarningSchema = z.strictObject({
+  code: captionWarningCodeSchema,
+  cueId: idSchema,
+  message: z.string().min(1)
+});
+export type CaptionWarning = z.infer<typeof captionWarningSchema>;
+export const captionSidecarReferenceSchema = z.strictObject({
+  artifactId: idSchema,
+  format: z.enum(["srt", "webvtt"]),
+  relativePath: z.string().min(1),
+  contentHash: z.string().min(1),
+  byteLength: z.number().int().nonnegative()
+});
+export type CaptionSidecarReference = z.infer<typeof captionSidecarReferenceSchema>;
+export const captionSidecarsSchema = z.strictObject({
+  srt: captionSidecarReferenceSchema.nullable(),
+  webvtt: captionSidecarReferenceSchema.nullable()
+});
+export const captionStateSchema = z.strictObject({
+  enabled: z.boolean(),
+  cues: captionCuesSchema,
+  style: captionStyleSchema,
+  warnings: z.array(captionWarningSchema),
+  sidecars: captionSidecarsSchema
+});
+export type CaptionState = z.infer<typeof captionStateSchema>;
+export const captionUpdateInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  enabled: z.boolean(),
+  cues: captionCuesSchema,
+  style: captionStyleSchema
+});
+export type CaptionUpdateInput = z.infer<typeof captionUpdateInputSchema>;
 export const audioStateSchema = z.strictObject({
   sourceGainDb: z.number(),
   muted: z.boolean(),
@@ -645,6 +742,13 @@ export const shortProjectSchema = z.strictObject({
   });
 });
 export type ShortProject = z.infer<typeof shortProjectSchema>;
+
+export const captionUpdateResultSchema = z.strictObject({
+  short: shortProjectSchema,
+  warnings: z.array(captionWarningSchema),
+  sidecars: captionSidecarsSchema
+});
+export type CaptionUpdateResult = z.infer<typeof captionUpdateResultSchema>;
 
 export const shortTimelineUpdateInputSchema = z.strictObject({
   expectedRevision: positiveRevisionSchema,

@@ -18,7 +18,10 @@ import {
   type ManualCropAddInput,
   type ManualCropMoveInput,
   type ManualCropRemoveInput,
+  type CaptionUpdateInput,
+  type CaptionUpdateResult,
   compositionSchema,
+  captionUpdateInputSchema,
   watchedFolderConfigurationInputSchema
 } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
@@ -57,6 +60,12 @@ import {
   generateAutomaticCropTrack,
   visualCropArtifactSchema
 } from "./crops.js";
+import {
+  CAPTION_ENGINE_VERSION,
+  CaptionEngine,
+  DEFAULT_CAPTION_STYLE,
+  generateCaptionSidecars
+} from "./captions.js";
 
 export class CoreService {
   constructor(
@@ -70,7 +79,8 @@ export class CoreService {
     readonly ollamaAnalysis?: OllamaAnalysisProvider,
     readonly localVisualSampling?: LocalVisualSampler,
     private readonly activeCredentialHandles: Set<string> = new Set(),
-    readonly openAi?: OpenAiProvider
+    readonly openAi?: OpenAiProvider,
+    readonly captionEngine: CaptionEngine = new CaptionEngine()
   ) {}
 
   async stop(): Promise<void> {
@@ -715,10 +725,20 @@ export class CoreService {
       composition: structuredClone(template.composition),
       captions: {
         enabled: true,
-        segments: structuredClone(transcript.segments.filter((segment) =>
+        cues: transcript.segments.filter((segment) =>
           segment.startMs >= candidate.startMs && segment.endMs <= candidate.endMs
-        )),
-        style: { fontFamily: "Arial", fontSize: 64, color: "#ffffff", highlightColor: "#ffdc5e" }
+        ).map((segment) => ({
+          id: segment.id,
+          startMs: segment.startMs,
+          endMs: segment.endMs,
+          text: segment.text,
+          words: segment.words.map((word) => ({
+            startMs: word.startMs, endMs: word.endMs, text: word.text
+          }))
+        })),
+        style: structuredClone(DEFAULT_CAPTION_STYLE),
+        warnings: [],
+        sidecars: { srt: null, webvtt: null }
       },
       audio: {
         sourceGainDb: 0, muted: false, fadeInMs: 0, fadeOutMs: 0,
@@ -746,6 +766,87 @@ export class CoreService {
     return this.repository.updateShort(id, expectedRevision, {
       copy, copyState: "accepted", copySource: "user_accepted"
     });
+  }
+
+  updateCaptions(id: string, input: CaptionUpdateInput): CaptionUpdateResult {
+    const parsed = captionUpdateInputSchema.parse(input);
+    const current = this.repository.getShort(id);
+    if (current.revision !== parsed.expectedRevision) {
+      throw new AppError("REVISION_CONFLICT", "Short was edited by another client", 409, {
+        expectedRevision: parsed.expectedRevision,
+        actualRevision: current.revision
+      });
+    }
+    if (!this.artifacts) {
+      throw new AppError(
+        "DEPENDENCY_UNAVAILABLE",
+        "Artifact store is required to save caption sidecars",
+        503
+      );
+    }
+    const analysis = this.captionEngine.analyze(
+      parsed.cues,
+      parsed.style,
+      current.composition,
+      current.sourceRanges,
+      parsed.enabled
+    );
+    const sidecarBytes = generateCaptionSidecars(
+      parsed.cues,
+      current.sourceRanges,
+      parsed.enabled
+    );
+    const nextRevision = parsed.expectedRevision + 1;
+    const basePath = `artifacts/shorts/${id}/revisions/${nextRevision}`;
+    const finalized = this.artifacts.finalizeBatch([
+      {
+        kind: "caption_srt",
+        ownerType: "short",
+        ownerId: id,
+        ownerRevision: nextRevision,
+        relativePath: `${basePath}/captions.srt`,
+        producerVersion: CAPTION_ENGINE_VERSION,
+        bytes: sidecarBytes.srt
+      },
+      {
+        kind: "caption_webvtt",
+        ownerType: "short",
+        ownerId: id,
+        ownerRevision: nextRevision,
+        relativePath: `${basePath}/captions.vtt`,
+        producerVersion: CAPTION_ENGINE_VERSION,
+        bytes: sidecarBytes.webvtt
+      }
+    ], ([srt, webvtt]) => {
+      if (!srt || !webvtt) {
+        throw new AppError("INTERNAL_ERROR", "Caption sidecar batch is incomplete");
+      }
+      const sidecars = {
+        srt: {
+          artifactId: srt.id,
+          format: "srt" as const,
+          relativePath: srt.relativePath,
+          contentHash: srt.contentHash,
+          byteLength: srt.byteLength
+        },
+        webvtt: {
+          artifactId: webvtt.id,
+          format: "webvtt" as const,
+          relativePath: webvtt.relativePath,
+          contentHash: webvtt.contentHash,
+          byteLength: webvtt.byteLength
+        }
+      };
+      const short = this.repository.updateShortCaptions(id, parsed.expectedRevision, {
+        enabled: parsed.enabled,
+        cues: parsed.cues,
+        style: parsed.style,
+        warnings: analysis.warnings,
+        sidecars
+      });
+      return { short, warnings: analysis.warnings, sidecars };
+    });
+    return finalized.value;
   }
   approveShort(id: string, expectedRevision: number) {
     return this.repository.approveShort(id, expectedRevision);

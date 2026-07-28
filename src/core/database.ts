@@ -527,6 +527,11 @@ const migrations: readonly Migration[] = [
       migrateCompositionCropTracks(db, "templates");
       migrateCompositionCropTracks(db, "short_projects");
     }
+  },
+  {
+    version: 10,
+    name: "editable captions and sidecar references",
+    up: (db) => migrateCaptionState(db)
   }
 ];
 
@@ -631,6 +636,70 @@ function normalizeCompositionLayers(
       return { ...layer, assetId: null };
     });
     if (changed) update.run(JSON.stringify({ ...composition, layers }), row.id);
+  }
+}
+
+function migrateCaptionState(db: SqliteDatabase): void {
+  const rows = db.prepare(
+    "SELECT id,captions_json FROM short_projects"
+  ).all() as Array<{ id: string; captions_json: string }>;
+  const update = db.prepare("UPDATE short_projects SET captions_json=? WHERE id=?");
+  for (const row of rows) {
+    let legacy: Record<string, unknown>;
+    try {
+      legacy = JSON.parse(row.captions_json) as Record<string, unknown>;
+    } catch {
+      legacy = {};
+    }
+    const legacyStyle = typeof legacy.style === "object" && legacy.style !== null
+      ? legacy.style as Record<string, unknown>
+      : {};
+    const sourceCues = Array.isArray(legacy.cues)
+      ? legacy.cues
+      : Array.isArray(legacy.segments)
+        ? legacy.segments
+        : [];
+    const cues = sourceCues.map((value) => {
+      const cue = value as Record<string, unknown>;
+      const words = Array.isArray(cue.words) ? cue.words : [];
+      return {
+        id: cue.id,
+        startMs: cue.startMs,
+        endMs: cue.endMs,
+        text: cue.text,
+        words: words.map((wordValue) => {
+          const word = wordValue as Record<string, unknown>;
+          return { startMs: word.startMs, endMs: word.endMs, text: word.text };
+        })
+      };
+    });
+    const fontSize = Number(legacyStyle.fontSizePx ?? legacyStyle.fontSize ?? 64);
+    const migrated = {
+      enabled: legacy.enabled !== false,
+      cues,
+      style: {
+        fontFamily: "Inter",
+        fontWeight: legacyStyle.fontWeight === 700
+          || String(legacyStyle.fontFamily ?? "").toLowerCase().includes("bold")
+          ? 700
+          : 400,
+        fontSizePx: Number.isInteger(fontSize) && fontSize >= 12 && fontSize <= 200
+          ? fontSize
+          : 64,
+        position: legacyStyle.position ?? { x: 0.5, y: 0.78 },
+        maxWidth: legacyStyle.maxWidth ?? 0.82,
+        textColor: legacyStyle.textColor ?? legacyStyle.color ?? "#ffffff",
+        highlightColor: legacyStyle.highlightColor ?? "#ffdc5e",
+        outline: legacyStyle.outline ?? { color: "#000000", widthPx: 4 },
+        background: legacyStyle.background
+          ?? { color: "#00000000", paddingPx: 12, cornerRadiusPx: 8 }
+      },
+      warnings: Array.isArray(legacy.warnings) ? legacy.warnings : [],
+      sidecars: typeof legacy.sidecars === "object" && legacy.sidecars !== null
+        ? legacy.sidecars
+        : { srt: null, webvtt: null }
+    };
+    update.run(JSON.stringify(migrated), row.id);
   }
 }
 

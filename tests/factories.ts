@@ -1,5 +1,31 @@
 import { randomUUID } from "node:crypto";
-import type { ClipCandidate, Episode, TranscriptSegment } from "../src/shared/domain";
+import type {
+  CaptionCue,
+  CaptionState,
+  ClipCandidate,
+  Episode,
+  TranscriptSegment
+} from "../src/shared/domain";
+
+export function captionState(cues: CaptionCue[] = []): CaptionState {
+  return {
+    enabled: true,
+    cues,
+    style: {
+      fontFamily: "Inter",
+      fontWeight: 400,
+      fontSizePx: 64,
+      position: { x: 0.5, y: 0.78 },
+      maxWidth: 0.82,
+      textColor: "#ffffff",
+      highlightColor: "#ffdc5e",
+      outline: { color: "#000000", widthPx: 4 },
+      background: { color: "#00000000", paddingPx: 12, cornerRadiusPx: 8 }
+    },
+    warnings: [],
+    sidecars: { srt: null, webvtt: null }
+  };
+}
 
 export function episode(overrides: Partial<Episode> = {}): Episode {
   const now = new Date().toISOString();

@@ -756,6 +756,18 @@ absorb a downstream task.
 
 ### EDT-04 — Implement caption data, editing, layout checks, and sidecars
 
+Completed 2026-07-28. Migration 10 preserves legacy cues while materializing
+approved Inter defaults, derived warning state, and sidecar references. The
+caption engine uses packaged Inter 4.1 OpenType metrics and glyph coverage for
+deterministic wrapping and typed warnings; exact-CAS service, HTTP, and MCP
+mutations atomically persist revision-owned LF-normalized UTF-8 SRT/WebVTT
+files with render and non-published schedule invalidation. Layout, encoding,
+range remapping, missing dependency, rollback, migration, transport parity, and
+transcript-independence fixtures are in `tests/captions.test.ts`,
+`tests/caption-service.test.ts`, `tests/artifact-store.test.ts`, and
+`tests/migrations.test.ts`. UI controls remain UI-01.3; burned-in rendering and
+preflight integration remain RND-01/RND-02.
+
 - **SPEC / gates:** 3.2, 5.3, 6.7; G5, G6.
 - **Prerequisites / unblocks:** TRC-01, EDT-01, and EDT-02; unblocks RND-01 and
   RND-02.

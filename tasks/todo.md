@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] EDT-04 — Implement caption data, editing, layout checks, and sidecars.
+- [ ] EDT-05 — Implement deterministic source and bed audio decisions.
 
 ## Completed
 
+- [x] EDT-04 — Implement caption data, editing, layout checks, and sidecars.
 - [x] EDT-03 — Add independent automatic and manual crop tracks.
 - [x] EDT-02 — Persist template clones, materialized lineage, and complete
   assets.

@@ -3,7 +3,7 @@ import { openDatabase } from "../src/core/database";
 import { Repository } from "../src/core/repository";
 import { starterTemplates } from "../src/shared/templates";
 import { AppError } from "../src/shared/errors";
-import { candidate, episode } from "./factories";
+import { candidate, captionState, episode } from "./factories";
 
 const databases: ReturnType<typeof openDatabase>[] = [];
 const setup = () => {
@@ -29,10 +29,7 @@ describe("repository revisions and recovery", () => {
         templateId: starterTemplates[1]!.id, templateVersion: starterTemplates[1]!.version, parentTemplateId: null
       },
       composition: structuredClone(starterTemplates[1]!.composition),
-      captions: {
-        enabled: true, segments: [],
-        style: { fontFamily: "Arial", fontSize: 64, color: "#fff", highlightColor: "#ff0" }
-      },
+      captions: captionState(),
       audio: {
         sourceGainDb: 0, muted: false, fadeInMs: 0, fadeOutMs: 0,
         bedAssetId: null, bedGainDb: null, normalizeLoudness: false

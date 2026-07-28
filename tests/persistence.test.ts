@@ -4,7 +4,7 @@ import { openDatabase } from "../src/core/database";
 import { Repository } from "../src/core/repository";
 import { AppError } from "../src/shared/errors";
 import { starterTemplates } from "../src/shared/templates";
-import { candidate, episode, segments } from "./factories";
+import { candidate, captionState, episode, segments } from "./factories";
 
 const databases: ReturnType<typeof openDatabase>[] = [];
 const setup = () => {
@@ -150,11 +150,13 @@ describe("complete transactional persistence", () => {
         parentTemplateId: null
       },
       composition: structuredClone(starterTemplates[0]!.composition),
-      captions: {
-        enabled: true,
-        segments: segments(2),
-        style: { fontFamily: "Inter", fontSize: 72, color: "#eee", highlightColor: "#f00" }
-      },
+      captions: captionState(segments(2).map((segment) => ({
+        id: segment.id,
+        startMs: segment.startMs,
+        endMs: segment.endMs,
+        text: segment.text,
+        words: segment.words.map(({ startMs, endMs, text }) => ({ startMs, endMs, text }))
+      }))),
       audio: {
         sourceGainDb: -2,
         muted: false,

@@ -127,6 +127,28 @@ describe("artifact store", () => {
       .some((entry) => String(entry).endsWith(".tmp"))).toBe(false);
   });
 
+  it("rolls every file and record back when a batch commit fails", () => {
+    const { directory, repository, store } = setup();
+    const ownerId = randomUUID();
+    const paths = [
+      `artifacts/shorts/${ownerId}/revisions/2/captions.srt`,
+      `artifacts/shorts/${ownerId}/revisions/2/captions.vtt`
+    ];
+    expect(() => store.finalizeBatch(paths.map((relativePath, index) => ({
+      kind: index === 0 ? "caption_srt" : "caption_webvtt",
+      ownerType: "short" as const,
+      ownerId,
+      ownerRevision: 2,
+      relativePath,
+      producerVersion: "test-v1",
+      bytes: Buffer.from(index === 0 ? "caption" : "WEBVTT\n\n")
+    })), () => {
+      throw new Error("injected Short mutation failure");
+    })).toThrowError(AppError);
+    expect(paths.every((path) => !existsSync(join(directory, path)))).toBe(true);
+    expect(repository.listArtifactRecords(ownerId)).toEqual([]);
+  });
+
   it.each([
     "../source.mp4",
     "artifacts/../source.mp4",

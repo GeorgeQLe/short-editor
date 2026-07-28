@@ -15,7 +15,7 @@ import { Repository } from "../src/core/repository";
 import { CoreService } from "../src/core/service";
 import { starterTemplates } from "../src/shared/templates";
 import type { ShortProject } from "../src/shared/domain";
-import { episode } from "./factories";
+import { captionState, episode } from "./factories";
 
 const directories: string[] = [];
 const repositories: Repository[] = [];
@@ -57,11 +57,7 @@ function setup(speakerLayerId = "speaker") {
         layer.id === "speaker" ? { ...layer, id: speakerLayerId } : layer
       )
     },
-    captions: {
-      enabled: true,
-      segments: [],
-      style: { fontFamily: "Arial", fontSize: 64, color: "#fff", highlightColor: "#ff0" }
-    },
+    captions: captionState(),
     audio: {
       sourceGainDb: 0,
       muted: false,

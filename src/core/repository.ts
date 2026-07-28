@@ -1018,6 +1018,38 @@ export class Repository {
     })();
   }
 
+  updateShortCaptions(
+    id: string,
+    expectedRevision: number,
+    captions: ShortProject["captions"]
+  ): ShortProject {
+    return this.transaction(() => {
+      const current = this.getShort(id);
+      if (current.revision !== expectedRevision) {
+        throw revisionConflict("Short", expectedRevision, current.revision);
+      }
+      const now = new Date().toISOString();
+      const nextRevision = expectedRevision + 1;
+      const changed = this.db.prepare(`
+        UPDATE short_projects
+        SET captions_json=?,approved=0,revision=?,updated_at=?
+        WHERE id=? AND revision=?
+      `).run(JSON.stringify(captions), nextRevision, now, id, expectedRevision);
+      if (!changed.changes) {
+        throw revisionConflict("Short", expectedRevision, this.getShort(id).revision);
+      }
+      this.db.prepare(`
+        UPDATE renders SET state='stale',updated_at=?
+        WHERE short_id=? AND state='succeeded' AND project_revision<?
+      `).run(now, id, nextRevision);
+      this.db.prepare(`
+        UPDATE schedule_entries SET needs_rerender=1,updated_at=?,revision=revision+1
+        WHERE short_id=? AND status<>'published'
+      `).run(now, id);
+      return this.getShort(id);
+    });
+  }
+
   approveShort(id: string, expectedRevision: number): ShortProject {
     return this.db.transaction(() => {
       const current = this.getShort(id);

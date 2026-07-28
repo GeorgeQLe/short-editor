@@ -18,7 +18,7 @@ import type {
   TranscriptSegment
 } from "../src/shared/domain";
 import { starterTemplates } from "../src/shared/templates";
-import { episode, segments } from "./factories";
+import { captionState, episode, segments } from "./factories";
 
 const repositories: Repository[] = [];
 const servers: Server[] = [];
@@ -66,16 +66,7 @@ function shortProject(episodeId: string): ShortProject {
       parentTemplateId: null
     },
     composition: structuredClone(template.composition),
-    captions: {
-      enabled: true,
-      segments: [],
-      style: {
-        fontFamily: "Arial",
-        fontSize: 64,
-        color: "#ffffff",
-        highlightColor: "#ffff00"
-      }
-    },
+    captions: captionState(),
     audio: {
       sourceGainDb: 0,
       muted: false,

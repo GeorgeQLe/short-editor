@@ -2,6 +2,95 @@
 
 ## 2026-07-28
 
+- Completed EDT-04 with migration 10 independent caption cues/words, complete
+  approved Inter Regular/Bold styles, persisted typed warnings and sidecar
+  references, and official OFL-licensed Inter 4.1 resources included in
+  Electron packaging.
+- Added deterministic OpenType advance/line/glyph analysis for explicit line
+  breaks, whitespace wrapping, safe areas, canvas overflow, missing glyphs,
+  sub-500 ms cues, overlaps, and source-range containment.
+- Added exact-CAS caption updates over service, HTTP, and MCP with one revision
+  increment, approval clearing, successful-render staleness, non-published-only
+  schedule flags, published-entry preservation, and transcript independence.
+  Revision-owned LF-normalized UTF-8-without-BOM SRT/WebVTT sidecars remap
+  disjoint Episode ranges to contiguous output time and are finalized in the
+  same rollback boundary as the Short and artifact records.
+- Added migration, schema, layout, timing, encoding, lifecycle, transport,
+  missing-dependency, and artifact rollback coverage. Full verification passes
+  33 test files and 222 tests plus production build/typecheck and diff hygiene.
+  UI controls remain UI-01.3; burned-in composition/preflight remain
+  RND-01/RND-02. Promoted EDT-05 as the sole current executable task.
+
+### EDT-04 ship manifest
+
+- **User goal:** Complete EDT-04 with deterministic editable caption data,
+  layout and timing checks, revision-owned SRT/WebVTT sidecars, and public
+  service/HTTP/MCP mutation parity.
+- **Changed files:** `IMPLEMENTATION_PLAN.md`, `SPEC.md`, `package.json`,
+  `package-lock.json`, `resources/fonts/Inter-Regular.otf`,
+  `resources/fonts/Inter-Bold.otf`, `resources/fonts/OFL.txt`,
+  `src/core/api.ts`, `src/core/artifact-store.ts`, `src/core/captions.ts`,
+  `src/core/database.ts`, `src/core/repository.ts`, `src/core/service.ts`,
+  `src/mcp/server.ts`, `src/shared/contracts.ts`,
+  `tests/artifact-store.test.ts`, `tests/caption-service.test.ts`,
+  `tests/captions.test.ts`, `tests/crop-service.test.ts`,
+  `tests/domain-contracts.test.ts`, `tests/factories.ts`,
+  `tests/migrations.test.ts`, `tests/persistence.test.ts`,
+  `tests/repository.test.ts`, `tests/short-lifecycle.test.ts`,
+  `tests/transcript-editing.test.ts`, `tasks/todo.md`, and
+  `tasks/history.md`.
+- **Per-file purpose:** `IMPLEMENTATION_PLAN.md` and `SPEC.md` record EDT-04
+  completion and separate remaining audio/render/UI scope; `package.json` and
+  `package-lock.json` add deterministic OpenType metrics and package the fonts;
+  the three `resources/fonts/*` files provide approved Inter Regular/Bold
+  runtime resources and their license; `src/core/captions.ts` implements
+  layout, glyph, timing, overlap, source-range, and sidecar logic;
+  `src/shared/contracts.ts` defines strict caption inputs, state, warnings, and
+  results; `src/core/database.ts` migrates legacy caption state;
+  `src/core/artifact-store.ts` atomically finalizes multi-file artifact batches;
+  `src/core/repository.ts` persists exact-CAS caption changes and dependent
+  invalidation; `src/core/service.ts` coordinates analysis, sidecars, and the
+  Short mutation; `src/core/api.ts` and `src/mcp/server.ts` expose transport
+  parity; `tests/captions.test.ts`, `tests/caption-service.test.ts`,
+  `tests/artifact-store.test.ts`, and `tests/migrations.test.ts` cover the new
+  behavior and rollback boundaries; `tests/factories.ts` centralizes valid
+  caption fixtures; the six remaining changed test files migrate existing
+  fixtures and assertions to the new contract; `tasks/todo.md` closes EDT-04
+  and promotes EDT-05; and `tasks/history.md` records the work and evidence.
+- **User-goal mapping:** The schema, engine, fonts, migration, artifact batch,
+  repository/service mutation, and HTTP/MCP surfaces form the complete EDT-04
+  path. Dedicated tests prove each contract and existing-suite fixture updates
+  preserve compatibility with the new persisted shape.
+- **Tests run:** Executable verification: `npm test` passed all 33 files and
+  222 tests after the final review fix; `npm run build` passed application
+  typecheck, Vite production build, and Node TypeScript compilation. Targeted
+  executable verification: `npm test -- --run tests/captions.test.ts` passed
+  all 8 caption-engine tests. Repository verification: `git diff --check`
+  passed without warnings.
+- **Skipped tests:** Interactive caption editing remains UI-01.3 because this
+  change exposes core/HTTP/MCP behavior but does not add the editor controls.
+  Burned-in caption composition and render preflight remain RND-01/RND-02.
+  Packaged native Windows font loading remains part of the later WIN gate; the
+  current environment verifies the same packaged font files through the
+  platform-neutral engine and build configuration.
+- **Adversarial review:** A failure-oriented review traced caption schema,
+  migration, layout, source-time remapping, sidecar encoding, artifact/Short
+  rollback, stale-write handling, and public interface parity. It found that an
+  adjacent-pair overlap scan missed a later cue nested beneath one long-running
+  cue, and that disabled captions unnecessarily loaded a font. The engine now
+  tracks the latest-ending active cue, bypasses font loading when disabled, and
+  has regression coverage for both cases. No blocking findings remain.
+- **Residual risk:** Windows packaged-resource resolution and real rendered
+  visual placement are not exercised on this macOS core-test boundary. A user
+  would first notice either issue during packaged Windows caption editing or
+  RND composition; UI-01.3, RND-01/RND-02, and the later WIN gate own those
+  checks.
+- **Rollback note:** Revert the EDT-04 feature commit before deploying
+  migration 10. After a database has migrated, restore a pre-migration backup
+  rather than attempting a down migration.
+- **Next command:** `$exec` for EDT-05, deterministic source and bed audio
+  decisions.
+
 - Completed EDT-03 with migration 9 independent automatic/manual crop tracks,
   typed face/person/screen observations, explicit starter person/screen targets,
   deterministic legacy manual UUIDs, and Short-output-time timestamp bounds.
