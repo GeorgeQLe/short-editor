@@ -537,6 +537,33 @@ const migrations: readonly Migration[] = [
     version: 11,
     name: "deterministic source and bed audio",
     up: (db) => migrateAudioState(db)
+  },
+  {
+    version: 12,
+    name: "immutable render preflights",
+    up: (db) => db.exec(`
+      CREATE TABLE render_preflights (
+        id TEXT PRIMARY KEY,
+        short_id TEXT NOT NULL REFERENCES short_projects(id),
+        project_revision INTEGER NOT NULL CHECK(project_revision > 0),
+        snapshot_json TEXT NOT NULL CHECK(json_valid(snapshot_json)),
+        snapshot_hash TEXT NOT NULL,
+        result_json TEXT NOT NULL CHECK(json_valid(result_json)),
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX render_preflights_short_revision_idx
+        ON render_preflights(short_id, project_revision, created_at);
+      CREATE TRIGGER render_preflights_no_update
+        BEFORE UPDATE ON render_preflights
+        BEGIN
+          SELECT RAISE(ABORT, 'render preflights are immutable');
+        END;
+      CREATE TRIGGER render_preflights_no_delete
+        BEFORE DELETE ON render_preflights
+        BEGIN
+          SELECT RAISE(ABORT, 'render preflights are immutable');
+        END;
+    `)
   }
 ];
 

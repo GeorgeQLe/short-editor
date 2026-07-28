@@ -953,6 +953,95 @@ export const renderSchema = z.strictObject({
 });
 export type Render = z.infer<typeof renderSchema>;
 
+export const renderPreflightFindingCodes = [
+  "SHORT_NOT_APPROVED",
+  "SOURCE_MISSING",
+  "SOURCE_CHANGED",
+  "SOURCE_PROBE_FAILED",
+  "SOURCE_VIDEO_STREAM_MISSING",
+  "SOURCE_VIDEO_STREAM_UNSUPPORTED",
+  "SOURCE_AUDIO_STREAM_MISSING",
+  "SOURCE_AUDIO_STREAM_UNSUPPORTED",
+  "SOURCE_RANGE_INVALID",
+  "ASSET_MISSING",
+  "ASSET_CHANGED",
+  "ASSET_KIND_MISMATCH",
+  "ASSET_INTEGRITY_FAILED",
+  "ASSET_PROBE_FAILED",
+  "CAPTION_OVERFLOW",
+  "CAPTION_SAFE_AREA",
+  "CAPTION_MISSING_GLYPH",
+  "CAPTION_SHORT_CUE",
+  "CAPTION_OVERLAP",
+  "CAPTION_OUTSIDE_SOURCE_RANGE",
+  "CAPTION_FONT_UNAVAILABLE",
+  "CROP_BOUNDS_INVALID",
+  "CROP_TIMESTAMP_INVALID",
+  "AUDIO_BED_INVALID",
+  "AUDIO_SPEECH_BACKGROUND_RATIO",
+  "AUDIO_SOURCE_MISSING",
+  "DURATION_EXCEEDED",
+  "FFMPEG_UNAVAILABLE",
+  "FFPROBE_UNAVAILABLE",
+  "OUTPUT_SETTINGS_INVALID",
+  "SAFE_AREA_INVALID",
+  "CONTENT_ID_WARNING"
+] as const;
+export const renderPreflightFindingCodeSchema = z.enum(renderPreflightFindingCodes);
+export type RenderPreflightFindingCode =
+  z.infer<typeof renderPreflightFindingCodeSchema>;
+export const renderPreflightFindingCategories = [
+  "approval",
+  "source",
+  "range",
+  "asset",
+  "caption",
+  "crop",
+  "audio",
+  "duration",
+  "dependency",
+  "output",
+  "safe_area",
+  "content_id"
+] as const;
+export const renderPreflightFindingCategorySchema =
+  z.enum(renderPreflightFindingCategories);
+const findingDetailValueSchema = z.union([
+  z.string().min(1),
+  z.number().finite(),
+  z.boolean()
+]);
+export const renderPreflightFindingSchema = z.strictObject({
+  code: renderPreflightFindingCodeSchema,
+  severity: validationSeveritySchema,
+  category: renderPreflightFindingCategorySchema,
+  message: z.string().min(1),
+  remediation: z.string().min(1),
+  details: z.record(z.string(), findingDetailValueSchema).optional(),
+  helpUrl: z.string().url().optional()
+});
+export type RenderPreflightFinding = z.infer<typeof renderPreflightFindingSchema>;
+export const renderPreflightRequestSchema = z.strictObject({
+  shortId: idSchema,
+  expectedRevision: positiveRevisionSchema
+});
+export type RenderPreflightRequest = z.infer<typeof renderPreflightRequestSchema>;
+export const renderPreflightDependencyVersionsSchema = z.strictObject({
+  ffmpeg: z.string().min(1).nullable(),
+  ffprobe: z.string().min(1).nullable()
+});
+export const renderPreflightResultSchema = z.strictObject({
+  id: idSchema,
+  shortId: idSchema,
+  revision: positiveRevisionSchema,
+  snapshotHash: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+  status: z.enum(["passed", "failed"]),
+  findings: z.array(renderPreflightFindingSchema),
+  dependencyVersions: renderPreflightDependencyVersionsSchema,
+  createdAt: utcInstantSchema
+});
+export type RenderPreflightResult = z.infer<typeof renderPreflightResultSchema>;
+
 export const scheduleRulesSchema = z.strictObject({
   startDate: dateSchema,
   timezone: ianaTimezoneSchema,

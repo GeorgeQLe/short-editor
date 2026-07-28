@@ -2,6 +2,25 @@
 
 ## 2026-07-28
 
+- Completed RND-01 with strict `{ shortId, expectedRevision }` preflight,
+  canonical `render-snapshot-v1` SHA-256 identity, migration 12 immutable audit
+  records, a centralized typed finding registry, and independent
+  FFmpeg/FFprobe version checks.
+- Snapshot capture now binds the exact Short revision, materialized
+  composition/lineage, ordered ranges, recomputed caption layouts, crop and
+  audio decisions, fixed v1 output requirements, and stable Episode/asset file
+  identity, metadata, and hashes. A transactional final revision check prevents
+  concurrent edits from being recorded under the requested revision.
+- Added matching strict HTTP `POST /v1/renders/preflight` and MCP
+  `renders.preflight` values with no public paths, stderr, or internal snapshot.
+  Focused tests cover canonical hashing and ordering, duration boundaries,
+  Content ID help, stale/concurrent revisions, repeatability, database
+  immutability, redaction, shared-asset binding validation, and no
+  Render/job/artifact creation. Adversarial review found and fixed an
+  overwritten-binding gap when one asset is reused by multiple layers. Full
+  verification passes 35 test files and 245 tests plus production build and
+  diff hygiene. Promoted RND-02 as current work.
+
 - Completed EDT-05 with migration 11 strict source/bed audio state, bounded gain
   and cut fades, nullable-pair asset binding, deterministic derived warnings,
   and removal of legacy loudness normalization.

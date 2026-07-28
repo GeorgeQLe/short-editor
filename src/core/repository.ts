@@ -2,16 +2,22 @@ import type { SqliteDatabase } from "./database.js";
 import type {
   AnalysisArtifact, Asset, CandidateContentPackage, CandidateGenerationDiagnostic,
   CandidateGenerationResult, CandidateGenerationRun, ClipCandidate, Composition,
-  ContentPackage, Episode, Job, Render,
+  ContentPackage, Episode, Job, Render, RenderPreflightResult,
   ProviderProvenance, ScheduleEntry, ScheduleRuleSet, ShortProject, Template, TranscriptRevision,
   TranscriptSegment, WatchedFolder
 } from "../shared/domain.js";
-import { analysisArtifactSchema, sourceRangesSchema, timedSegmentsSchema } from "../shared/domain.js";
+import {
+  analysisArtifactSchema,
+  renderPreflightResultSchema,
+  sourceRangesSchema,
+  timedSegmentsSchema
+} from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
 import { candidatesConflict, compareCandidates } from "./candidates.js";
 import { assertEpisodeTransition, type RelinkContext } from "../shared/episode-transitions.js";
 import { createHash, randomUUID } from "node:crypto";
 import { validateOwnedRelativePath } from "./artifact-path.js";
+import { canonicalJson } from "./analysis-cache.js";
 
 type Row = Record<string, unknown>;
 const bool = (value: unknown) => value === 1;
@@ -62,6 +68,11 @@ export interface RelinkComparison {
   expiresAt: string;
   consumedAt: string | null;
   createdAt: string;
+}
+
+export interface StoredRenderPreflight {
+  result: RenderPreflightResult;
+  snapshot: unknown;
 }
 
 export class Repository {
@@ -1312,6 +1323,71 @@ export class Repository {
       ? this.db.prepare("SELECT * FROM renders WHERE short_id=? ORDER BY created_at").all(shortId)
       : this.db.prepare("SELECT * FROM renders ORDER BY created_at").all();
     return (rows as Row[]).map(mapRender);
+  }
+
+  insertRenderPreflight(
+    expectedRevision: number,
+    snapshot: unknown,
+    result: RenderPreflightResult
+  ): RenderPreflightResult {
+    return this.transaction(() => {
+      const current = this.db.prepare(
+        "SELECT revision FROM short_projects WHERE id=?"
+      ).get(result.shortId) as { revision: number } | undefined;
+      if (!current) throw new AppError("NOT_FOUND", "Short not found", 404);
+      if (current.revision !== expectedRevision) {
+        throw revisionConflict("Short", expectedRevision, current.revision);
+      }
+      const parsed = renderPreflightResultSchema.parse(result);
+      if (parsed.revision !== expectedRevision) {
+        throw new AppError("VALIDATION_ERROR", "Render preflight revision does not match", 422);
+      }
+      const snapshotHash = `sha256:${createHash("sha256")
+        .update(canonicalJson(snapshot))
+        .digest("hex")}`;
+      if (parsed.snapshotHash !== snapshotHash) {
+        throw new AppError("VALIDATION_ERROR", "Render preflight snapshot hash does not match", 422);
+      }
+      this.db.prepare(`
+        INSERT INTO render_preflights(
+          id,short_id,project_revision,snapshot_json,snapshot_hash,result_json,created_at
+        ) VALUES(?,?,?,?,?,?,?)
+      `).run(
+        parsed.id,
+        parsed.shortId,
+        parsed.revision,
+        JSON.stringify(snapshot),
+        parsed.snapshotHash,
+        JSON.stringify(parsed),
+        parsed.createdAt
+      );
+      return parsed;
+    });
+  }
+
+  getRenderPreflight(id: string): StoredRenderPreflight {
+    const row = this.db.prepare(
+      "SELECT snapshot_json,result_json FROM render_preflights WHERE id=?"
+    ).get(id) as Row | undefined;
+    if (!row) throw new AppError("NOT_FOUND", "Render preflight not found", 404);
+    return {
+      snapshot: json<unknown>(row.snapshot_json),
+      result: renderPreflightResultSchema.parse(json<unknown>(row.result_json))
+    };
+  }
+
+  listRenderPreflights(shortId?: string): RenderPreflightResult[] {
+    const rows = shortId
+      ? this.db.prepare(`
+          SELECT result_json FROM render_preflights
+          WHERE short_id=? ORDER BY created_at,id
+        `).all(shortId)
+      : this.db.prepare(
+          "SELECT result_json FROM render_preflights ORDER BY created_at,id"
+        ).all();
+    return (rows as Row[]).map((row) =>
+      renderPreflightResultSchema.parse(json<unknown>(row.result_json))
+    );
   }
 
   createScheduleRuleSet(ruleSet: ScheduleRuleSet): ScheduleRuleSet {

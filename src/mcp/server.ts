@@ -8,6 +8,8 @@ import {
   compositionSchema,
   contentPackageSchema,
   cropDetectionObservationSchema,
+  renderPreflightRequestSchema,
+  renderPreflightResultSchema,
   sourceRangesSchema,
   templateCloneInputSchema,
   templateUpdateInputSchema,
@@ -258,6 +260,29 @@ register("shorts.remove_manual_crop", "Remove one UUID-addressed manual crop or 
 register("renders.start", "Queue a render for an approved, current Short revision.", {
   shortId: uuid, expectedRevision
 }, (input) => core("/renders/start", "POST", input));
+server.registerTool("renders.preflight", {
+  description: "Validate and persist one immutable Short revision render snapshot without creating output.",
+  inputSchema: {
+    shortId: renderPreflightRequestSchema.shape.shortId,
+    expectedRevision: renderPreflightRequestSchema.shape.expectedRevision
+  },
+  outputSchema: renderPreflightResultSchema
+}, async (input) => {
+  try {
+    const value = renderPreflightResultSchema.parse(
+      await core("/renders/preflight", "POST", input)
+    );
+    return { ...result(value), structuredContent: value };
+  } catch (error) {
+    return {
+      isError: true,
+      content: [{
+        type: "text" as const,
+        text: error instanceof Error ? error.message : String(error)
+      }]
+    };
+  }
+});
 register("renders.validate", "Probe and validate a final 1080×1920 H.264/AAC MP4.", {
   path: z.string()
 }, (input) => core("/renders/validate", "POST", input));

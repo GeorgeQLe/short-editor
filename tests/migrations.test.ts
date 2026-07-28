@@ -36,7 +36,8 @@ describe("database migrations", () => {
     for (const table of [
       "watched_folders", "transcript_revisions", "analysis_artifacts", "templates",
       "assets", "artifact_records", "renders", "schedule_rule_sets", "schedule_entries",
-      "cloud_authorizations", "jobs", "relink_comparisons", "candidate_generation_runs"
+      "cloud_authorizations", "jobs", "relink_comparisons", "candidate_generation_runs",
+      "render_preflights"
     ]) expect(tables.has(table), table).toBe(true);
   });
 

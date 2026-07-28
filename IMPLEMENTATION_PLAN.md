@@ -866,6 +866,12 @@ remain RND-01/RND-02; interactive controls remain UI-01.3.
   recovery. Capture macOS evidence; deferred to UI-01.4/UI-03 and WIN-03.6/.9.
 - **Evidence / acceptance:** G6 preflight matrix is complete and a filesystem
   snapshot proves no final render is created.
+- **Implementation evidence (2026-07-28):** Implemented with migration 12,
+  strict shared request/result/finding contracts, centralized registry,
+  canonical `render-snapshot-v1`, stable dependency/media/hash inspection,
+  atomic revision recheck, insert/read-only HTTP/MCP parity, and focused
+  no-output/repeatability/redaction/duration/concurrency coverage in
+  `tests/render-preflight.test.ts`. RND-02 remains the output boundary.
 
 ### RND-02 — Compose originals with an explicit FFmpeg graph
 

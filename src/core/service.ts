@@ -70,6 +70,7 @@ import {
   generateCaptionSidecars
 } from "./captions.js";
 import { deriveAudioWarnings } from "./audio.js";
+import { RenderPreflightService } from "./render-preflight.js";
 
 export class CoreService {
   constructor(
@@ -84,7 +85,16 @@ export class CoreService {
     readonly localVisualSampling?: LocalVisualSampler,
     private readonly activeCredentialHandles: Set<string> = new Set(),
     readonly openAi?: OpenAiProvider,
-    readonly captionEngine: CaptionEngine = new CaptionEngine()
+    readonly captionEngine: CaptionEngine = new CaptionEngine(),
+    readonly renderPreflights: RenderPreflightService = new RenderPreflightService(
+      repository,
+      captionEngine,
+      {
+        resolveOwnedPath: artifacts
+          ? (relativePath) => artifacts.resolveOwnedPath(relativePath)
+          : undefined
+      }
+    )
   ) {}
 
   async stop(): Promise<void> {
@@ -1160,6 +1170,15 @@ export class CoreService {
   }
   listRenders(shortId?: string) {
     return this.repository.listRenders(shortId);
+  }
+  preflightRender(shortId: string, expectedRevision: number) {
+    return this.renderPreflights.preflight(shortId, expectedRevision);
+  }
+  getRenderPreflight(id: string) {
+    return this.repository.getRenderPreflight(id).result;
+  }
+  listRenderPreflights(shortId?: string) {
+    return this.repository.listRenderPreflights(shortId);
   }
   startRender(shortId: string, expectedRevision: number) {
     const project = this.repository.getShort(shortId);

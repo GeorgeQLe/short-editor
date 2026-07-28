@@ -1,5 +1,98 @@
 # Ship manifest
 
+## RND-01 shipping boundary — 2026-07-28
+
+### User goal
+
+Add an insert-only render preflight that validates one exact approved Short
+revision, persists its complete render-decision snapshot, returns typed
+actionable findings, and creates no Render, job, or output artifact.
+
+### Changed files
+
+`IMPLEMENTATION_PLAN.md`, `README.md`, `SPEC.md`, `src/core/api.ts`,
+`src/core/database.ts`, `src/core/render-preflight.ts`,
+`src/core/repository.ts`, `src/core/service.ts`, `src/mcp/server.ts`,
+`src/shared/contracts.ts`, `tasks/history.md`, `tasks/ship-manifest.md`,
+`tasks/todo.md`, `tests/migrations.test.ts`, and
+`tests/render-preflight.test.ts`.
+
+### Per-file purpose
+
+- `src/shared/contracts.ts` defines strict request, result, dependency, category,
+  code, severity, remediation, identifier-detail, and help-link contracts.
+- `src/core/render-preflight.ts` implements the canonical snapshot, registry,
+  stable dependency/resource probing, decision recomputation, safe findings,
+  hashing, ordering, revision-bound workflow, and complete validation when one
+  asset is reused across multiple bindings.
+- `src/core/database.ts` adds migration 12 and database-enforced immutable
+  `render_preflights`; `src/core/repository.ts` exposes insert/read-only access
+  with an atomic final revision comparison.
+- `src/core/service.ts`, `src/core/api.ts`, and `src/mcp/server.ts` expose
+  identical strict HTTP/MCP values without internal paths, stderr, or snapshots.
+- `tests/render-preflight.test.ts` and `tests/migrations.test.ts` cover contracts,
+  hashes, ordering, dependency parsing, duration edges, Content ID help,
+  repeatability, stale/concurrent revisions, immutability, redaction, shared
+  asset bindings, prior-version upgrades, and no Render/job/artifact side
+  effects.
+- `README.md`, `SPEC.md`, `IMPLEMENTATION_PLAN.md`, `tasks/todo.md`,
+  `tasks/history.md`, and `tasks/ship-manifest.md` record the implemented
+  boundary, evidence, and promotion of RND-02.
+
+### User-goal mapping
+
+The contracts establish the public typed boundary; the preflight engine captures
+and validates the exact immutable render decision; migration and repository
+changes preserve an insert-only audit record with a final atomic revision check;
+HTTP/MCP surfaces expose only the safe result; and focused tests prove
+repeatability, redaction, immutability, concurrent-edit rejection, and the
+no-output invariant.
+
+### Tests run
+
+- Executable verification: `npm test -- --run
+  tests/render-preflight.test.ts` passed 10 tests after the adversarial-review
+  regression was added.
+- Executable verification: `npm test` passed 35 files and 245 tests.
+- Executable verification: `npm run build` passed typecheck, Vite production
+  build, and Node compilation.
+- Repository verification: `git diff --check` and the added-line credential
+  scan passed.
+
+### Skipped tests
+
+Native Windows NSIS packaging was skipped because RND-01 changes the
+platform-neutral core/schema/transports and creates no packaged or final media.
+Visual output inspection was skipped because RND-01 intentionally creates no
+output; RND-02 owns the first FFmpeg output artifact and its media fixtures.
+
+### Adversarial review
+
+A failure-oriented changed-file review traced stale and concurrent revisions,
+snapshot hash recomputation, database immutability, dependency independence,
+resource changes during inspection, public redaction, finding determinism, and
+multi-layer asset reuse. It found that the asset inspection map overwrote an
+earlier binding when one asset ID appeared on multiple layers. The implementation
+now validates every binding while probing each file once, with a focused
+regression test. No unresolved finding remains.
+
+### Residual risk
+
+The immutable preflight is executable and tested, but it does not yet feed a
+real FFmpeg graph. Cross-platform binary behavior and final audiovisual output
+remain unproven until RND-02 and the later Windows gate.
+
+### Rollback note
+
+Revert the RND-01 feature commit before deploying migration 12. After a database
+has migrated, restore a pre-migration backup rather than attempting a down
+migration.
+
+### Next command
+
+Run `npx skillpacks install exec-loop` from the project shell before invoking
+`$exec` for RND-02.
+
 ## EDT-03 shipping boundary — 2026-07-28
 
 ### User goal
