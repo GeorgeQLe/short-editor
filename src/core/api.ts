@@ -7,6 +7,10 @@ import {
   candidateContentPackageAcceptInputSchema,
   compositionSchema,
   contentPackageSchema,
+  cropReanalysisInputSchema,
+  manualCropAddInputSchema,
+  manualCropMoveInputSchema,
+  manualCropRemoveInputSchema,
   scheduleRulesSchema,
   shortApprovalInputSchema,
   shortTimelineUpdateInputSchema,
@@ -172,6 +176,41 @@ export function createApi(service: CoreService, desktopToken?: string) {
   app.post("/v1/shorts/:id/approve", route((req) => {
     const input = shortApprovalInputSchema.parse(req.body);
     return service.approveShort(id.parse(req.params.id), input.expectedRevision);
+  }));
+  app.post("/v1/shorts/:id/crops/reanalyze", route((req) =>
+    service.reanalyzeCrops(
+      id.parse(req.params.id),
+      cropReanalysisInputSchema.parse(req.body)
+    )
+  ));
+  app.post("/v1/shorts/:id/layers/:layerId/crops/manual", route((req) =>
+    service.addManualCropControl(
+      id.parse(req.params.id),
+      z.string().min(1).parse(req.params.layerId),
+      manualCropAddInputSchema.parse(req.body)
+    )
+  ));
+  app.put("/v1/shorts/:id/layers/:layerId/crops/manual/:controlId", route((req) => {
+    const input = manualCropMoveInputSchema.parse({
+      ...req.body,
+      controlId: req.params.controlId
+    });
+    return service.moveManualCropControl(
+      id.parse(req.params.id),
+      z.string().min(1).parse(req.params.layerId),
+      input
+    );
+  }));
+  app.delete("/v1/shorts/:id/layers/:layerId/crops/manual/:controlId", route((req) => {
+    const input = manualCropRemoveInputSchema.parse({
+      ...req.body,
+      controlId: req.params.controlId
+    });
+    return service.removeManualCropControl(
+      id.parse(req.params.id),
+      z.string().min(1).parse(req.params.layerId),
+      input
+    );
   }));
   app.get("/v1/templates", (_req, res) => res.json(ok(service.listTemplates())));
   app.post("/v1/templates/:id/clone", route((req) => {

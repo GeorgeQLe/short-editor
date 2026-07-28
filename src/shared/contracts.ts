@@ -408,27 +408,136 @@ export const candidateGenerationResultSchema = z.strictObject({
 });
 export type CandidateGenerationResult = z.infer<typeof candidateGenerationResultSchema>;
 
-export const cropKeyframeSchema = z.strictObject({
+const cropRectangleAtSchema = z.strictObject({
   atMs: z.number().int().nonnegative(),
+  ...normalizedRectangleSchema.shape
+});
+
+function orderedUniqueTimes<T extends z.ZodTypeAny>(schema: T) {
+  return z.array(schema).superRefine((items, context) => {
+    for (let index = 1; index < items.length; index++) {
+      const previous = items[index - 1] as { atMs: number };
+      const current = items[index] as { atMs: number };
+      if (current.atMs <= previous.atMs) {
+        context.addIssue({
+          code: "custom",
+          path: [index, "atMs"],
+          message: "Crop timestamps must be unique and strictly increasing"
+        });
+      }
+    }
+  });
+}
+
+export const cropDetectionObservationSchema = z.strictObject({
   ...normalizedRectangleSchema.shape,
-  source: z.enum(["automatic", "manual"])
-}).superRefine((frame, context) => {
-  if (frame.x + frame.width > 1) {
-    context.addIssue({ code: "custom", path: ["width"], message: "Crop exceeds horizontal bounds" });
-  }
-  if (frame.y + frame.height > 1) {
-    context.addIssue({ code: "custom", path: ["height"], message: "Crop exceeds vertical bounds" });
+  confidence: z.number().min(0).max(1).optional()
+});
+export type CropDetectionObservation = z.infer<typeof cropDetectionObservationSchema>;
+
+export const visualCropSampleSchema = z.strictObject({
+  atMs: z.number().int().nonnegative(),
+  activity: z.number().min(0).max(1),
+  speakerFraming: z.number().min(0).max(1).nullable(),
+  faceCount: z.number().int().nonnegative().nullable(),
+  screenShare: z.boolean().nullable(),
+  faces: z.array(cropDetectionObservationSchema).optional(),
+  people: z.array(cropDetectionObservationSchema).optional(),
+  screens: z.array(cropDetectionObservationSchema).optional()
+});
+export type VisualCropSample = z.infer<typeof visualCropSampleSchema>;
+
+export const automaticCropFrameSchema = cropRectangleAtSchema;
+export type AutomaticCropFrame = z.infer<typeof automaticCropFrameSchema>;
+export const automaticCropProvenanceSchema = z.strictObject({
+  artifactId: idSchema,
+  artifactContentHash: z.string().min(1),
+  generatorVersion: z.string().min(1),
+  smoothingVersion: z.string().min(1),
+  target: z.enum(["person", "screen", "auto"]),
+  sourceWidth: z.number().int().positive().nullable(),
+  sourceHeight: z.number().int().positive().nullable(),
+  generatedAt: utcInstantSchema
+});
+export const automaticCropFallbackSchema = z.strictObject({
+  mode: z.enum(["none", "fit", "fill"]),
+  reason: z.enum([
+    "none",
+    "missing_samples",
+    "missing_detections",
+    "unsupported_detection",
+    "missing_dimensions",
+    "unmatched_source"
+  ])
+}).superRefine((fallback, context) => {
+  if ((fallback.mode === "none") !== (fallback.reason === "none")) {
+    context.addIssue({
+      code: "custom",
+      path: ["reason"],
+      message: "A fallback mode and reason must either both be present or both be absent"
+    });
   }
 });
-export const layerSchema = z.strictObject({
+export const automaticCropTrackSchema = z.strictObject({
+  frames: orderedUniqueTimes(automaticCropFrameSchema),
+  provenance: automaticCropProvenanceSchema.nullable(),
+  fallback: automaticCropFallbackSchema
+});
+export type AutomaticCropTrack = z.infer<typeof automaticCropTrackSchema>;
+
+export const manualCropControlSchema = z.discriminatedUnion("mode", [
+  z.strictObject({
+    id: idSchema,
+    mode: z.literal("crop"),
+    atMs: z.number().int().nonnegative(),
+    x: normalizedRectangleSchema.shape.x,
+    y: normalizedRectangleSchema.shape.y,
+    width: normalizedRectangleSchema.shape.width,
+    height: normalizedRectangleSchema.shape.height
+  }).superRefine((frame, context) => {
+    if (frame.x + frame.width > 1) {
+      context.addIssue({ code: "custom", path: ["width"], message: "Crop exceeds horizontal bounds" });
+    }
+    if (frame.y + frame.height > 1) {
+      context.addIssue({ code: "custom", path: ["height"], message: "Crop exceeds vertical bounds" });
+    }
+  }),
+  z.strictObject({
+    id: idSchema,
+    mode: z.literal("automatic"),
+    atMs: z.number().int().nonnegative()
+  })
+]);
+export type ManualCropControl = z.infer<typeof manualCropControlSchema>;
+export const manualCropTrackSchema = orderedUniqueTimes(manualCropControlSchema);
+
+const layerBase = {
   id: z.string().min(1),
-  type: z.enum(["video", "image", "captions", "shape", "logo"]),
   source: z.enum(["episode", "asset", "none"]),
   assetId: idSchema.nullable(),
   region: normalizedRectangleSchema,
-  fit: z.enum(["fill", "fit"]),
-  cropTrack: z.array(cropKeyframeSchema).default([])
+  fit: z.enum(["fill", "fit"])
+};
+const emptyAutomaticCropTrack = {
+  frames: [],
+  provenance: null,
+  fallback: { mode: "fit" as const, reason: "missing_samples" as const }
+};
+export const videoLayerSchema = z.strictObject({
+  ...layerBase,
+  type: z.literal("video"),
+  cropTarget: z.enum(["person", "screen", "auto"]).default("auto"),
+  automaticCropTrack: automaticCropTrackSchema.default(emptyAutomaticCropTrack),
+  manualCropTrack: manualCropTrackSchema.default([])
 });
+export const nonVideoLayerSchema = z.strictObject({
+  ...layerBase,
+  type: z.enum(["image", "captions", "shape", "logo"])
+});
+export const layerSchema = z.discriminatedUnion("type", [
+  videoLayerSchema,
+  nonVideoLayerSchema
+]);
 export const compositionSchema = z.strictObject({
   width: z.literal(1080),
   height: z.literal(1920),
@@ -511,6 +620,29 @@ export const shortProjectSchema = z.strictObject({
   revision: positiveRevisionSchema,
   createdAt: utcInstantSchema,
   updatedAt: utcInstantSchema
+}).superRefine((project, context) => {
+  const durationMs = project.sourceRanges.reduce(
+    (total, range) => total + range.endMs - range.startMs,
+    0
+  );
+  project.composition.layers.forEach((layer, layerIndex) => {
+    if (layer.type !== "video") return;
+    const tracks = [
+      ["automaticCropTrack", layer.automaticCropTrack.frames] as const,
+      ["manualCropTrack", layer.manualCropTrack] as const
+    ];
+    for (const [track, controls] of tracks) {
+      controls.forEach((control, controlIndex) => {
+        if (control.atMs > durationMs) {
+          context.addIssue({
+            code: "custom",
+            path: ["composition", "layers", layerIndex, track, controlIndex, "atMs"],
+            message: "Crop timestamp exceeds the Short output duration"
+          });
+        }
+      });
+    }
+  });
 });
 export type ShortProject = z.infer<typeof shortProjectSchema>;
 
@@ -524,6 +656,29 @@ export const shortApprovalInputSchema = z.strictObject({
   expectedRevision: positiveRevisionSchema
 });
 export type ShortApprovalInput = z.infer<typeof shortApprovalInputSchema>;
+
+export const cropReanalysisInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  layerIds: z.array(z.string().min(1)).min(1).optional()
+});
+export type CropReanalysisInput = z.infer<typeof cropReanalysisInputSchema>;
+export const manualCropAddInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  control: manualCropControlSchema
+});
+export type ManualCropAddInput = z.infer<typeof manualCropAddInputSchema>;
+export const manualCropMoveInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  controlId: idSchema,
+  atMs: z.number().int().nonnegative(),
+  crop: normalizedRectangleSchema.optional()
+});
+export type ManualCropMoveInput = z.infer<typeof manualCropMoveInputSchema>;
+export const manualCropRemoveInputSchema = z.strictObject({
+  expectedRevision: positiveRevisionSchema,
+  controlId: idSchema
+});
+export type ManualCropRemoveInput = z.infer<typeof manualCropRemoveInputSchema>;
 
 export const templateSchema = z.strictObject({
   id: z.string().min(1),

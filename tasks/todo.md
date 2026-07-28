@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] EDT-03 — Add independent automatic and manual crop tracks.
+- [ ] EDT-04 — Implement caption data, editing, layout checks, and sidecars.
 
 ## Completed
 
+- [x] EDT-03 — Add independent automatic and manual crop tracks.
 - [x] EDT-02 — Persist template clones, materialized lineage, and complete
   assets.
 - [x] EDT-01 — Complete the Short timeline and approval lifecycle.

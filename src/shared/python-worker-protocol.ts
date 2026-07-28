@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { providerProvenanceSchema } from "./contracts.js";
+import { providerProvenanceSchema, visualCropSampleSchema } from "./contracts.js";
 import { idSchema } from "./validators.js";
 
 export const PYTHON_WORKER_PROTOCOL_VERSION = "v1" as const;
@@ -178,13 +178,7 @@ export const visualSamplingWorkerResultSchema = z.strictObject({
     faceDetection: z.enum(["supported", "unsupported"]),
     screenShareDetection: z.enum(["supported", "unsupported"])
   }),
-  samples: z.array(z.strictObject({
-    atMs: z.number().int().nonnegative(),
-    activity: z.number().min(0).max(1),
-    speakerFraming: z.number().min(0).max(1).nullable(),
-    faceCount: z.number().int().nonnegative().nullable(),
-    screenShare: z.boolean().nullable()
-  })),
+  samples: z.array(visualCropSampleSchema),
   provenance: providerProvenanceSchema
 });
 export const providerCallWorkerResultSchema = z.strictObject({

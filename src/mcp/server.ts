@@ -5,6 +5,7 @@ import {
   assetImportInputSchema,
   compositionSchema,
   contentPackageSchema,
+  cropDetectionObservationSchema,
   sourceRangesSchema,
   templateCloneInputSchema,
   templateUpdateInputSchema,
@@ -16,7 +17,7 @@ const server = new McpServer({ name: "short-editor", version: "1.0.0" });
 const uuid = z.string().uuid();
 const expectedRevision = z.number().int().positive();
 
-type Method = "GET" | "POST" | "PUT";
+type Method = "GET" | "POST" | "PUT" | "DELETE";
 async function core(path: string, method: Method = "GET", body?: unknown): Promise<unknown> {
   const response = await fetch(`${coreUrl}${path}`, {
     method,
@@ -187,6 +188,54 @@ register("shorts.update_copy", "Update accepted copy without overwriting other f
 register("shorts.approve", "Approve the current Short revision after timeline and copy validation.", {
   shortId: uuid, expectedRevision
 }, ({ shortId, ...input }) => core(`/shorts/${shortId}/approve`, "POST", input));
+register("shorts.reanalyze_crops", "Regenerate independent automatic crop tracks from the newest complete visual samples.", {
+  shortId: uuid,
+  expectedRevision,
+  layerIds: z.array(z.string().min(1)).min(1).optional()
+}, ({ shortId, ...input }) => core(`/shorts/${shortId}/crops/reanalyze`, "POST", input));
+register("shorts.add_manual_crop", "Add a crop override or explicit return-to-automatic control to one video layer.", {
+  shortId: uuid,
+  layerId: z.string().min(1),
+  expectedRevision,
+  control: z.discriminatedUnion("mode", [
+    z.strictObject({
+      id: uuid,
+      mode: z.literal("crop"),
+      atMs: z.number().int().nonnegative(),
+      ...cropDetectionObservationSchema.omit({ confidence: true }).shape
+    }),
+    z.strictObject({
+      id: uuid,
+      mode: z.literal("automatic"),
+      atMs: z.number().int().nonnegative()
+    })
+  ])
+}, ({ shortId, layerId, ...input }) =>
+  core(`/shorts/${shortId}/layers/${encodeURIComponent(String(layerId))}/crops/manual`, "POST", input));
+register("shorts.move_manual_crop", "Move or numerically update one UUID-addressed manual crop control.", {
+  shortId: uuid,
+  layerId: z.string().min(1),
+  expectedRevision,
+  controlId: uuid,
+  atMs: z.number().int().nonnegative(),
+  crop: cropDetectionObservationSchema.omit({ confidence: true }).optional()
+}, ({ shortId, layerId, controlId, ...input }) =>
+  core(
+    `/shorts/${shortId}/layers/${encodeURIComponent(String(layerId))}/crops/manual/${controlId}`,
+    "PUT",
+    input
+  ));
+register("shorts.remove_manual_crop", "Remove one UUID-addressed manual crop or automatic-resume control.", {
+  shortId: uuid,
+  layerId: z.string().min(1),
+  expectedRevision,
+  controlId: uuid
+}, ({ shortId, layerId, controlId, ...input }) =>
+  core(
+    `/shorts/${shortId}/layers/${encodeURIComponent(String(layerId))}/crops/manual/${controlId}`,
+    "DELETE",
+    input
+  ));
 
 register("renders.start", "Queue a render for an approved, current Short revision.", {
   shortId: uuid, expectedRevision

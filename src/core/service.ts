@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
 import {
   type ContentPackage,
@@ -12,6 +13,12 @@ import {
   type TranscriptRevision,
   type ProviderProvenance,
   type WatchedFolderConfigurationInput,
+  type ManualCropControl,
+  type CropReanalysisInput,
+  type ManualCropAddInput,
+  type ManualCropMoveInput,
+  type ManualCropRemoveInput,
+  compositionSchema,
   watchedFolderConfigurationInputSchema
 } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
@@ -21,7 +28,7 @@ import type { MediaService } from "./media.js";
 import type { JobQueue } from "./jobs.js";
 import { draftSchedule, type SchedulableShort } from "./scheduler.js";
 import { validateRender } from "./render.js";
-import type { ArtifactStore } from "./artifact-store.js";
+import { sha256, type ArtifactStore } from "./artifact-store.js";
 import type { CloudAuthorization } from "./repository.js";
 import { WatchedFolderCoordinator } from "./watched-folders.js";
 import {
@@ -46,6 +53,10 @@ import {
 } from "../shared/domain.js";
 import type { OpenAiProvider } from "./openai-provider.js";
 import { canonicalJson } from "./analysis-cache.js";
+import {
+  generateAutomaticCropTrack,
+  visualCropArtifactSchema
+} from "./crops.js";
 
 export class CoreService {
   constructor(
@@ -739,6 +750,167 @@ export class CoreService {
   approveShort(id: string, expectedRevision: number) {
     return this.repository.approveShort(id, expectedRevision);
   }
+  reanalyzeCrops(id: string, input: CropReanalysisInput) {
+    const project = this.repository.getShort(id);
+    if (project.revision !== input.expectedRevision) {
+      throw new AppError("REVISION_CONFLICT", "Short was edited by another client", 409, {
+        expectedRevision: input.expectedRevision,
+        actualRevision: project.revision
+      });
+    }
+    if (!this.artifacts) {
+      throw new AppError("DEPENDENCY_UNAVAILABLE", "Artifact store is unavailable", 503);
+    }
+    const selected = input.layerIds ? new Set(input.layerIds) : null;
+    const videoLayers = project.composition.layers.filter((layer) => layer.type === "video");
+    if (selected) {
+      const available = new Set(videoLayers.map((layer) => layer.id));
+      const invalid = input.layerIds!.filter((layerId) => !available.has(layerId));
+      if (invalid.length) {
+        throw new AppError("VALIDATION_ERROR", "Crop re-analysis requires video layer IDs", 422, {
+          layerIds: invalid
+        });
+      }
+    }
+    const candidates = [...this.repository.listArtifactRecords(project.episodeId)]
+      .filter((artifact) =>
+        artifact.kind === "analysis_visual_input" && artifact.state === "complete"
+      )
+      .reverse();
+    if (!candidates.length) {
+      throw new AppError("INVALID_STATE", "No complete visual-sampling artifact is available", 409);
+    }
+    let selectedArtifact: {
+      record: (typeof candidates)[number];
+      visual: ReturnType<typeof visualCropArtifactSchema.parse>;
+    } | null = null;
+    for (const record of candidates) {
+      try {
+        const bytes = readFileSync(this.artifacts.resolveOwnedPath(record.relativePath));
+        const contentHash = sha256(bytes);
+        if (contentHash !== record.contentHash) continue;
+        selectedArtifact = {
+          record,
+          visual: visualCropArtifactSchema.parse(JSON.parse(bytes.toString("utf8")))
+        };
+        break;
+      } catch {
+        // Continue to the next-newest complete, valid visual input.
+      }
+    }
+    if (!selectedArtifact) {
+      throw new AppError("INVALID_STATE", "No valid visual-sampling artifact is available", 409);
+    }
+    const artifactRecord = selectedArtifact.record;
+    const visual = selectedArtifact.visual;
+    const episode = this.repository.getEpisode(project.episodeId);
+    const outputDurationMs = project.sourceRanges.reduce(
+      (total, range) => total + range.endMs - range.startMs,
+      0
+    );
+    const generatedAt = new Date().toISOString();
+    const composition = compositionSchema.parse({
+      ...project.composition,
+      layers: project.composition.layers.map((layer) => {
+        if (layer.type !== "video" || (selected && !selected.has(layer.id))) return layer;
+        const asset = layer.source === "asset" && layer.assetId
+          ? this.repository.getAsset(layer.assetId)
+          : null;
+        return {
+          ...layer,
+          automaticCropTrack: generateAutomaticCropTrack({
+            layer,
+            sourceRanges: project.sourceRanges,
+            outputDurationMs,
+            sourceWidth: asset?.width ?? episode.width,
+            sourceHeight: asset?.height ?? episode.height,
+            artifactId: artifactRecord.id,
+            artifactContentHash: artifactRecord.contentHash,
+            artifact: visual,
+            generatedAt
+          })
+        };
+      })
+    });
+    return this.repository.updateShort(id, input.expectedRevision, { composition });
+  }
+  addManualCropControl(id: string, layerId: string, input: ManualCropAddInput) {
+    return this.mutateManualCropTrack(id, layerId, input.expectedRevision, (track, durationMs) => {
+      if (input.control.atMs > durationMs) {
+        throw cropTimestampError(input.control.atMs, durationMs);
+      }
+      if (track.some((control) => control.id === input.control.id)) {
+        throw new AppError("VALIDATION_ERROR", "Manual crop control ID already exists", 422);
+      }
+      if (track.some((control) => control.atMs === input.control.atMs)) {
+        throw new AppError("VALIDATION_ERROR", "Manual crop timestamp already exists", 422);
+      }
+      return [...track, input.control].sort((a, b) => a.atMs - b.atMs);
+    });
+  }
+  moveManualCropControl(id: string, layerId: string, input: ManualCropMoveInput) {
+    return this.mutateManualCropTrack(id, layerId, input.expectedRevision, (track, durationMs) => {
+      if (input.atMs > durationMs) throw cropTimestampError(input.atMs, durationMs);
+      const index = track.findIndex((control) => control.id === input.controlId);
+      if (index < 0) throw new AppError("NOT_FOUND", "Manual crop control not found", 404);
+      if (track.some((control, other) => other !== index && control.atMs === input.atMs)) {
+        throw new AppError("VALIDATION_ERROR", "Manual crop timestamp already exists", 422);
+      }
+      const existing = track[index]!;
+      if (input.crop && existing.mode !== "crop") {
+        throw new AppError("VALIDATION_ERROR", "Automatic-resume controls do not have rectangles", 422);
+      }
+      const updated: ManualCropControl = existing.mode === "crop"
+        ? { ...existing, atMs: input.atMs, ...(input.crop ?? {}) }
+        : { ...existing, atMs: input.atMs };
+      return track.map((control, other) => other === index ? updated : control)
+        .sort((a, b) => a.atMs - b.atMs);
+    });
+  }
+  removeManualCropControl(id: string, layerId: string, input: ManualCropRemoveInput) {
+    return this.mutateManualCropTrack(id, layerId, input.expectedRevision, (track) => {
+      if (!track.some((control) => control.id === input.controlId)) {
+        throw new AppError("NOT_FOUND", "Manual crop control not found", 404);
+      }
+      return track.filter((control) => control.id !== input.controlId);
+    });
+  }
+
+  private mutateManualCropTrack(
+    id: string,
+    layerId: string,
+    expectedRevision: number,
+    mutate: (track: ManualCropControl[], durationMs: number) => ManualCropControl[]
+  ) {
+    const project = this.repository.getShort(id);
+    if (project.revision !== expectedRevision) {
+      throw new AppError("REVISION_CONFLICT", "Short was edited by another client", 409, {
+        expectedRevision,
+        actualRevision: project.revision
+      });
+    }
+    const durationMs = project.sourceRanges.reduce(
+      (total, range) => total + range.endMs - range.startMs,
+      0
+    );
+    let found = false;
+    const composition = compositionSchema.parse({
+      ...project.composition,
+      layers: project.composition.layers.map((layer) => {
+        if (layer.id !== layerId) return layer;
+        if (layer.type !== "video") {
+          throw new AppError("VALIDATION_ERROR", "Crop controls are valid only for video layers", 422);
+        }
+        found = true;
+        return {
+          ...layer,
+          manualCropTrack: mutate(structuredClone(layer.manualCropTrack), durationMs)
+        };
+      })
+    });
+    if (!found) throw new AppError("NOT_FOUND", "Composition layer not found", 404);
+    return this.repository.updateShort(id, expectedRevision, { composition });
+  }
 
   listTemplates() { return this.repository.listTemplates(); }
   cloneTemplate(sourceId: string, name: string, description?: string): Template {
@@ -898,6 +1070,13 @@ export class CoreService {
     if (!update.changes) throw new AppError("REVISION_CONFLICT", "Entry is stale or needs rerender", 409);
     return this.repository.db.prepare("SELECT * FROM schedule_entries WHERE id=?").get(entryId);
   }
+}
+
+function cropTimestampError(atMs: number, durationMs: number): AppError {
+  return new AppError("VALIDATION_ERROR", "Crop timestamp exceeds the Short output duration", 422, {
+    atMs,
+    durationMs
+  });
 }
 
 export const importPathsInput = z.object({ paths: z.array(z.string()).min(1) });

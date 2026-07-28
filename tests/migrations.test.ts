@@ -226,7 +226,10 @@ describe("database migrations", () => {
         source: "episode",
         region: { x: 0, y: 0, width: 1, height: 1 },
         fit: "fill",
-        cropTrack: []
+        cropTrack: [
+          { atMs: 0, x: 0, y: 0, width: 1, height: 1, source: "automatic" },
+          { atMs: 500, x: 0.1, y: 0.1, width: 0.8, height: 0.8, source: "manual" }
+        ]
       }]
     };
     legacy.prepare(`
@@ -255,9 +258,33 @@ describe("database migrations", () => {
     const short = upgraded.prepare(`
       SELECT composition_json,template_lineage_json FROM short_projects WHERE id=?
     `).get(shortId) as { composition_json: string; template_lineage_json: string };
-    expect(templateComposition.layers[0]).toMatchObject({ id: "speaker", assetId: null });
+    expect(templateComposition.layers[0]).toMatchObject({
+      id: "speaker",
+      assetId: null,
+      cropTarget: "person",
+      automaticCropTrack: {
+        frames: [{ atMs: 0, x: 0, y: 0, width: 1, height: 1 }],
+        provenance: null,
+        fallback: { mode: "none", reason: "none" }
+      },
+      manualCropTrack: [{
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        mode: "crop",
+        atMs: 500,
+        x: 0.1,
+        y: 0.1,
+        width: 0.8,
+        height: 0.8
+      }]
+    });
     expect(JSON.parse(short.composition_json).layers[0]).toMatchObject({
-      id: "speaker", assetId: null
+      id: "speaker",
+      assetId: null,
+      cropTarget: "person",
+      automaticCropTrack: {
+        frames: [{ atMs: 0, x: 0, y: 0, width: 1, height: 1 }]
+      },
+      manualCropTrack: [{ mode: "crop", atMs: 500 }]
     });
     expect(JSON.parse(short.template_lineage_json)).toEqual({
       templateVersion: 1,

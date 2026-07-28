@@ -943,6 +943,9 @@ export class Repository {
       const renderAffecting = patch.composition !== undefined
         || patch.captions !== undefined
         || patch.audio !== undefined;
+      if (patch.composition) {
+        validateCompositionCropTimes(patch.composition, outputDuration(current.sourceRanges));
+      }
       const next = {
         ...current,
         ...patch,
@@ -990,6 +993,7 @@ export class Repository {
       const episode = this.getEpisode(current.episodeId);
       assertSourceAvailable(episode);
       validateSourceRanges(sourceRanges, episode.durationMs);
+      validateCompositionCropTimes(current.composition, outputDuration(sourceRanges));
 
       const now = new Date().toISOString();
       const nextRevision = current.revision + 1;
@@ -1371,9 +1375,9 @@ export class Repository {
   listArtifactRecords(ownerId?: string): StoredArtifact[] {
     const rows = ownerId
       ? this.db.prepare(
-        "SELECT * FROM artifact_records WHERE owner_id=? ORDER BY created_at"
+        "SELECT * FROM artifact_records WHERE owner_id=? ORDER BY created_at,rowid"
       ).all(ownerId)
-      : this.db.prepare("SELECT * FROM artifact_records ORDER BY created_at").all();
+      : this.db.prepare("SELECT * FROM artifact_records ORDER BY created_at,rowid").all();
     return (rows as Row[]).map(mapStoredArtifact);
   }
 
@@ -1803,4 +1807,28 @@ function validateSourceRanges(
       message: "Range must be within the Episode duration"
     }]);
   }
+}
+
+function outputDuration(sourceRanges: ShortProject["sourceRanges"]): number {
+  return sourceRanges.reduce((total, range) => total + range.endMs - range.startMs, 0);
+}
+
+function validateCompositionCropTimes(composition: Composition, durationMs: number): void {
+  composition.layers.forEach((layer, layerIndex) => {
+    if (layer.type !== "video") return;
+    const tracks = [
+      ["automaticCropTrack", layer.automaticCropTrack.frames] as const,
+      ["manualCropTrack", layer.manualCropTrack] as const
+    ];
+    for (const [trackName, controls] of tracks) {
+      controls.forEach((control, controlIndex) => {
+        if (control.atMs > durationMs) {
+          throw new AppError("VALIDATION_ERROR", "Crop timestamp exceeds the Short output duration", 422, [{
+            path: ["composition", "layers", layerIndex, trackName, controlIndex, "atMs"],
+            message: `Crop timestamp must be at most ${durationMs}`
+          }]);
+        }
+      });
+    }
+  });
 }

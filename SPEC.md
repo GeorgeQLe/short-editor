@@ -631,6 +631,10 @@ providers.list_capabilities
 providers.get_status
 
 shorts.update_timeline
+shorts.reanalyze_crops
+shorts.add_manual_crop
+shorts.move_manual_crop
+shorts.remove_manual_crop
 shorts.update_captions
 shorts.update_audio
 shorts.approve
@@ -647,7 +651,7 @@ renders.retry
 
 Names MAY gain aliases before v1 release, but the behavior above MUST remain
 discoverable and typed. Destructive deletion tools MUST NOT be added in v1.
-The explicit v1 inventory contains exactly 40 tools. `shorts.update_audio` MUST
+The explicit v1 inventory contains exactly 44 tools. `shorts.update_audio` MUST
 be non-destructive, require `expectedRevision`, and use concrete fields for
 source gain, source mute, cut-fade duration, optional bed-asset ID, and bed gain.
 
@@ -696,7 +700,7 @@ Queued job types without installed handlers are not complete functionality.
 | Revisioned Short projects and invalidation | Implemented | [`src/shared/contracts.ts`](src/shared/contracts.ts), [`src/core/repository.ts`](src/core/repository.ts), [`src/core/service.ts`](src/core/service.ts), [`src/core/api.ts`](src/core/api.ts), [`src/mcp/server.ts`](src/mcp/server.ts), and [`tests/short-lifecycle.test.ts`](tests/short-lifecycle.test.ts) implement EDT-01: guarded revision-1 creation with independent accepted-transcript captions; strict bounded integer-millisecond ranges; atomic timeline and approval CAS; accepted-copy approval; exact revision increments; render-affecting invalidation; copy/title-only preservation; and byte-preserved published schedules through HTTP and MCP. Interactive editor and packaged Windows evidence remain assigned to UI-01.3 and WIN-03. |
 | Starter templates and composition schema | Implemented | EDT-02 is implemented across [`src/shared/contracts.ts`](src/shared/contracts.ts), [`src/shared/templates.ts`](src/shared/templates.ts), [`src/core/database.ts`](src/core/database.ts), [`src/core/repository.ts`](src/core/repository.ts), [`src/core/service.ts`](src/core/service.ts), [`src/core/api.ts`](src/core/api.ts), and [`src/mcp/server.ts`](src/mcp/server.ts): three immutable built-ins and user clones have immediate-parent lineage, CAS version/revision updates, nullable asset bindings, legacy normalization, persisted-template Short selection, and independent Short composition/lineage snapshots. [`tests/template-assets.test.ts`](tests/template-assets.test.ts) proves clone/update/interface parity and prior-Short stability. Interactive editor proof remains UI-01.3. |
 | Asset inventory foundation | Implemented | [`src/core/media.ts`](src/core/media.ts), [`src/core/service.ts`](src/core/service.ts), and [`src/core/repository.ts`](src/core/repository.ts) canonicalize and reference imported sources in place; require explicit trimmed provenance and reusable state; stably inspect PNG/JPEG/WebP, H.264, AAC/MP3/PCM media with FFprobe; persist applicable dimensions/duration; preserve exclusive source/owned paths; and reject missing, empty, changing, malformed, streamless, or unsupported sources with typed errors. [`tests/media.test.ts`](tests/media.test.ts) and [`tests/template-assets.test.ts`](tests/template-assets.test.ts) cover metadata, source-byte preservation, failures, and HTTP/MCP parity. Rights/editor UX remains UI-01.3. |
-| Crop tracking and overrides | Pending | Crop-keyframe schemas exist in [`src/shared/domain.ts`](src/shared/domain.ts), but detection, smoothing, tracking, and an interactive override workflow do not. |
+| Crop tracking and overrides | Implemented | EDT-03 is implemented across [`src/shared/contracts.ts`](src/shared/contracts.ts), [`src/core/crops.ts`](src/core/crops.ts), [`src/core/database.ts`](src/core/database.ts), [`src/core/repository.ts`](src/core/repository.ts), [`src/core/service.ts`](src/core/service.ts), [`src/core/api.ts`](src/core/api.ts), and [`src/mcp/server.ts`](src/mcp/server.ts): independent automatic/manual tracks, typed detections, source-to-Short remapping, deterministic bounded smoothing/interpolation, explicit fit/fill fallbacks, exact resume markers, migration 9, CAS mutations, and invalidation. [`tests/crops.test.ts`](tests/crops.test.ts), [`tests/crop-service.test.ts`](tests/crop-service.test.ts), and [`tests/migrations.test.ts`](tests/migrations.test.ts) cover engine, preservation, migration, and HTTP/MCP behavior. Interactive manipulation remains UI-01.3. |
 | Captions and audio editing | Pending | Caption layers exist in templates and complete caption/audio state now round-trips with Short revisions, but editor controls, sidecars, rendering composition, and dedicated update interfaces are absent. |
 | Render validation contract | Partial | [`src/core/render.ts`](src/core/render.ts) probes an existing output and checks dimensions, codecs, audio/video presence, and the 180-second ceiling; [`src/core/repository.ts`](src/core/repository.ts) can persist validation, encoder provenance, hashes, errors, and attempt numbers. The render workflow does not reject zero duration, transition a Render only after validation, or provide preflight/retry; deterministic media fixtures are also absent. |
 | FFmpeg composition renderer | Pending | `render` can be queued, but [`src/core/bootstrap.ts`](src/core/bootstrap.ts) installs no render handler and no composition filter graph exists. |
@@ -828,6 +832,15 @@ supporting evidence, not release acceptance.
   crash logs, and absence of source deletion.
 
 ## 10. Changelog
+
+### 1.2.0 — 2026-07-28
+
+- Replaced mixed crop keyframes with independent automatic and UUID-addressed
+  manual tracks, explicit automatic-resume controls, and starter crop targets.
+- Added deterministic bounded detection selection, aspect correction,
+  smoothing, interpolation, fit/fill fallback provenance, and migration 9.
+- Added strict revisioned HTTP/MCP crop re-analysis and manual add/move/remove
+  operations, increasing the explicit MCP inventory from 40 to 44 tools.
 
 ### 1.1.0 — 2026-07-27
 

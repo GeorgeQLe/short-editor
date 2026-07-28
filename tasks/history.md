@@ -2,6 +2,25 @@
 
 ## 2026-07-28
 
+- Completed EDT-03 with migration 9 independent automatic/manual crop tracks,
+  typed face/person/screen observations, explicit starter person/screen targets,
+  deterministic legacy manual UUIDs, and Short-output-time timestamp bounds.
+- Added deterministic source-range remapping, target selection, person/face
+  unions, padding, aspect correction, clamping, temporal smoothing, linear
+  interpolation, explicit fit/fill fallbacks, and exact manual-to-automatic
+  precedence.
+- Added strict CAS re-analysis and manual add/move/remove operations over HTTP
+  and MCP. Each successful mutation increments once, clears approval, stales
+  successful renders, flags only unpublished schedules, and preserves manual
+  tracks bit-for-bit across repeated automatic analysis.
+- Added crop engine, service, interface-parity, migration, and contract fixtures.
+  Adversarial review found and fixed unencoded arbitrary layer IDs in MCP crop
+  mutation paths; the transport regression now exercises a slash-containing ID.
+- Full `npm test` passes all 31 files and 208 tests; `npm run build`,
+  `git diff --check`, and the focused added-line credential scan pass without
+  warnings. Interactive editing remains UI-01.3 and native packaged evidence
+  remains WIN-03.4. Promoted EDT-04 as the sole current executable task.
+
 - Completed EDT-02 with nullable composition asset bindings, migration-backed
   legacy normalization, immutable built-ins, immediate-parent template clones,
   exact CAS version/revision increments, and persisted-template Short creation

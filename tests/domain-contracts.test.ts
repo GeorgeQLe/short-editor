@@ -64,7 +64,13 @@ const composition = {
     assetId: null,
     region: { x: 0, y: 0, width: 1, height: 1 },
     fit: "fill" as const,
-    cropTrack: []
+    cropTarget: "person" as const,
+    automaticCropTrack: {
+      frames: [],
+      provenance: null,
+      fallback: { mode: "fill" as const, reason: "missing_samples" as const }
+    },
+    manualCropTrack: []
   }]
 };
 

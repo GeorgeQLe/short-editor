@@ -519,6 +519,14 @@ const migrations: readonly Migration[] = [
           AND json_extract(template_lineage_json, '$.templateId') IS NULL
       `).run();
     }
+  },
+  {
+    version: 9,
+    name: "independent automatic and manual crop tracks",
+    up: (db) => {
+      migrateCompositionCropTracks(db, "templates");
+      migrateCompositionCropTracks(db, "short_projects");
+    }
   }
 ];
 
@@ -623,6 +631,98 @@ function normalizeCompositionLayers(
       return { ...layer, assetId: null };
     });
     if (changed) update.run(JSON.stringify({ ...composition, layers }), row.id);
+  }
+}
+
+function migrateCompositionCropTracks(
+  db: SqliteDatabase,
+  table: "templates" | "short_projects"
+): void {
+  const rows = db.prepare(
+    `SELECT id,composition_json${table === "short_projects" ? ",template_id" : ""} FROM ${table}`
+  ).all() as Array<{
+    id: string;
+    composition_json: string;
+    template_id?: string;
+  }>;
+  const update = db.prepare(`UPDATE ${table} SET composition_json=? WHERE id=?`);
+  for (const row of rows) {
+    let composition: { layers?: unknown[] };
+    try {
+      composition = JSON.parse(row.composition_json) as { layers?: unknown[] };
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(composition.layers)) continue;
+    const layers = composition.layers.map((value, layerIndex) => {
+      if (typeof value !== "object" || value === null) return value;
+      const layer = value as Record<string, unknown>;
+      const { cropTrack, ...withoutLegacyTrack } = layer;
+      if (layer.type !== "video") return withoutLegacyTrack;
+      if (
+        Object.prototype.hasOwnProperty.call(layer, "automaticCropTrack") &&
+        Object.prototype.hasOwnProperty.call(layer, "manualCropTrack") &&
+        Object.prototype.hasOwnProperty.call(layer, "cropTarget")
+      ) return withoutLegacyTrack;
+      const legacyFrames = Array.isArray(cropTrack)
+        ? cropTrack.filter((frame): frame is Record<string, unknown> =>
+          typeof frame === "object" && frame !== null
+        )
+        : [];
+      const automaticFrames = legacyFrames
+        .filter((frame) => frame.source === "automatic")
+        .map(({ source: _source, ...frame }) => frame)
+        .sort((left, right) =>
+          Number((left as Record<string, unknown>).atMs)
+          - Number((right as Record<string, unknown>).atMs)
+        )
+        .filter((frame, index, frames) =>
+          index === 0
+          || (frame as Record<string, unknown>).atMs
+            !== (frames[index - 1] as Record<string, unknown>).atMs
+        );
+      const manualCropTrack = legacyFrames
+        .filter((frame) => frame.source === "manual")
+        .map(({ source: _source, ...frame }, frameIndex) => ({
+          ...frame,
+          id: legacyUuid(
+            `crop-control:${table}:${row.id}:${String(layer.id ?? layerIndex)}:${frameIndex}:${String(frame.atMs)}`
+          ),
+          mode: "crop"
+        }))
+        .sort((left, right) =>
+          Number((left as Record<string, unknown>).atMs)
+          - Number((right as Record<string, unknown>).atMs)
+        )
+        .filter((frame, index, frames) =>
+          index === 0
+          || (frame as Record<string, unknown>).atMs
+            !== (frames[index - 1] as Record<string, unknown>).atMs
+        );
+      const templateId = table === "templates" ? row.id : row.template_id;
+      const starter = templateId === "split-subject-speaker-v1"
+        || templateId === "fullscreen-speaker-v1"
+        || templateId === "screen-speaker-v1";
+      const starterTarget = starter && String(layer.id) === "screen"
+        ? "screen"
+        : starter && String(layer.id) === "speaker"
+          ? "person"
+          : "auto";
+      return {
+        ...withoutLegacyTrack,
+        cropTarget: starterTarget,
+        automaticCropTrack: {
+          frames: automaticFrames,
+          provenance: null,
+          fallback: {
+            mode: automaticFrames.length ? "none" : (layer.fit === "fill" ? "fill" : "fit"),
+            reason: automaticFrames.length ? "none" : "missing_samples"
+          }
+        },
+        manualCropTrack
+      };
+    });
+    update.run(JSON.stringify({ ...composition, layers }), row.id);
   }
 }
 

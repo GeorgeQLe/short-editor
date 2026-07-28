@@ -736,6 +736,23 @@ absorb a downstream task.
   stale-save recovery. Capture macOS evidence; defer to WIN-03.4.
 - **Evidence / acceptance:** Every sampled interpolated rectangle remains within
   source bounds and manual fixtures are bit-for-bit stable after auto reanalysis.
+- **Implemented 2026-07-28:** [`src/core/crops.ts`](src/core/crops.ts) now
+  remaps Episode observations to contiguous Short time, selects screen/person/
+  auto detections, pads and aspect-corrects unions, clamps and deterministically
+  smooths frames, emits explicit fit/fill fallbacks, interpolates crops, and
+  resolves manual precedence with exact automatic-resume markers. Migration 9
+  splits legacy tracks while [`src/core/service.ts`](src/core/service.ts),
+  [`src/core/repository.ts`](src/core/repository.ts), [`src/core/api.ts`](src/core/api.ts),
+  and [`src/mcp/server.ts`](src/mcp/server.ts) provide exact-CAS re-analysis and
+  add/move/remove operations with render/schedule invalidation.
+  [`tests/crops.test.ts`](tests/crops.test.ts),
+  [`tests/crop-service.test.ts`](tests/crop-service.test.ts),
+  [`tests/migrations.test.ts`](tests/migrations.test.ts), and
+  [`tests/domain-contracts.test.ts`](tests/domain-contracts.test.ts) cover
+  bounds/aspect/fallback/smoothing/interpolation, source-range remapping,
+  per-layer manual survival, migration, stale writes, invalid state, and
+  HTTP/MCP parity. UI manipulation remains UI-01.3 and packaged Windows
+  validation remains WIN-03.4.
 
 ### EDT-04 — Implement caption data, editing, layout checks, and sidecars
 
@@ -1032,7 +1049,7 @@ absorb a downstream task.
 - **Tests / fixtures / Windows:** Schema discovery snapshots and success/error
   parity for every tool; forged authorization, secrets, stable IDs, job fields,
   no deletion, and API/MCP value equality.
-- **Milestone / exit criteria:** Machine-generated discovery exposes exactly 40
+- **Milestone / exit criteria:** Machine-generated discovery exposes exactly 44
   unique typed tools with API-equivalent values/errors, durable Jobs, redaction,
   pagination compatibility, and zero unexplained UI-only transitions; suites
   pass and enable API-03 plus G8.
