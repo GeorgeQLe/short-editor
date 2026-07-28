@@ -70,7 +70,8 @@
   fixtures before users can rely on audible output.
 - **Rollback note:** Revert the EDT-05 feature commit before deploying migration
   11. After migration, restore a pre-migration backup instead of down-migrating.
-- **Next command:** `$exec` for RND-01 immutable-revision typed preflight.
+- **Next command:** Run `npx skillpacks install exec-loop` from the project
+  shell before invoking `$exec` for RND-01 immutable-revision typed preflight.
 
 - Completed EDT-04 with migration 10 independent caption cues/words, complete
   approved Inter Regular/Bold styles, persisted typed warnings and sidecar
