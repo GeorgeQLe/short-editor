@@ -2,6 +2,28 @@
 
 ## 2026-07-27
 
+- Completed PRO-05 with an Electron-owned OpenAI HTTP adapter and a typed
+  child-process bridge; plaintext credentials remain confined to Electron and
+  inherited OpenAI credential environment variables are stripped from the core.
+- Added explicit `transcription` and `diarization` speech modes, 20-minute mono
+  MP3 chunk preparation below the 25 MB upload limit, timeline offsets,
+  chunk-scoped speaker identities, raw/accepted transcript artifacts, progress,
+  cleanup, cancellation, and no model fallback.
+- Added strict Responses API episode analysis with an explicit configured model,
+  refusal/incomplete/schema/model validation, request provenance, independent
+  `analysis` authorization, and proposed raw typed artifacts.
+- Centralized canonical analysis cache identity for Ollama and OpenAI, added a
+  migration-safe unique successful-cache constraint and transactional winner
+  selection, required authorization before reuse, and rejected corrupt cache
+  rows.
+- Added non-secret provider capability/status HTTP operations and read-only MCP
+  tools, bounded timeout/network/429/retryable-5xx retries with revocation
+  checks, and deterministic OpenAI/security/cache fixtures. Full `npm test`
+  (148 tests), `npm run build`, and `git diff --check` pass; native packaged
+  Windows execution remains the WIN-03 gate.
+- Hardened the typed Electron bridge after adversarial review by rejecting
+  responses whose job ID does not match the pending request; the targeted
+  OpenAI core suite (8 tests) and production build pass after the fix.
 - Completed PRO-04 with an OS-protected desktop credential vault backed by
   Electron safeStorage (Windows DPAPI), opaque handles, atomic ciphertext-only
   persistence, create/edit/remove UI, and locked-vault failure behavior.

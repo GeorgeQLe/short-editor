@@ -4,12 +4,21 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, type ChildProcess } from "node:child_process";
 import { ProtectedCredentialVault } from "../security/credential-vault.js";
+import {
+  openAiBridgeCancelSchema,
+  openAiBridgeRequestSchema,
+  type OpenAiBridgeEvent
+} from "../shared/domain.js";
+import { normalizeError } from "../shared/errors.js";
+import { OpenAiHttpAdapter } from "./openai-adapter.js";
 
 const directory = fileURLToPath(new URL(".", import.meta.url));
 let core: ChildProcess | undefined;
 const desktopToken = randomBytes(32).toString("base64url");
 const coreUrl = "http://127.0.0.1:43120/v1";
 let credentialVault: ProtectedCredentialVault;
+const openAiAdapter = new OpenAiHttpAdapter();
+const openAiOperations = new Map<string, AbortController>();
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -54,13 +63,11 @@ app.whenReady().then(() => {
     desktopRequest(`/desktop/cloud-authorizations/${encodeURIComponent(id)}/revoke`, "POST")
   );
   core = spawn(process.execPath, [join(directory, "../core/cli.js")], {
-    env: {
-      ...process.env,
-      ELECTRON_RUN_AS_NODE: "1",
-      SHORT_EDITOR_DESKTOP_TOKEN: desktopToken
-    },
-    windowsHide: true
+    env: coreEnvironment(),
+    windowsHide: true,
+    stdio: ["ignore", "inherit", "inherit", "ipc"]
   });
+  core.on("message", handleCoreMessage);
   void waitForCore().then(synchronizeCredentialHandles);
   createWindow();
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
@@ -101,6 +108,110 @@ async function desktopRequest(path: string, method = "GET", body?: unknown): Pro
   };
   if (!response.ok) throw new Error(payload.error?.message ?? "Desktop security operation failed");
   return payload.data;
+}
+
+async function handleCoreMessage(message: unknown): Promise<void> {
+  if (!message || typeof message !== "object") return;
+  const envelope = message as { channel?: unknown; payload?: unknown };
+  if (envelope.channel !== "short-editor:openai") return;
+  const cancellation = openAiBridgeCancelSchema.safeParse(envelope.payload);
+  if (cancellation.success) {
+    openAiOperations.get(cancellation.data.jobId)?.abort();
+    return;
+  }
+  const request = openAiBridgeRequestSchema.safeParse(envelope.payload);
+  if (!request.success) return;
+  const controller = new AbortController();
+  openAiOperations.set(request.data.jobId, controller);
+  const send = (payload: OpenAiBridgeEvent) => {
+    if (core?.connected) core.send({ channel: "short-editor:openai", payload });
+  };
+  const authorize = async () => {
+    const result = await desktopRequest("/desktop/cloud-authorizations/validate", "POST", {
+      scopeType: request.data.authorization.scopeType,
+      scopeId: request.data.authorization.scopeId,
+      provider: "openai",
+      operationClass: request.data.authorization.operationClass,
+      credentialHandle: request.data.credentialHandle
+    }) as { authorized?: unknown };
+    return result.authorized === true && credentialVault.has(request.data.credentialHandle);
+  };
+  try {
+    const summary = credentialVault.list().find(
+      (item) => item.handle === request.data.credentialHandle
+    );
+    if (!summary || summary.provider !== "openai") {
+      throw new Error("Protected OpenAI credential is unavailable");
+    }
+    const apiKey = credentialVault.resolve(request.data.credentialHandle);
+    const onProgress = (progress: number, stage: string) => send({
+      type: "progress",
+      requestId: request.data.requestId,
+      jobId: request.data.jobId,
+      progress,
+      stage
+    });
+    const result = request.data.operation === "speech"
+      ? await openAiAdapter.speech({
+        apiKey,
+        inputPath: request.data.inputPath,
+        options: request.data.options,
+        signal: controller.signal,
+        authorize,
+        onProgress
+      })
+      : await openAiAdapter.analyze({
+        apiKey,
+        inputPaths: request.data.inputPaths,
+        options: request.data.options,
+        signal: controller.signal,
+        authorize,
+        onProgress
+      });
+    send({
+      type: "result",
+      requestId: request.data.requestId,
+      jobId: request.data.jobId,
+      result
+    });
+  } catch (error) {
+    const normalized = normalizeError(error);
+    send({
+      type: "error",
+      requestId: request.data.requestId,
+      jobId: request.data.jobId,
+      code: bridgeErrorCode(normalized.code),
+      message: normalized.message,
+      retryable: normalized.retryable
+    });
+  } finally {
+    openAiOperations.delete(request.data.jobId);
+  }
+}
+
+function bridgeErrorCode(code: string): "DEPENDENCY_UNAVAILABLE" | "PROVIDER_UNAVAILABLE" |
+  "PROVIDER_OUTPUT_INVALID" | "CLOUD_NOT_AUTHORIZED" | "JOB_CANCELLED" | "INTERNAL_ERROR" {
+  if (
+    code === "DEPENDENCY_UNAVAILABLE" ||
+    code === "PROVIDER_UNAVAILABLE" ||
+    code === "PROVIDER_OUTPUT_INVALID" ||
+    code === "CLOUD_NOT_AUTHORIZED" ||
+    code === "JOB_CANCELLED"
+  ) return code;
+  return "INTERNAL_ERROR";
+}
+
+function coreEnvironment(): NodeJS.ProcessEnv {
+  const environment = { ...process.env };
+  for (const name of [
+    "OPENAI_API_KEY",
+    "OPENAI_API_TOKEN",
+    "OPENAI_ORG_ID",
+    "OPENAI_PROJECT_ID"
+  ]) delete environment[name];
+  environment.ELECTRON_RUN_AS_NODE = "1";
+  environment.SHORT_EDITOR_DESKTOP_TOKEN = desktopToken;
+  return environment;
 }
 
 async function waitForCore(): Promise<void> {

@@ -4,6 +4,7 @@ export * from "./job-messages.js";
 export * from "./python-worker-protocol.js";
 export * from "./error-contracts.js";
 export * from "./episode-transitions.js";
+export * from "./openai-contracts.js";
 
 export interface ApiResult<T> {
   data: T;

@@ -108,6 +108,12 @@ export const providerProvenanceSchema = z.strictObject({
   modelId: z.string().min(1),
   providerVersion: z.string().min(1),
   optionsVersion: z.string().min(1),
+  providerRequestId: z.string().min(1).nullable().optional(),
+  requestedModelId: z.string().min(1).optional(),
+  returnedModelId: z.string().min(1).optional(),
+  adapterVersion: z.string().min(1).optional(),
+  promptVersion: z.string().min(1).nullable().optional(),
+  schemaVersion: z.string().min(1).nullable().optional(),
   createdAt: utcInstantSchema
 });
 export type ProviderProvenance = z.infer<typeof providerProvenanceSchema>;

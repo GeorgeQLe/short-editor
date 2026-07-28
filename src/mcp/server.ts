@@ -75,8 +75,39 @@ register("analysis.start", "Queue episode analysis. OpenAI requires explicit clo
   episodeId: uuid, provider: z.enum(["local", "openai"]).default("local"),
   modelId: z.string().min(1).optional(),
   wordTimestamps: z.boolean().optional(),
+  speechMode: z.enum(["transcription", "diarization"]).optional(),
+  timeoutMs: z.number().int().positive().optional(),
   authorizationBatchId: uuid.optional()
 }, (input) => core("/analysis/start", "POST", input));
+register("analysis.openai_start", "Queue authorized OpenAI strict structured episode analysis.", {
+  episodeId: uuid,
+  modelId: z.string().min(1).optional(),
+  timeoutMs: z.number().int().positive().optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  intervalMs: z.number().int().positive().optional(),
+  maximumSamples: z.number().int().positive().optional(),
+  authorizationBatchId: uuid.optional()
+}, (input) => core("/analysis/openai/start", "POST", input));
+register(
+  "providers.list_capabilities",
+  "List non-secret local provider capabilities without contacting OpenAI.",
+  {},
+  () => core("/providers/capabilities")
+);
+register(
+  "providers.get_status",
+  "Get locally computed provider configuration and authorization readiness.",
+  {
+    episodeId: uuid.optional(),
+    authorizationBatchId: uuid.optional()
+  },
+  ({ episodeId, authorizationBatchId }) => {
+    const query = new URLSearchParams();
+    if (episodeId) query.set("episodeId", String(episodeId));
+    if (authorizationBatchId) query.set("authorizationBatchId", String(authorizationBatchId));
+    return core(`/providers/status${query.size ? `?${query}` : ""}`);
+  }
+);
 register(
   "analysis.local_transcription_status",
   "Report installed faster-whisper models and local transcription capabilities.",

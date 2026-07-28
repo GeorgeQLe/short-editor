@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { z } from "zod";
@@ -8,6 +8,7 @@ import {
   type ScheduleRules,
   type ShortProject,
   type TranscriptSegment,
+  type TranscriptRevision,
   type ProviderProvenance,
   type WatchedFolderConfigurationInput,
   watchedFolderConfigurationInputSchema
@@ -33,6 +34,17 @@ import {
   localTranscriptionOptionsSchema,
   type LocalTranscriptionProvider
 } from "./local-transcription.js";
+import {
+  OPENAI_ADAPTER_VERSION,
+  openAiAnalysisOptionsSchema,
+  openAiSpeechOptionsSchema,
+  type AnalysisArtifact,
+  type OpenAiSpeechResult,
+  type ProviderCapability,
+  type ProviderStatus
+} from "../shared/domain.js";
+import type { OpenAiProvider } from "./openai-provider.js";
+import { canonicalJson } from "./analysis-cache.js";
 
 export class CoreService {
   constructor(
@@ -45,7 +57,8 @@ export class CoreService {
     readonly localTranscription?: LocalTranscriptionProvider,
     readonly ollamaAnalysis?: OllamaAnalysisProvider,
     readonly localVisualSampling?: LocalVisualSampler,
-    private readonly activeCredentialHandles: Set<string> = new Set()
+    private readonly activeCredentialHandles: Set<string> = new Set(),
+    readonly openAi?: OpenAiProvider
   ) {}
 
   async stop(): Promise<void> {
@@ -92,6 +105,8 @@ export class CoreService {
     options: {
       modelId?: string;
       wordTimestamps?: boolean;
+      speechMode?: "transcription" | "diarization";
+      timeoutMs?: number;
       authorizationBatchId?: string;
     } = {}
   ) {
@@ -99,10 +114,23 @@ export class CoreService {
     if (episode.missing) {
       throw new AppError("SOURCE_MISSING", "Cannot transcribe an Episode with missing source media", 409);
     }
-    const transcription = localTranscriptionOptionsSchema.parse({
-      modelId: options.modelId ?? process.env.SHORT_EDITOR_WHISPER_MODEL ?? "small.en",
-      wordTimestamps: options.wordTimestamps ?? true
-    });
+    const transcription = provider === "openai"
+      ? openAiSpeechOptionsSchema.parse({
+        mode: options.speechMode ?? "transcription",
+        modelId: options.modelId ?? (
+          options.speechMode === "diarization"
+            ? "gpt-4o-transcribe-diarize"
+            : "whisper-1"
+        ),
+        wordTimestamps: options.speechMode === "diarization"
+          ? false
+          : (options.wordTimestamps ?? true),
+        timeoutMs: options.timeoutMs ?? 120_000
+      })
+      : localTranscriptionOptionsSchema.parse({
+        modelId: options.modelId ?? process.env.SHORT_EDITOR_WHISPER_MODEL ?? "small.en",
+        wordTimestamps: options.wordTimestamps ?? true
+      });
     return this.jobs.enqueue({
       type: "analyze",
       entityId: episodeId,
@@ -112,6 +140,56 @@ export class CoreService {
         cloudScope: { type: "batch" as const, id: options.authorizationBatchId }
       } : {}),
       payload: transcription
+    });
+  }
+
+  startOpenAiAnalysis(
+    episodeId: string,
+    options: {
+      modelId?: string;
+      timeoutMs?: number;
+      temperature?: number;
+      intervalMs?: number;
+      maximumSamples?: number;
+      authorizationBatchId?: string;
+    } = {}
+  ) {
+    const episode = this.repository.getEpisode(episodeId);
+    if (episode.missing) {
+      throw new AppError("SOURCE_MISSING", "Cannot analyze an Episode with missing source media", 409);
+    }
+    if (!episode.contentHash) {
+      throw new AppError("INVALID_STATE", "Episode hashing must finish before analysis", 409);
+    }
+    this.repository.getAcceptedTranscriptRevision(episodeId);
+    const modelId = options.modelId ?? process.env.SHORT_EDITOR_OPENAI_ANALYSIS_MODEL;
+    if (!modelId) {
+      throw new AppError(
+        "DEPENDENCY_UNAVAILABLE",
+        "OpenAI analysis is unconfigured; select an exact model",
+        503,
+        undefined,
+        false
+      );
+    }
+    const payload = openAiAnalysisOptionsSchema.parse({
+      modelId,
+      timeoutMs: options.timeoutMs ?? 180_000,
+      temperature: options.temperature ?? 0,
+      visual: {
+        intervalMs: options.intervalMs ?? 2_000,
+        maximumSamples: options.maximumSamples ?? 300
+      }
+    });
+    return this.jobs.enqueue({
+      type: "analyze",
+      entityId: episodeId,
+      provider: "openai",
+      cloudOperationClass: "analysis",
+      ...(options.authorizationBatchId ? {
+        cloudScope: { type: "batch" as const, id: options.authorizationBatchId }
+      } : {}),
+      payload
     });
   }
 
@@ -262,6 +340,176 @@ export class CoreService {
   listAnalysisArtifacts(episodeId: string) {
     this.repository.getEpisode(episodeId);
     return this.repository.listAnalysisArtifacts(episodeId);
+  }
+
+  listProviderCapabilities(): ProviderCapability[] {
+    return [
+      {
+        provider: "local",
+        providerClass: "local",
+        operations: ["transcription", "analysis"],
+        features: ["offline", "timed-segments", "visual-sampling"],
+        defaultModels: { transcription: process.env.SHORT_EDITOR_WHISPER_MODEL ?? "small.en" }
+      },
+      {
+        provider: "ollama",
+        providerClass: "local",
+        operations: ["analysis"],
+        features: ["strict-schema", "explicit-endpoint-classification"],
+        defaultModels: { analysis: process.env.SHORT_EDITOR_OLLAMA_MODEL ?? "gemma3" }
+      },
+      {
+        provider: "openai",
+        providerClass: "cloud",
+        operations: ["transcription", "diarization", "analysis"],
+        features: [
+          "verbose-json",
+          "optional-word-timestamps",
+          "diarized-json",
+          "strict-structured-output",
+          OPENAI_ADAPTER_VERSION
+        ],
+        defaultModels: {
+          transcription: "whisper-1",
+          diarization: "gpt-4o-transcribe-diarize",
+          ...(process.env.SHORT_EDITOR_OPENAI_ANALYSIS_MODEL
+            ? { analysis: process.env.SHORT_EDITOR_OPENAI_ANALYSIS_MODEL }
+            : {})
+        }
+      }
+    ];
+  }
+
+  getProviderStatus(scope?: {
+    episodeId?: string;
+    authorizationBatchId?: string;
+  }): ProviderStatus[] {
+    if (scope?.episodeId) this.repository.getEpisode(scope.episodeId);
+    const scopeType = scope?.authorizationBatchId ? "batch" : "project";
+    const scopeId = scope?.authorizationBatchId ?? scope?.episodeId;
+    const authorized = (operation: "transcription" | "analysis") => {
+      const authorization = scopeId ? this.repository.findCloudAuthorization(
+        scopeType,
+        scopeId,
+        "openai",
+        operation
+      ) : undefined;
+      return Boolean(
+        authorization?.credentialHandle &&
+        this.activeCredentialHandles.has(authorization.credentialHandle)
+      );
+    };
+    const credentialConfigured = this.activeCredentialHandles.size > 0;
+    const analysisConfigured = Boolean(process.env.SHORT_EDITOR_OPENAI_ANALYSIS_MODEL);
+    return [
+      {
+        provider: "local",
+        configured: Boolean(this.localTranscription),
+        credentialConfigured: false,
+        transcriptionReady: Boolean(this.localTranscription),
+        analysisReady: false,
+        authorization: { transcription: true, analysis: true },
+        detail: this.localTranscription ? null : "Local transcription is unavailable"
+      },
+      {
+        provider: "ollama",
+        configured: Boolean(this.ollamaAnalysis && this.localVisualSampling),
+        credentialConfigured: false,
+        transcriptionReady: false,
+        analysisReady: Boolean(this.ollamaAnalysis && this.localVisualSampling),
+        authorization: { transcription: false, analysis: true },
+        detail: this.ollamaAnalysis && this.localVisualSampling
+          ? null
+          : "Ollama analysis is unavailable"
+      },
+      {
+        provider: "openai",
+        configured: credentialConfigured,
+        credentialConfigured,
+        transcriptionReady: credentialConfigured && authorized("transcription"),
+        analysisReady: credentialConfigured && analysisConfigured && authorized("analysis"),
+        authorization: {
+          transcription: authorized("transcription"),
+          analysis: authorized("analysis")
+        },
+        detail: credentialConfigured
+          ? (analysisConfigured ? null : "Structured analysis needs an explicit request model")
+          : "No protected OpenAI credential is configured"
+      }
+    ];
+  }
+
+  validateCloudAuthorization(input: {
+    scopeType: "project" | "batch";
+    scopeId: string;
+    provider: "openai";
+    operationClass: "transcription" | "analysis";
+    credentialHandle: string;
+  }): boolean {
+    const authorization = this.repository.findCloudAuthorization(
+      input.scopeType,
+      input.scopeId,
+      input.provider,
+      input.operationClass
+    );
+    return authorization?.credentialHandle === input.credentialHandle &&
+      this.activeCredentialHandles.has(input.credentialHandle);
+  }
+
+  storeOpenAiSpeech(
+    episodeId: string,
+    result: OpenAiSpeechResult,
+    inputHash: string
+  ) {
+    return this.repository.transaction(() => {
+      const revision = this.storeTranscript(
+        episodeId,
+        result.segments,
+        result.language,
+        result.provenance
+      ) as TranscriptRevision;
+      const artifact: AnalysisArtifact = {
+        id: randomUUID(),
+        entityId: episodeId,
+        ownerType: "episode",
+        kind: "transcript",
+        state: "accepted",
+        provenance: result.provenance,
+        inputHash,
+        rawOutput: {
+          providerOutput: result.rawOutput,
+          requestMetadata: result.requestMetadata
+        },
+        acceptedProjection: {
+          transcriptRevisionId: revision.id,
+          revision: revision.revision,
+          language: revision.language,
+          segments: revision.segments
+        },
+        createdAt: result.provenance.createdAt
+      };
+      this.repository.insertAnalysisArtifact(artifact);
+      return revision;
+    });
+  }
+
+  openAiSpeechInputHash(
+    episodeId: string,
+    options: {
+      mode: string;
+      modelId: string;
+      wordTimestamps: boolean;
+    }
+  ): string {
+    const episode = this.repository.getEpisode(episodeId);
+    return `sha256:${createHash("sha256").update(canonicalJson({
+      sourceHash: episode.contentHash ?? episode.fingerprint,
+      provider: "openai",
+      modelId: options.modelId,
+      speechMode: options.mode,
+      wordTimestamps: options.wordTimestamps,
+      optionsVersion: "openai-speech-v1"
+    })).digest("hex")}`;
   }
 
   setTranscript(episodeId: string, segments: TranscriptSegment[]) {

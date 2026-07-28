@@ -439,6 +439,10 @@ absorb a downstream task.
 
 ### PRO-05 — Implement OpenAI adapters, provenance, and cache identity
 
+- **Status:** Implemented 2026-07-27. Deterministic provider, authorization,
+  artifact, retry, cancellation, provenance, capability/status, and exact-cache
+  suites pass. Native packaged Windows authorized-cloud execution and UI
+  evidence remain assigned to WIN-03.2/UI-01.1.
 - **SPEC / gates:** 1, 3.3, 5.3–5.4, 6.2, 7.3; G2, G3, G8.
 - **Prerequisites / unblocks:** PRO-01 and PRO-04; unblocks authorized cloud
   workflow and TRC-03.
@@ -469,6 +473,18 @@ absorb a downstream task.
 - **Evidence / acceptance:** G2 passes; raw results remain distinguishable from
   accepted projections and every artifact exposes local/cloud creation
   provenance without credentials.
+- **Implementation evidence (2026-07-27):** [`src/electron/openai-adapter.ts`](src/electron/openai-adapter.ts),
+  [`src/core/openai-provider.ts`](src/core/openai-provider.ts),
+  [`src/shared/openai-contracts.ts`](src/shared/openai-contracts.ts), and
+  [`src/core/analysis-cache.ts`](src/core/analysis-cache.ts) implement the
+  Electron-only credential boundary, chunked speech modes, strict Responses
+  analysis, typed IPC, request metadata, and canonical cache identity.
+  [`tests/openai-adapter.test.ts`](tests/openai-adapter.test.ts) and
+  [`tests/openai-core.test.ts`](tests/openai-core.test.ts) cover multi-chunk
+  offsets/speakers, raw/accepted separation, refusal/partial/malformed/model
+  failures, bounded retries, revocation, cancellation, status redaction, cache
+  misses, and concurrent winner selection. Migration 6 prevents duplicate
+  successful cache rows. Full tests/build/diff checks pass; WIN-03 remains open.
 
 ## Milestone 4 — Transcript revisions and Candidate quality
 

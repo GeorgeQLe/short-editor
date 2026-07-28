@@ -44,11 +44,15 @@ export function createApi(service: CoreService, desktopToken?: string) {
       episodeId: id, provider: z.enum(["local", "openai"]).default("local"),
       modelId: z.string().min(1).optional(),
       wordTimestamps: z.boolean().optional(),
+      speechMode: z.enum(["transcription", "diarization"]).optional(),
+      timeoutMs: z.number().int().positive().optional(),
       authorizationBatchId: id.optional()
     }).parse(req.body);
     return service.startAnalysis(input.episodeId, input.provider, {
       modelId: input.modelId,
       wordTimestamps: input.wordTimestamps,
+      speechMode: input.speechMode,
+      timeoutMs: input.timeoutMs,
       authorizationBatchId: input.authorizationBatchId
     });
   }));
@@ -67,6 +71,29 @@ export function createApi(service: CoreService, desktopToken?: string) {
       maximumSamples: z.number().int().positive().optional()
     }).parse(req.body);
     return service.startOllamaAnalysis(input.episodeId, input);
+  }));
+  app.post("/v1/analysis/openai/start", route((req) => {
+    const input = z.strictObject({
+      episodeId: id,
+      modelId: z.string().min(1).optional(),
+      timeoutMs: z.number().int().positive().optional(),
+      temperature: z.number().min(0).max(2).optional(),
+      intervalMs: z.number().int().positive().optional(),
+      maximumSamples: z.number().int().positive().optional(),
+      authorizationBatchId: id.optional()
+    }).parse(req.body);
+    return service.startOpenAiAnalysis(input.episodeId, input);
+  }));
+  app.get("/v1/providers/capabilities", route(() =>
+    service.listProviderCapabilities()
+  ));
+  app.get("/v1/providers/status", route((req) => {
+    const episodeId = asString(req.query.episodeId);
+    const authorizationBatchId = asString(req.query.authorizationBatchId);
+    return service.getProviderStatus({
+      ...(episodeId ? { episodeId: id.parse(episodeId) } : {}),
+      ...(authorizationBatchId ? { authorizationBatchId: id.parse(authorizationBatchId) } : {})
+    });
   }));
   app.get("/v1/analysis/ollama/status", route((req) => {
     const baseUrl = asString(req.query.baseUrl);
@@ -182,6 +209,16 @@ export function createApi(service: CoreService, desktopToken?: string) {
   app.post("/v1/desktop/cloud-authorizations/:id/revoke", desktopOnly, route((req) => {
     service.revokeCloudAuthorization(id.parse(req.params.id));
     return { revoked: true };
+  }));
+  app.post("/v1/desktop/cloud-authorizations/validate", desktopOnly, route((req) => {
+    const input = z.strictObject({
+      scopeType: z.enum(["project", "batch"]),
+      scopeId: id,
+      provider: z.literal("openai"),
+      operationClass: z.enum(["transcription", "analysis"]),
+      credentialHandle: z.string().min(1)
+    }).parse(req.body);
+    return { authorized: service.validateCloudAuthorization(input) };
   }));
 
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {

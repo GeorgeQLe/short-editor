@@ -20,13 +20,28 @@ import {
 import {
   analysisInputHash,
   createAnalysisArtifact,
+  episodeAnalysisOutputSchema,
   localAnalysisJobOptionsSchema,
   LocalVisualSampler,
   OllamaAnalysisProvider
 } from "./local-analysis.js";
 import { AppError } from "../shared/errors.js";
+import {
+  OPENAI_ANALYSIS_PROMPT_VERSION,
+  OPENAI_ANALYSIS_SCHEMA_VERSION,
+  openAiAnalysisOptionsSchema,
+  openAiSpeechOptionsSchema
+} from "../shared/domain.js";
+import type {
+  OpenAiAuthorizationContext,
+  OpenAiProvider
+} from "./openai-provider.js";
+import { analysisCacheIdentity } from "./analysis-cache.js";
 
-export function createCore(databasePath?: string): CoreService {
+export function createCore(
+  databasePath?: string,
+  openAiProvider?: OpenAiProvider
+): CoreService {
   const selectedDatabasePath = databasePath ?? startupDatabasePath();
   const dataDirectory = selectedDatabasePath === ":memory:"
     ? mkdtempSync(join(tmpdir(), "short-editor-memory-"))
@@ -54,14 +69,177 @@ export function createCore(databasePath?: string): CoreService {
       await media.probeEpisode(job.entityId!);
     },
     analyze: async (job, payload) => {
-      if (job.provider !== "local") {
-        throw new AppError(
-          "DEPENDENCY_UNAVAILABLE",
-          "OpenAI transcription is not installed and local fallback is disabled",
-          503
-        );
-      }
       const episode = repository.getEpisode(job.entityId!);
+      if (job.provider === "openai") {
+        if (!openAiProvider) {
+          throw new AppError(
+            "DEPENDENCY_UNAVAILABLE",
+            "The Electron OpenAI bridge is unavailable and local fallback is disabled",
+            503
+          );
+        }
+        const envelope = payload as {
+          operation?: unknown;
+          authorizationScope?: { type?: unknown; id?: unknown };
+          options?: unknown;
+          credentialHandle?: unknown;
+        };
+        if (
+          (envelope.operation !== "transcription" && envelope.operation !== "analysis") ||
+          (envelope.authorizationScope?.type !== "project" &&
+            envelope.authorizationScope?.type !== "batch") ||
+          typeof envelope.authorizationScope.id !== "string" ||
+          typeof envelope.credentialHandle !== "string"
+        ) {
+          throw new AppError("CLOUD_NOT_AUTHORIZED", "Cloud job authorization is invalid", 403);
+        }
+        const authorization: OpenAiAuthorizationContext = {
+          scopeType: envelope.authorizationScope.type,
+          scopeId: envelope.authorizationScope.id,
+          operationClass: envelope.operation
+        };
+        if (!service.validateCloudAuthorization({
+          ...authorization,
+          provider: "openai",
+          credentialHandle: envelope.credentialHandle
+        })) {
+          throw new AppError("CLOUD_NOT_AUTHORIZED", "Cloud authorization was revoked", 403);
+        }
+        const cancellation = setInterval(() => {
+          if (jobs.cancellationRequested(job.id)) void openAiProvider.cancel(job.id);
+        }, 100);
+        try {
+          if (envelope.operation === "transcription") {
+            const options = openAiSpeechOptionsSchema.parse(envelope.options);
+            const result = await openAiProvider.speech(
+              job.id,
+              envelope.credentialHandle,
+              episode.sourcePath,
+              options,
+              authorization,
+              (progress, stage) => jobs.progress(job.id, progress, stage)
+            );
+            if (jobs.cancellationRequested(job.id)) return;
+            service.storeOpenAiSpeech(
+              episode.id,
+              result,
+              service.openAiSpeechInputHash(episode.id, options)
+            );
+            jobs.progress(job.id, 0.98, "stored raw and accepted OpenAI transcript");
+            return;
+          }
+          const options = openAiAnalysisOptionsSchema.parse(envelope.options);
+          const transcript = repository.getAcceptedTranscriptRevision(episode.id);
+          if (!episode.contentHash) {
+            throw new AppError("INVALID_STATE", "Episode hashing must finish before analysis", 409);
+          }
+          const inputHash = analysisCacheIdentity({
+            sourceHash: episode.contentHash,
+            transcriptId: transcript.id,
+            transcriptRevision: transcript.revision,
+            provider: "openai",
+            modelId: options.modelId,
+            promptVersion: OPENAI_ANALYSIS_PROMPT_VERSION,
+            schemaVersion: OPENAI_ANALYSIS_SCHEMA_VERSION,
+            visualSamplingVersion: "visual-sampling-v1",
+            visualOptions: options.visual,
+            outputOptions: { temperature: options.temperature }
+          });
+          if (!service.validateCloudAuthorization({
+            ...authorization,
+            provider: "openai",
+            credentialHandle: envelope.credentialHandle
+          })) {
+            throw new AppError("CLOUD_NOT_AUTHORIZED", "Cloud authorization was revoked", 403);
+          }
+          if (repository.findAnalysisArtifact(episode.id, "episode_analysis", inputHash)) {
+            jobs.progress(job.id, 1, "reused exact authorized OpenAI analysis");
+            return;
+          }
+          const visual = await localVisualSampling.sample(
+            job.id,
+            episode.sourcePath,
+            options.visual,
+            (progress, stage) => jobs.progress(job.id, progress * 0.4, stage)
+          );
+          if (jobs.cancellationRequested(job.id)) return;
+          const artifactRoot = `artifacts/episodes/${episode.id}/analysis-inputs/${job.id}`;
+          const transcriptRecord = artifacts.finalize({
+            kind: "analysis_transcript_input",
+            ownerType: "episode",
+            ownerId: episode.id,
+            ownerRevision: transcript.revision,
+            relativePath: `${artifactRoot}/transcript.json`,
+            producerVersion: "analysis-input-v1",
+            bytes: Buffer.from(JSON.stringify({
+              revision: transcript.revision,
+              language: transcript.language,
+              segments: transcript.segments
+            }))
+          });
+          const visualRecord = artifacts.finalize({
+            kind: "analysis_visual_input",
+            ownerType: "episode",
+            ownerId: episode.id,
+            ownerRevision: transcript.revision,
+            relativePath: `${artifactRoot}/visual.json`,
+            producerVersion: "visual-sampling-v1",
+            bytes: Buffer.from(JSON.stringify({
+              capabilities: visual.capabilities,
+              samples: visual.samples,
+              provenance: visual.provenance
+            }))
+          });
+          const result = await openAiProvider.analyze(
+            job.id,
+            envelope.credentialHandle,
+            [
+              artifacts.resolveOwnedPath(transcriptRecord.relativePath),
+              artifacts.resolveOwnedPath(visualRecord.relativePath)
+            ],
+            options,
+            authorization,
+            (progress, stage) => jobs.progress(job.id, 0.4 + progress * 0.55, stage)
+          );
+          if (jobs.cancellationRequested(job.id)) return;
+          const validatedOutput = episodeAnalysisOutputSchema.safeParse(result.output);
+          if (!validatedOutput.success) {
+            throw new AppError(
+              "PROVIDER_OUTPUT_INVALID",
+              "OpenAI returned output that does not match the analysis schema",
+              422
+            );
+          }
+          const artifact = createAnalysisArtifact(
+            episode.id,
+            inputHash,
+            validatedOutput.data,
+            result.provenance
+          );
+          repository.insertAnalysisArtifactWinner({
+            ...artifact,
+            rawOutput: {
+              typedOutput: result.output,
+              providerOutput: result.rawOutput,
+              requestMetadata: result.requestMetadata
+            }
+          });
+          jobs.progress(job.id, 0.98, "stored proposed OpenAI analysis");
+          return;
+        } catch (error) {
+          if (
+            error instanceof AppError &&
+            error.code === "JOB_CANCELLED" &&
+            jobs.cancellationRequested(job.id)
+          ) return;
+          throw error;
+        } finally {
+          clearInterval(cancellation);
+        }
+      }
+      if (job.provider !== "local") {
+        throw new AppError("DEPENDENCY_UNAVAILABLE", "Analysis provider is unavailable", 503);
+      }
       const localAnalysis = localAnalysisJobOptionsSchema.safeParse(payload);
       if (localAnalysis.success) {
         const transcript = repository.getAcceptedTranscriptRevision(episode.id);
@@ -126,7 +304,7 @@ export function createCore(databasePath?: string): CoreService {
             (progress, stage) => jobs.progress(job.id, 0.45 + progress * 0.5, stage)
           );
           if (jobs.cancellationRequested(job.id)) return;
-          repository.insertAnalysisArtifact(createAnalysisArtifact(
+          repository.insertAnalysisArtifactWinner(createAnalysisArtifact(
             episode.id,
             inputHash,
             analyzed.output,
@@ -194,7 +372,8 @@ export function createCore(databasePath?: string): CoreService {
     localTranscription,
     ollamaAnalysis,
     localVisualSampling,
-    activeCredentialHandles
+    activeCredentialHandles,
+    openAiProvider
   );
   runner.start();
   void watchedFolders.start();

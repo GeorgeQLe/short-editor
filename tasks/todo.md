@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] PRO-05 — Implement OpenAI adapters, provenance, and cache identity.
+- [ ] TRC-01 — Add accepted transcript revisions and safe editing.
 
 ## Completed
 
+- [x] PRO-05 — Implement OpenAI adapters, provenance, and cache identity.
 - [x] PRO-04 — Add Windows-protected credentials and persisted cloud
   authorization.
 - [x] PRO-03 — Implement Ollama analysis and local visual sampling.

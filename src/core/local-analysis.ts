@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { isIP } from "node:net";
 import { z } from "zod";
 import {
@@ -11,6 +11,7 @@ import {
 } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
 import type { PythonWorkerSupervisor } from "./python-worker-supervisor.js";
+import { analysisCacheIdentity } from "./analysis-cache.js";
 
 export const OLLAMA_PROMPT_VERSION = "episode-analysis-prompt-v1";
 export const OLLAMA_SCHEMA_VERSION = "episode-analysis-schema-v1";
@@ -303,21 +304,22 @@ export function analysisInputHash(input: {
   ollama: OllamaOptions;
   visual: VisualSamplingOptions;
 }): string {
-  const normalized = {
+  return analysisCacheIdentity({
     sourceHash: input.sourceHash,
     transcriptRevision: input.transcript.revision,
     transcriptId: input.transcript.id,
     provider: "ollama",
     modelId: input.ollama.modelId,
-    baseUrl: normalizedBaseUrl(input.ollama.baseUrl),
-    providerClass: classifyProviderEndpoint(input.ollama.baseUrl),
     promptVersion: OLLAMA_PROMPT_VERSION,
     schemaVersion: OLLAMA_SCHEMA_VERSION,
-    visualOptionsVersion: VISUAL_OPTIONS_VERSION,
-    visual: visualSamplingOptionsSchema.parse(input.visual),
-    temperature: input.ollama.temperature
-  };
-  return `sha256:${createHash("sha256").update(JSON.stringify(normalized)).digest("hex")}`;
+    visualSamplingVersion: VISUAL_OPTIONS_VERSION,
+    visualOptions: visualSamplingOptionsSchema.parse(input.visual),
+    outputOptions: {
+      baseUrl: normalizedBaseUrl(input.ollama.baseUrl),
+      providerClass: classifyProviderEndpoint(input.ollama.baseUrl),
+      temperature: input.ollama.temperature
+    }
+  });
 }
 
 export function createAnalysisArtifact(

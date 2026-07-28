@@ -17,13 +17,15 @@ The current vertical slice includes:
   reporting, bounded cancellation/restart, and typed provider-operation results;
 - installed-model-only faster-whisper English transcription with normalized
   segment/word timing, explicit absent diarization, and local provenance;
+- configurable Ollama analysis plus explicitly authorized OpenAI transcription,
+  diarization, and strict structured analysis with no silent model fallback;
 - versioned starter composition templates;
 - render preflight/output validation through `ffprobe`;
 - a timezone-aware, rules-based launch scheduler;
 - a versioned HTTP API, React dashboard, Electron shell, and typed MCP adapter.
 
-Ollama/OpenAI analysis providers, production crop tracking, and the complete
-FFmpeg filter graph are intentionally behind interfaces for later phases.
+Production crop tracking and the complete FFmpeg composition filter graph remain
+behind interfaces for later phases.
 
 ## Development
 

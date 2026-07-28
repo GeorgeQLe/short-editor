@@ -381,6 +381,28 @@ const migrations: readonly Migration[] = [
           ON relink_comparisons(episode_id, expires_at);
       `);
     }
+  },
+  {
+    version: 6,
+    name: "successful analysis cache uniqueness",
+    up: (db) => {
+      db.exec(`
+        WITH ranked AS (
+          SELECT id,ROW_NUMBER() OVER (
+            PARTITION BY entity_id,kind,input_hash
+            ORDER BY CASE state WHEN 'accepted' THEN 0 ELSE 1 END,created_at DESC,id
+          ) cache_rank
+          FROM analysis_artifacts
+          WHERE kind='episode_analysis' AND state IN ('proposed','accepted')
+        )
+        UPDATE analysis_artifacts
+        SET state='superseded'
+        WHERE id IN (SELECT id FROM ranked WHERE cache_rank>1);
+        CREATE UNIQUE INDEX analysis_artifact_success_cache_unique_idx
+          ON analysis_artifacts(entity_id,kind,input_hash)
+          WHERE kind='episode_analysis' AND state IN ('proposed','accepted');
+      `);
+    }
   }
 ];
 

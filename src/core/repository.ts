@@ -4,6 +4,7 @@ import type {
   ProviderProvenance, ScheduleEntry, ScheduleRuleSet, ShortProject, Template, TranscriptRevision,
   TranscriptSegment, WatchedFolder
 } from "../shared/domain.js";
+import { analysisArtifactSchema } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
 import { assertEpisodeTransition, type RelinkContext } from "../shared/episode-transitions.js";
 import { randomUUID } from "node:crypto";
@@ -582,6 +583,28 @@ export class Repository {
     return artifact;
   }
 
+  insertAnalysisArtifactWinner(artifact: AnalysisArtifact): AnalysisArtifact {
+    return this.transaction(() => {
+      const existing = this.findAnalysisArtifact(
+        artifact.entityId,
+        artifact.kind,
+        artifact.inputHash
+      );
+      if (existing) return existing;
+      try {
+        return this.insertAnalysisArtifact(artifact);
+      } catch (error) {
+        const winner = this.findAnalysisArtifact(
+          artifact.entityId,
+          artifact.kind,
+          artifact.inputHash
+        );
+        if (winner) return winner;
+        throw error;
+      }
+    });
+  }
+
   listAnalysisArtifacts(entityId: string): AnalysisArtifact[] {
     return (this.db.prepare(`
       SELECT * FROM analysis_artifacts WHERE entity_id=? ORDER BY created_at
@@ -598,7 +621,18 @@ export class Repository {
       WHERE entity_id=? AND kind=? AND input_hash=? AND state IN ('proposed','accepted')
       ORDER BY created_at DESC LIMIT 1
     `).get(entityId, kind, inputHash) as Row | undefined;
-    return row ? mapAnalysisArtifact(row) : undefined;
+    if (!row) return undefined;
+    try {
+      const artifact = mapAnalysisArtifact(row);
+      const parsed = analysisArtifactSchema.safeParse(artifact);
+      if (parsed.success) return parsed.data;
+    } catch {
+      // Mark an unreadable cache record below and force recomputation.
+    }
+    this.db.prepare(
+      "UPDATE analysis_artifacts SET state='corrupt' WHERE id=?"
+    ).run(String(row.id));
+    return undefined;
   }
 
   createTemplate(template: Template): Template {
