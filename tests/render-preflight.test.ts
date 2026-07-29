@@ -373,8 +373,9 @@ describe("immutable render preflight workflow", () => {
       arguments: { shortId: context.project.id, expectedRevision: 1 }
     });
     expect(mcp.isError).not.toBe(true);
-    expect(renderPreflightResultSchema.parse(mcp.structuredContent))
-      .toEqual(mcp.structuredContent);
+    const structured = mcp.structuredContent as { apiVersion: string; data: unknown };
+    expect(structured.apiVersion).toBe("v1");
+    expect(renderPreflightResultSchema.parse(structured.data)).toEqual(structured.data);
     const mcpText = JSON.stringify(mcp.content);
     expect(mcpText).toContain(context.project.id);
     expect(mcpText).not.toContain("render-snapshot-v1");

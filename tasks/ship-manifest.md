@@ -1,5 +1,116 @@
 # Ship manifest
 
+## API-02 shipping boundary — 2026-07-29
+
+### User goal
+
+Freeze complete non-destructive MCP parity around the existing core HTTP API
+with concrete schemas, versioned envelopes, cursor pagination, and no
+credential or authorization bypass.
+
+### Changed files
+
+`.agents/project.json`, `SPEC.md`, `IMPLEMENTATION_PLAN.md`,
+`docs/mcp-transition-audit.md`,
+`docs/mcp-v1-tools.json`, `package.json`,
+`scripts/generate-mcp-tool-inventory.ts`, `src/mcp/registry.ts`,
+`src/mcp/server.ts`, `src/shared/contracts.ts`, `tasks/history.md`,
+`tasks/ship-manifest.md`, `tasks/todo.md`, `tests/mcp-contract.test.ts`, and
+the existing MCP workflow parity tests.
+
+Generated local agent configuration directories remain unrelated and excluded.
+
+### Per-file purpose
+
+- `.agents/project.json` records the installed `investigate` project skill.
+- `src/mcp/registry.ts` is the frozen 44-tool authority for discovery,
+  registration, concrete input/output schemas, safe annotations, HTTP mappings,
+  request construction, and redacted response translation.
+- `src/mcp/server.ts` is the thin stdio entrypoint and re-exports the testable
+  registry/factory surface.
+- `src/shared/contracts.ts` adds shared versioned success, import,
+  watched-folder configuration, local-status, and render-probe schemas.
+- `scripts/generate-mcp-tool-inventory.ts`, `package.json`, and
+  `docs/mcp-v1-tools.json` provide the deterministic checked-in discovery
+  generator, command, and generated artifact.
+- `tests/mcp-contract.test.ts` freezes the inventory, strict schemas,
+  annotations, discovery, envelope/error translation, pagination/filter
+  forwarding, URI construction, authorization rejection, and redaction.
+- `tests/candidate-integration.test.ts`, `tests/render-preflight.test.ts`,
+  `tests/short-lifecycle.test.ts`, and `tests/transcript-editing.test.ts` update
+  real workflow parity assertions for complete versioned MCP envelopes.
+- `docs/mcp-transition-audit.md` classifies typed MCP transitions, user-only
+  security gates, and diagnostic helpers.
+- `SPEC.md` and `IMPLEMENTATION_PLAN.md` record the implemented contract and
+  evidence; `tasks/todo.md` closes API-02 and promotes API-03;
+  `tasks/history.md` records the session; this file records the ship boundary.
+
+### User-goal mapping
+
+The authoritative registry makes runtime discovery, request routing, generated
+documentation, and tests agree on exactly 44 non-destructive tools. Concrete
+strict schemas and shared typed envelopes deliver parity without arbitrary
+records or flattened errors. Cursor forwarding preserves the HTTP contract,
+while the transition audit and authorization regressions prove that desktop
+credentials and cloud authorization remain user-only gates.
+
+### Tests run
+
+- Executable verification: `npm test` passed all 40 test files and 296 tests,
+  including real FFmpeg coverage. The redaction regression intentionally wrote
+  `Unexpected internal error` to stderr while passing; this is accepted fixture
+  output, not an unresolved product warning.
+- Executable verification: `npm run build` passed TypeScript typecheck, the Vite
+  production build, and Node TypeScript compilation without warnings.
+- Artifact verification: two `npm run generate:mcp-inventory` runs produced the
+  same SHA-256,
+  `b2626ba7bfb858cdbe8205c14e9952d01ca5dc10b6fe67265a988fdd9690975e`.
+- Repository checks: `git diff --check` passed, and focused changed-file
+  credential/secret scans found no credential material.
+
+### Skipped tests
+
+- Native Windows NSIS packaging and packaged MCP startup were skipped on the
+  current macOS host; WIN-03 owns that release gate.
+- Interactive UI-to-MCP acceptance was skipped because this boundary changes no
+  UI and the transition inventory is documentation-only; UI-01 owns interactive
+  workflow proof.
+- No lint script exists in `package.json`; typecheck, production build, the full
+  suite, artifact generation, and diff hygiene are the available executable
+  gates.
+
+### Adversarial review
+
+A failure-oriented review served as the equivalent configured review lane
+because no repository-local `quality-sweep` or `expert-review` command is
+installed. It checked duplicate tool names and mappings, unknown and forged
+authorization fields, loose composition inputs, unencoded path/query values,
+cursor over-fetching, malformed/non-JSON cores, network error redaction,
+registered error preservation, success output validation, and destructive
+annotations. The focused contract suite exercises these failure classes; no
+unresolved finding remains.
+
+### Residual risk
+
+MCP success values intentionally become v1 envelopes and list values
+intentionally become single cursor pages. Four undocumented MCP helpers are
+removed; their HTTP routes remain. Input-schema failures stay MCP
+invalid-parameter errors, while requests reaching the core retain its
+structured envelope. Native Windows and interactive UI acceptance remain owned
+by WIN-03 and UI-01; no database or HTTP route changed.
+
+### Rollback note
+
+Revert the API-02 commit to restore the prior monolithic MCP entrypoint and
+unversioned MCP results. The generated inventory and transition audit can be
+removed with the same revert; no data migration or durable-state rollback is
+required.
+
+### Next command
+
+Run `$exec` to begin API-03 schema freeze and release-facing interface
+generation.
+
 ## API-01 shipping boundary — 2026-07-28
 
 ### User goal

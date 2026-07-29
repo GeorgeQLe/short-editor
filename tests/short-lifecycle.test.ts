@@ -534,7 +534,7 @@ describe("Short HTTP and MCP parity", () => {
     });
     expect(conflict.isError).toBe(true);
     expect(JSON.stringify(conflict.content)).toContain("REVISION_CONFLICT");
-    expect(JSON.stringify(conflict.content)).toContain("\\\"actualRevision\\\":3");
+    expect(JSON.stringify(conflict.content)).toContain("\\\"actualRevision\\\": 3");
   });
 
   it("exposes successful timeline/approval mutations and structured failures through both surfaces", async () => {
@@ -601,7 +601,7 @@ describe("Short HTTP and MCP parity", () => {
     });
     expect(conflict.isError).toBe(true);
     expect(JSON.stringify(conflict.content)).toContain("REVISION_CONFLICT");
-    expect(JSON.stringify(conflict.content)).toContain('\\"actualRevision\\":3');
+    expect(JSON.stringify(conflict.content)).toContain('\\"actualRevision\\": 3');
 
     const alreadyApproved = await client.callTool({
       name: "shorts.approve",

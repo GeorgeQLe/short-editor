@@ -739,7 +739,7 @@ Queued job types without installed handlers are not complete functionality.
 | FFmpeg composition renderer | Implemented | [`src/core/render-composition.ts`](src/core/render-composition.ts), [`src/core/render.ts`](src/core/render.ts), [`src/core/artifact-store.ts`](src/core/artifact-store.ts), and [`src/core/bootstrap.ts`](src/core/bootstrap.ts) implement explicit snapshot-derived filter scripts, direct no-shell spawning, original-source range concatenation, stored-order fit/fill layers, independent crops, assets, caption burn-in, source/bed audio, silence fallback, progress, dependency/input identity rechecks, and atomic validated MP4/sidecar finalization. [`tests/render.test.ts`](tests/render.test.ts) covers strict start contracts, deterministic graphs, special/spaced paths, real H.264/AAC composition, validation, provenance, sidecars, and unchanged originals. |
 | Deterministic scheduling | Implemented | SCH-01–02 are implemented in [`src/shared/contracts.ts`](src/shared/contracts.ts), [`src/core/scheduler.ts`](src/core/scheduler.ts), [`src/core/database.ts`](src/core/database.ts), [`src/core/repository.ts`](src/core/repository.ts), [`src/core/service.ts`](src/core/service.ts), [`src/core/api.ts`](src/core/api.ts), and [`src/mcp/server.ts`](src/mcp/server.ts): revisioned persisted rules, machine-timezone-independent DST handling, approved/current/validated Render eligibility, stable deterministic drafting, existing-entry spacing, legal collision-free moves, exact entry CAS, rerender protection, manual optional YouTube URL recording, and permanent publication locks. [`tests/scheduler.test.ts`](tests/scheduler.test.ts), [`tests/schedule-rules.test.ts`](tests/schedule-rules.test.ts), [`tests/schedule-semantics.test.ts`](tests/schedule-semantics.test.ts), [`tests/render-preflight.test.ts`](tests/render-preflight.test.ts), [`tests/migrations.test.ts`](tests/migrations.test.ts), and [`tests/persistence.test.ts`](tests/persistence.test.ts) cover DST anomalies, caps, ties, eligibility, spacing, moves, conflicts, locks, URLs, Content ID warnings, transports, and upgrades. Interactive calendar and packaged Windows proof remain UI-01.5/WIN-03.7. |
 | Versioned localhost HTTP API | Implemented | API-01 is implemented by the authoritative 60-operation registration table in [`src/core/api.ts`](src/core/api.ts) and generated [`docs/api-v1-routes.json`](docs/api-v1-routes.json): 54 ordinary and six desktop-token-gated routes have stable operation IDs, access/mutation/revision/long-operation classifications, universal v1 envelopes, strict mutation/query validation, redacted malformed/internal failures, structured unknown-route handling, and explicit IPv4-loopback default binding. All ten unbounded collections use operation/filter-bound opaque cursor pages with 1–1,000 limits and deterministic ID tie-breakers. [`tests/api-contract.test.ts`](tests/api-contract.test.ts) covers inventory drift, pagination boundaries/traversal/cursor isolation, envelope strictness, redaction, no durable deletion, loopback, and desktop-token denial; the existing workflow suites cover domain success and registered failures. |
-| Typed MCP adapter | Partial | [`src/mcp/server.ts`](src/mcp/server.ts) exposes the original tools over the core API. Several inputs are arbitrary records, structured errors are flattened, `apiVersion` is discarded, and the parity additions in section 7.2 are pending. |
+| Typed MCP adapter | Implemented | API-02 is implemented by the authoritative 44-tool registry and factory in [`src/mcp/registry.ts`](src/mcp/registry.ts), the thin stdio entrypoint in [`src/mcp/server.ts`](src/mcp/server.ts), and generated [`docs/mcp-v1-tools.json`](docs/mcp-v1-tools.json). Every tool has a strict concrete input, typed success/error envelope output, non-destructive annotations, and one stable HTTP operation mapping. MCP returns one opaque-cursor page unchanged, preserves complete v1 envelopes, and redacts malformed or unreachable core responses. [`tests/mcp-contract.test.ts`](tests/mcp-contract.test.ts) and the workflow suites cover discovery, strictness, pagination/filter forwarding, authorization forgery, URI encoding, output validation, stable domain values, and HTTP/MCP success/error parity. |
 | Electron/React shell and library UI | Partial | [`src/electron/main.ts`](src/electron/main.ts), [`src/electron/preload.ts`](src/electron/preload.ts), and [`src/ui/App.tsx`](src/ui/App.tsx) provide a desktop shell, native MP4 import, searchable inventory, metrics, job polling, and local-analysis queue action. Candidate, editor, and calendar views are placeholders. |
 | Accessibility | Partial | The library uses semantic tables, labels, live status, keyboard-native controls, and non-color text states in [`src/ui/App.tsx`](src/ui/App.tsx). No formal WCAG/keyboard/text-scaling audit covers the full workflow. |
 | Windows installer | Partial | [`package.json`](package.json) defines an NSIS target and packaged-resource boundary. No evidence establishes bundled working FFmpeg/Python resources or a clean Windows 11 end-to-end packaging test. |
@@ -834,7 +834,7 @@ supporting evidence, not release acceptance.
 - Contract-test every HTTP operation and every tool in section 7.2 for success,
   schema rejection, not-found, invalid state, revision conflict, cancellation,
   and provider failure.
-- Verify MCP discovery contains exactly the 40 unique tools in section 7.2.
+- Verify MCP discovery contains exactly the 44 unique tools in section 7.2.
 - Verify success/error envelopes include `apiVersion`, IDs remain stable, jobs
   are durable, errors remain structured, and credentials never appear.
 - Run a UI-to-MCP parity inventory and prove every primary persisted UI
@@ -865,6 +865,18 @@ supporting evidence, not release acceptance.
   crash logs, and absence of source deletion.
 
 ## 10. Changelog
+
+### 1.4.0 — 2026-07-29
+
+- Froze one authoritative 44-tool MCP registry with strict concrete inputs,
+  typed versioned success/error envelopes, non-destructive annotations, stable
+  HTTP mappings, and deterministic generated discovery documentation.
+- Changed MCP lists to return one HTTP-compatible opaque-cursor page and
+  removed four undocumented experimental/diagnostic tools while retaining
+  their HTTP operations.
+- Documented user-only desktop credential/cloud-authorization gates and
+  classified read-only diagnostic HTTP helpers outside the primary transition
+  inventory.
 
 ### 1.3.0 — 2026-07-28
 

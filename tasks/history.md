@@ -1,5 +1,26 @@
 # Session history
 
+## 2026-07-29
+
+- Completed API-02 with one authoritative 44-tool registry shared by MCP
+  discovery, runtime registration, request construction, and deterministic
+  generated documentation. Removed the four undocumented MCP helpers while
+  preserving their HTTP operations.
+- Every tool now has a strict concrete input, typed versioned success/error
+  output, non-destructive annotations, and a stable HTTP operation mapping.
+  Composition and audio use canonical domain fields; list tools accept
+  `limit`/opaque `cursor`, preserve filters, and return one HTTP page unchanged.
+- Added a shared redacted HTTP/MCP translator that preserves complete valid
+  envelopes in text and structured content, plus a server factory and thin
+  stdio entrypoint. Added the UI/HTTP transition audit covering user-only
+  credential/cloud gates and diagnostic read-only helpers.
+- Added generated-artifact, discovery, schema, annotation, pagination, cursor,
+  URI, forged-authorization, malformed-core, network-redaction, and exact
+  envelope regressions; updated existing workflow parity assertions for
+  versioned envelopes. Full verification passes 40 test files and 296 tests,
+  production build/typecheck, generation stability, diff hygiene, and focused
+  secret scanning. Promoted API-03.
+
 ## 2026-07-28
 
 - Completed API-01 by replacing ad hoc Express registration with one

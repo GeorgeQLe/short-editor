@@ -438,7 +438,7 @@ describe("Candidate HTTP and MCP diagnostics", () => {
       });
     expect(tools.tools.find((tool) => tool.name === "candidates.review")?.inputSchema)
       .toMatchObject({ required: expect.arrayContaining(["candidateId", "expectedRevision", "status"]) });
-    expect(tools.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+    expect(tools.tools.map((tool) => tool.name)).not.toEqual(expect.arrayContaining([
       "candidates.get_content_package", "candidates.accept_content_package"
     ]));
     const result = await client.callTool({
@@ -448,7 +448,8 @@ describe("Candidate HTTP and MCP diagnostics", () => {
     expect(result.isError).not.toBe(true);
     const content = result.content as Array<{ type: string; text?: string }>;
     expect(JSON.parse(content[0]!.text!)).toMatchObject({
-      diagnostic: { sufficient: false, code: "INSUFFICIENT_MATERIAL" }
+      apiVersion: "v1",
+      data: { diagnostic: { sufficient: false, code: "INSUFFICIENT_MATERIAL" } }
     });
   });
 });

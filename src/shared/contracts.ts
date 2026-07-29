@@ -23,6 +23,12 @@ export const pageSchema = <T extends z.ZodType>(itemSchema: T) => z.strictObject
   nextCursor: z.string().min(1).nullable()
 });
 
+export const apiSuccessEnvelopeSchema = <T extends z.ZodType>(dataSchema: T) =>
+  z.strictObject({
+    apiVersion: z.literal("v1"),
+    data: dataSchema
+  });
+
 export type ImportRejectionCode = "VALIDATION_ERROR" | "DEPENDENCY_UNAVAILABLE";
 
 export interface ImportRejectedResult {
@@ -30,6 +36,12 @@ export interface ImportRejectedResult {
   code: ImportRejectionCode;
   reason: string;
 }
+
+export const importRejectedResultSchema = z.strictObject({
+  path: z.string(),
+  code: z.enum(["VALIDATION_ERROR", "DEPENDENCY_UNAVAILABLE"]),
+  reason: z.string().min(1)
+});
 
 const nullableNonempty = z.string().min(1).nullable();
 const confidenceSchema = z.number().min(0).max(1);
@@ -64,6 +76,13 @@ export const episodeSchema = z.strictObject({
   updatedAt: utcInstantSchema
 });
 export type Episode = z.infer<typeof episodeSchema>;
+
+export const importResultSchema = z.strictObject({
+  imported: z.array(episodeSchema),
+  duplicates: z.array(episodeSchema),
+  relinked: z.array(episodeSchema),
+  rejected: z.array(importRejectedResultSchema)
+});
 
 export const watchedFolderScanStatuses = ["never_scanned", "scanning", "succeeded", "failed"] as const;
 export const watchedFolderScanStatusSchema = z.enum(watchedFolderScanStatuses);
@@ -1285,6 +1304,30 @@ export const jobSchema = z.strictObject({
   updatedAt: utcInstantSchema
 });
 export type Job = z.infer<typeof jobSchema>;
+
+export const watchedFolderConfigurationResultSchema = z.union([
+  watchedFolderSchema,
+  jobSchema
+]);
+
+export const localTranscriptionStatusSchema = z.strictObject({
+  available: z.boolean(),
+  models: z.array(z.strictObject({
+    modelId: z.string().min(1),
+    installed: z.boolean()
+  })),
+  features: z.array(z.string().min(1))
+});
+
+export const renderProbeValidationSchema = z.strictObject({
+  valid: z.boolean(),
+  errors: z.array(z.string().min(1)),
+  width: z.number().int().nonnegative().nullable(),
+  height: z.number().int().nonnegative().nullable(),
+  durationMs: z.number().int().nonnegative().nullable(),
+  videoCodec: z.string().min(1).nullable(),
+  audioCodec: z.string().min(1).nullable()
+});
 
 export const domainEntityNames = [
   "Episode", "WatchedFolder", "TranscriptRevision", "AnalysisArtifact", "Candidate",

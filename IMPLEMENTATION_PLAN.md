@@ -1089,6 +1089,9 @@ interactive calendar proof remains assigned to UI-01.5/WIN-03.7.
 
 ### API-02 — Deliver concrete MCP schemas and complete parity
 
+- **Status:** Implemented 2026-07-29. The generated discovery artifact and
+  runtime factory share one frozen 44-tool registry; cursor pages and complete
+  v1 success/error envelopes now pass through the HTTP core unchanged.
 - **SPEC / gates:** 2.3, 4.1, 5.4, 7.2–7.3; G2, G8.
 - **Prerequisites / unblocks:** API-01 and PRO-04; unblocks complete agent
   workflow and UI parity audit.
@@ -1131,8 +1134,8 @@ interactive calendar proof remains assigned to UI-01.5/WIN-03.7.
   `API-02.1` adds the shared result/error translator and concrete schemas for the
   original tools; `API-02.2` adds inventory, transcript, and provider parity;
   `API-02.3` adds Short, template, asset, preflight, and retry parity, including
-  `shorts.update_audio` with concrete `sourceGain`, `sourceMuted`,
-  `cutFadeMilliseconds`, optional `bedAssetId`, `bedGain`, and
+  `shorts.update_audio` with concrete `sourceGainDb`, `sourceMuted`,
+  `cutFadeMs`, nullable `bedAssetId`, `bedGainDb`, and
   `expectedRevision` fields; and
   `API-02.4` adds schedule parity plus the final authorization/no-deletion
   security inventory. Each subtask must leave discovery and existing tools

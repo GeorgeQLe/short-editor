@@ -531,9 +531,12 @@ describe("transcript MCP parity", () => {
     const exactContent = exact.content as Array<{ type: string; text?: string }>;
     const exactText = exactContent[0]?.type === "text" ? exactContent[0].text ?? "" : "";
     expect(JSON.parse(exactText)).toMatchObject({
-      revision: 1,
-      acceptedState: "superseded",
-      segments: original
+      apiVersion: "v1",
+      data: {
+        revision: 1,
+        acceptedState: "superseded",
+        segments: original
+      }
     });
 
     const stale = await client.callTool({
@@ -549,8 +552,8 @@ describe("transcript MCP parity", () => {
     const staleText = staleContent[0]?.type === "text" ? staleContent[0].text ?? "" : "";
     expect(stale.isError).toBe(true);
     expect(staleText).toContain("REVISION_CONFLICT");
-    expect(staleText).toContain("\"expectedRevision\":1");
-    expect(staleText).toContain("\"actualRevision\":2");
+    expect(staleText).toContain("\"expectedRevision\": 1");
+    expect(staleText).toContain("\"actualRevision\": 2");
     expect(staleText).not.toContain("MCP sensitive stale text.");
   });
 });
