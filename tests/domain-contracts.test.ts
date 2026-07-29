@@ -211,6 +211,32 @@ describe("SPEC 5.1 entity contracts", () => {
     starterTemplates.forEach((template) => expect(templateSchema.safeParse(template).success).toBe(true));
   });
 
+  it("contracts text bindings, optional text, media layers, and caption transforms", () => {
+    const news = structuredClone(starterTemplates[3]!.composition);
+    const text = news.layers.find((layer) => layer.type === "text")!;
+    const media = news.layers.find((layer) => layer.type === "media")!;
+    expect(compositionSchema.parse(news).captionStylePreset?.textTransform).toBe("uppercase");
+    text.content = "Literal topic";
+    expect(compositionSchema.safeParse(news).success).toBe(true);
+    text.content = null;
+    expect(compositionSchema.safeParse(news).success).toBe(true);
+    text.content = { binding: "short_title" };
+    expect(compositionSchema.safeParse(news).success).toBe(true);
+    expect(compositionSchema.safeParse({
+      ...news,
+      layers: news.layers.map((layer) => layer.id === media.id
+        ? { ...layer, source: "episode" }
+        : layer)
+    }).success).toBe(false);
+    const legacyCaptionStyle = { ...captionState().style };
+    delete (legacyCaptionStyle as Partial<typeof legacyCaptionStyle>).textTransform;
+    const parsed = compositionSchema.parse({
+      ...starterTemplates[0]!.composition,
+      captionStylePreset: legacyCaptionStyle
+    });
+    expect(parsed.captionStylePreset?.textTransform).toBe("none");
+  });
+
   it("uses strict template and asset mutation contracts", () => {
     expect(templateCloneInputSchema.parse({ name: "  Clone  " })).toEqual({ name: "Clone" });
     expect(templateCloneInputSchema.safeParse({ name: "Clone", unknown: true }).success).toBe(false);

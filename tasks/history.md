@@ -2,6 +2,20 @@
 
 ## 2026-07-29
 
+- Added the immutable News Brief + Speaker starter template with a related-media
+  upper region, tracked speaker lower region, Short-title topic binding, logo
+  slot, and split-centered uppercase captions.
+- Extended strict composition contracts with text and image-or-video media
+  layers, migrated existing caption styles to an explicit no-transform default,
+  and preserved user templates while installing the new built-in.
+- Advanced the render graph to v2 with deterministic Inter text measurement,
+  wrapping and ellipsis, aligned word highlights, caption transforms, media
+  final-frame repeat, and a real FFmpeg split-composition regression.
+- Full verification passes 41 test files and 311 tests plus production
+  build/typecheck, deterministic interface generation, diff hygiene, focused
+  secret scanning, and failure-oriented review. The remaining work is the five
+  promoted UI-01 workflow slices.
+
 - Completed API-03 by freezing the exact generated HTTP route inventory and MCP
   Draft-07 input/output schemas behind a deterministic, digest-bearing v1
   release manifest and generated interface guide.

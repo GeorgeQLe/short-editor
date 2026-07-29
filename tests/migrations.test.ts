@@ -196,6 +196,36 @@ describe("database migrations", () => {
     });
   });
 
+  it("adds exactly one news built-in without replacing user templates", () => {
+    const db = new Database(":memory:");
+    databases.push(db);
+    migrateDatabase(db, databaseMigrations.slice(0, 16));
+    db.prepare("DELETE FROM templates WHERE id='news-brief-speaker-v1'").run();
+    const now = "2026-07-29T12:00:00.000Z";
+    db.prepare(`
+      INSERT INTO templates(
+        id,name,description,version,revision,parent_template_id,built_in,
+        composition_json,created_at,updated_at
+      ) VALUES('user-news','My News','keep me',3,4,'fullscreen-speaker-v1',0,?,?,?)
+    `).run(JSON.stringify(starterTemplates[0]!.composition), now, now);
+    migrateDatabase(db);
+    expect(db.prepare(`
+      SELECT id,name,built_in FROM templates WHERE id='news-brief-speaker-v1'
+    `).get()).toEqual({
+      id: "news-brief-speaker-v1",
+      name: "News Brief + Speaker",
+      built_in: 1
+    });
+    expect(db.prepare(`
+      SELECT name,description,version,revision,built_in FROM templates WHERE id='user-news'
+    `).get()).toEqual({
+      name: "My News", description: "keep me", version: 3, revision: 4, built_in: 0
+    });
+    expect((db.prepare(`
+      SELECT count(*) AS count FROM templates WHERE id='news-brief-speaker-v1'
+    `).get() as { count: number }).count).toBe(1);
+  });
+
   it("demotes pre-RND-03 successes while preserving their legacy outputs", () => {
     const path = join(mkdtempSync(join(tmpdir(), "short-editor-determinism-migration-")), "fixture.db");
     const legacy = new Database(path);
@@ -499,6 +529,7 @@ describe("database migrations", () => {
         maxWidth: 0.82,
         textColor: "#eeeeee",
         highlightColor: "#ff0000",
+        textTransform: "none",
         outline: { color: "#000000", widthPx: 4 },
         background: { color: "#00000000", paddingPx: 12, cornerRadiusPx: 8 }
       },

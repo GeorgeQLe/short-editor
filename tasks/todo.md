@@ -1,9 +1,21 @@
 # Current work
 
-No task is currently promoted.
+- [ ] UI-01.1 — Complete the library, watched-folder, relink, provider-status,
+  and cloud-authorization workflow.
+- [ ] UI-01.2 — Complete transcript editing, Candidate review, and accepted-copy
+  workflow.
+- [ ] UI-01.3 — Complete timeline, composition, crop, caption, and audio editing
+  with session undo/redo.
+- [ ] UI-01.4 — Complete approval, preflight, render progress, cancellation,
+  recovery, and retry workflow.
+- [ ] UI-01.5 — Complete schedule rules, list/calendar, move, collision, and
+  publication-recording workflow.
 
 ## Completed
 
+- [x] Add the News Brief + Speaker starter template with bound topic text,
+  image-or-video related media, split composition, uppercase caption preset,
+  migration compatibility, and executable render coverage.
 - [x] API-03 — Freeze schemas and generate release-facing interface
   documentation.
 - [x] API-02 — Deliver concrete MCP schemas and complete parity.

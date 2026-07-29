@@ -5,8 +5,14 @@ import type {
   ManualCropControl
 } from "../shared/domain.js";
 import type { RenderSnapshot } from "./render-preflight.js";
+import {
+  layoutCaptionForRender,
+  layoutInterTextLines,
+  measureInterText,
+  transformText
+} from "./captions.js";
 
-export const RENDER_GRAPH_VERSION = "ffmpeg-composition-v1";
+export const RENDER_GRAPH_VERSION = "ffmpeg-composition-v2";
 
 export interface RenderGraph {
   script: string;
@@ -40,7 +46,8 @@ export function buildRenderGraph(
   for (const { identity } of assets) {
     const uses = snapshot.short.composition.layers.filter(
       (layer) => layer.source === "asset" && layer.assetId === identity.id &&
-        (layer.type === "image" || layer.type === "logo" || layer.type === "video")
+        (layer.type === "image" || layer.type === "logo" || layer.type === "video" ||
+          layer.type === "media")
     ).length;
     if (!uses) continue;
     const input = assetInput.get(identity.id)!;
@@ -102,6 +109,25 @@ export function buildRenderGraph(
         if (filters === input) continue;
         const next = `canvas_${canvasIndex + 1}`;
         lines.push(`${filters}[${next}]`);
+        canvasIndex++;
+      }
+      continue;
+    }
+    if (layer.type === "text") {
+      const text = layer.content === null
+        ? null
+        : typeof layer.content === "string"
+          ? layer.content
+          : snapshot.short.title;
+      if (text !== null && text.length > 0) {
+        const next = `canvas_${canvasIndex + 1}`;
+        lines.push(`${textLayerFilter(
+          `[canvas_${canvasIndex}]`,
+          text,
+          layer,
+          snapshot.short.composition,
+          fontDirectory
+        )}[${next}]`);
         canvasIndex++;
       }
       continue;
@@ -358,31 +384,168 @@ function captionFilters(
       })) }];
   });
   for (const cue of mapped) {
-    chain += drawText(cue.text, cue.startMs, cue.endMs, style.textColor, style, fontDirectory, true);
-    for (const word of cue.words) {
-      chain += drawText(word.text, word.startMs, word.endMs, style.highlightColor, style, fontDirectory, false);
+    const cueText = transformText(cue.text, style.textTransform);
+    const layout = layoutCaptionForRender(cue, style, {
+      width: 1080,
+      height: 1920,
+      background: "#000000",
+      safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+      layers: []
+    }, fontDirectory);
+    const firstLineY = 1920 * style.position.y
+      - layout.lines.length * layout.lineHeight / 2;
+    layout.lines.forEach((line, lineIndex) => {
+      chain += drawTextAt(
+        line,
+        cue.startMs,
+        cue.endMs,
+        style.textColor,
+        style,
+        fontDirectory,
+        1080 * style.position.x - layout.lineWidths[lineIndex]! / 2,
+        firstLineY + lineIndex * layout.lineHeight,
+        true
+      );
+    });
+    const transformedWords = cue.words.map((word) => ({
+      ...word,
+      text: transformText(word.text, style.textTransform)
+    }));
+    let searchPosition = { line: 0, column: 0 };
+    for (const word of transformedWords) {
+      const position = findWordPosition(word.text, layout.lines, searchPosition);
+      if (!position) continue;
+      searchPosition = { line: position.line, column: position.column + word.text.length };
+      const lineWidth = layout.lineWidths[position.line]!;
+      const prefixWidth = measureInterText(
+        layout.lines[position.line]!.slice(0, position.column),
+        style.fontSizePx,
+        style.fontWeight,
+        fontDirectory
+      );
+      const x = 1080 * style.position.x - lineWidth / 2 + prefixWidth;
+      const y = 1920 * style.position.y - layout.lines.length * layout.lineHeight / 2
+        + position.line * layout.lineHeight;
+      chain += drawTextAt(
+        word.text,
+        word.startMs,
+        word.endMs,
+        style.highlightColor,
+        style,
+        fontDirectory,
+        x,
+        y,
+        false
+      );
     }
   }
   return chain.endsWith(",") ? chain.slice(0, -1) : chain;
 }
 
-function drawText(
+function findWordPosition(
+  word: string,
+  lines: string[],
+  from: { line: number; column: number }
+): { line: number; column: number } | null {
+  for (let line = from.line; line < lines.length; line++) {
+    const column = lines[line]!.indexOf(word, line === from.line ? from.column : 0);
+    if (column >= 0) return { line, column };
+  }
+  return null;
+}
+
+function drawTextAt(
   text: string,
   startMs: number,
   endMs: number,
   color: string,
   style: RenderSnapshot["short"]["captions"]["style"],
   fontDirectory: string,
+  x: number,
+  y: number,
   box: boolean
 ): string {
   const font = `${fontDirectory}/${style.fontWeight === 700 ? "Inter-Bold.otf" : "Inter-Regular.otf"}`;
   return `drawtext=fontfile='${escapeFilter(font)}':text='${escapeText(text)}':` +
     `expansion=none:fontsize=${style.fontSizePx}:fontcolor=${ffColor(color)}:` +
     `borderw=${style.outline.widthPx}:bordercolor=${ffColor(style.outline.color)}:` +
-    `x=w*${number(style.position.x)}-text_w/2:y=h*${number(style.position.y)}-text_h/2:` +
+    `x=${number(x)}:y=${number(y)}:` +
     `box=${box && style.background.color !== "#00000000" ? 1 : 0}:` +
     `boxcolor=${ffColor(style.background.color)}:boxborderw=${style.background.paddingPx}:` +
     `enable='between(t\\,${seconds(startMs)}\\,${seconds(endMs)})',`;
+}
+
+function textLayerFilter(
+  input: string,
+  value: string,
+  layer: Extract<Composition["layers"][number], { type: "text" }>,
+  composition: Composition,
+  fontDirectory: string
+): string {
+  const region = pixelRegion(layer.region, composition);
+  const style = layer.style;
+  const transformed = style.textTransform === "uppercase"
+    ? value.toLocaleUpperCase()
+    : value;
+  const layout = layoutInterTextLines(
+    transformed,
+    region.width,
+    style.fontSizePx,
+    style.fontWeight,
+    fontDirectory,
+    style.wrap
+  );
+  let lines = layout.lines.slice(0, style.maxLines);
+  if (
+    style.overflow === "ellipsis" &&
+    (layout.lines.length > style.maxLines ||
+      measureInterText(
+        lines.at(-1) ?? "",
+        style.fontSizePx,
+        style.fontWeight,
+        fontDirectory
+      ) > region.width)
+  ) {
+    const last = lines.at(-1) ?? "";
+    let shortened = last;
+    while (
+      shortened.length > 0 &&
+      measureInterText(
+        `${shortened}…`,
+        style.fontSizePx,
+        style.fontWeight,
+        fontDirectory
+      ) > region.width
+    ) shortened = shortened.slice(0, -1);
+    lines[lines.length - 1] = `${shortened.trimEnd()}…`;
+  }
+  const contentHeight = lines.length * layout.lineHeight;
+  const firstY = style.verticalAlign === "top"
+    ? region.y
+    : style.verticalAlign === "bottom"
+      ? region.y + region.height - contentHeight
+      : region.y + (region.height - contentHeight) / 2;
+  const font = `${fontDirectory}/${style.fontWeight === 700 ? "Inter-Bold.otf" : "Inter-Regular.otf"}`;
+  let chain = input;
+  lines.forEach((line, index) => {
+    const lineWidth = measureInterText(
+      line,
+      style.fontSizePx,
+      style.fontWeight,
+      fontDirectory
+    );
+    const x = style.align === "left"
+      ? region.x
+      : style.align === "right"
+        ? region.x + region.width - lineWidth
+        : region.x + (region.width - lineWidth) / 2;
+    chain += `${index === 0 ? "" : ","}drawtext=fontfile='${escapeFilter(font)}':text='${escapeText(line)}':` +
+      `expansion=none:fontsize=${style.fontSizePx}:fontcolor=${ffColor(style.color)}:` +
+      `x=${number(x)}:y=${number(firstY + index * layout.lineHeight)}:` +
+      `box=${style.backgroundColor === "#00000000" ? 0 : 1}:` +
+      `boxcolor=${ffColor(style.backgroundColor)}:boxborderw=${style.backgroundPaddingPx}`;
+  });
+  return chain;
 }
 
 function pixelRegion(region: Composition["layers"][number]["region"], composition: Composition) {

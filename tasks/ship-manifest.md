@@ -1,5 +1,118 @@
 # Ship manifest
 
+## News Brief + Speaker shipping boundary — 2026-07-29
+
+### User goal
+
+Ship the completed session boundary: add a production-renderable News Brief +
+Speaker starter template and route the remaining project work into executable
+UI workflow slices.
+
+### Changed files
+
+`docs/mcp-v1-tools.json`, `docs/release-interface-v1.json`,
+`docs/release-interfaces-v1.md`, `src/core/captions.ts`,
+`src/core/database.ts`, `src/core/render-composition.ts`,
+`src/core/render-preflight.ts`, `src/core/service.ts`,
+`src/shared/contracts.ts`, `src/shared/templates.ts`, `tasks/history.md`,
+`tasks/ship-manifest.md`, `tasks/todo.md`, `tests/domain-contracts.test.ts`,
+`tests/factories.ts`, `tests/migrations.test.ts`, `tests/render.test.ts`, and
+`tests/template-assets.test.ts`.
+
+### Per-file purpose
+
+- `src/shared/contracts.ts` adds strict text-layer, media-layer, caption
+  transform, and optional composition caption-preset schemas;
+  `src/shared/templates.ts` defines the immutable News Brief + Speaker
+  composition.
+- `src/core/database.ts` installs the new built-in and upgrades existing
+  caption styles in migration 17; `src/core/service.ts` materializes the
+  template caption preset and enforces image-or-video media bindings.
+- `src/core/captions.ts` shares deterministic Inter layout, measurement, and
+  transformation helpers between analysis and rendering.
+- `src/core/render-preflight.ts` validates media-layer assets;
+  `src/core/render-composition.ts` advances the graph to v2 and renders bound
+  topic text, related media, wrapped/ellipsized Inter text, transformed
+  captions, and aligned word highlights.
+- The three generated files under `docs/` publish the changed MCP composition
+  schemas and their new release digest.
+- `tests/domain-contracts.test.ts`, `tests/migrations.test.ts`,
+  `tests/template-assets.test.ts`, and `tests/render.test.ts` cover strict
+  schemas, migration preservation, materialization and binding rules,
+  deterministic graphs, and a real FFmpeg output; `tests/factories.ts` updates
+  the canonical caption fixture.
+- `tasks/todo.md` records the completed boundary and promotes the five UI-01
+  slices; `tasks/history.md` and this manifest record the session and evidence.
+
+### User-goal mapping
+
+The new immutable template expresses the complete requested split layout, and
+Short creation binds its topic to the persisted title while inheriting its
+caption preset. Strict schemas, service checks, migration 17, preflight, and
+render graph v2 carry that layout safely from stored state through an actual
+1080×1920 H.264/AAC output. Generated MCP schemas keep the public interface in
+sync, while the task files route the remaining interactive work without
+claiming that any UI slice is complete.
+
+### Tests run
+
+- Executable verification: `npm test` passed all 41 files and 311 tests,
+  including the real FFmpeg News Brief render and existing determinism suite.
+  The intentional `Unexpected internal error` stderr line is accepted output
+  from the redacted-500 regression, not a product warning.
+- Executable verification: `npm run build` passed TypeScript typecheck, the
+  Vite production build, and Node TypeScript compilation without warnings.
+- Artifact verification: two complete
+  `npm run generate:release-interfaces` runs produced identical SHA-256
+  digests for all three release-interface artifacts.
+- Repository verification: `git diff --check` and a focused changed-file
+  credential-signature scan passed.
+
+### Skipped tests
+
+- Native Windows NSIS packaging was skipped because the current host is macOS
+  and this boundary does not alter packaging configuration. Packaged Windows
+  acceptance remains a later release gate.
+- Interactive UI acceptance was skipped because this session adds domain,
+  migration, preflight, and rendering support but no UI controls. The promoted
+  UI-01 slices own those workflows.
+- No lint script or task-document audit script exists. Typecheck, production
+  build, the full suite, deterministic generation, diff hygiene, and focused
+  credential scanning are the available automated gates.
+
+### Adversarial review
+
+A failure-oriented review served as the equivalent review lane because no
+repository-local `quality-sweep` or `expert-review` command is installed. It
+checked legacy caption-style parsing and migration, built-in/user-template
+preservation, strict text/media discriminants, image/video versus audio/logo
+binding rejection, unbound optional slots, title binding, font fallback and
+caching, FFmpeg filter escaping, wrapping and ellipsis bounds, word-highlight
+placement, repeated media inputs, final-frame behavior, graph determinism, and
+generated-schema drift. Focused and full regressions cover the material failure
+classes; no unresolved finding remains.
+
+### Residual risk
+
+The real-media test proves a one-second image-backed composition on the current
+FFmpeg build. Native Windows font/filter behavior, longer related videos, and
+interactive authoring remain unproved until the Windows and UI acceptance
+work. Text `clip` behavior intentionally draws within the configured
+composition without a separate region mask; the built-in uses bounded wrapping
+and ellipsis.
+
+### Rollback note
+
+Revert the feature commit before migration 17 is deployed. After migration,
+reverting the code leaves the inserted built-in row and explicit
+`textTransform: "none"` values in place; restore a pre-migration database
+backup if an exact durable-state rollback is required.
+
+### Next command
+
+Run `$exec` for UI-01.1, starting with the library, watched-folder, relink,
+provider-status, and cloud-authorization workflow.
+
 ## API-03 shipping boundary — 2026-07-29
 
 ### User goal

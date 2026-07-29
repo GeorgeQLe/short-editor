@@ -4,7 +4,7 @@ This document is generated. The checked-in JSON artifacts are the exact
 machine-readable compatibility boundary:
 
 - [HTTP route inventory](api-v1-routes.json) — 60 operations, SHA-256 `d77fb06e4d1156606c17ef95c838d7752725af8569af62b23ba25ce3cd32773a`
-- [MCP tool schemas](mcp-v1-tools.json) — 44 tools with Draft-07 input/output schemas, SHA-256 `b2626ba7bfb858cdbe8205c14e9952d01ca5dc10b6fe67265a988fdd9690975e`
+- [MCP tool schemas](mcp-v1-tools.json) — 44 tools with Draft-07 input/output schemas, SHA-256 `bc3585035d5e3532876a50622e9b99ea1c5bfcd5a1b6c20d4d17edf307c283e9`
 - [Compatibility manifest](release-interface-v1.json) — policy, artifact digests, and exact MCP-to-HTTP mappings
 
 ## Compatibility policy

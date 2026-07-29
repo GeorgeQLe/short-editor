@@ -547,6 +547,53 @@ const layerBase = {
   region: normalizedRectangleSchema,
   fit: z.enum(["fill", "fit"])
 };
+const captionColorSchema = z.string().regex(
+  /^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/,
+  "Colors must use #RRGGBB or #RRGGBBAA"
+);
+export const captionStyleSchema = z.strictObject({
+  fontFamily: z.literal("Inter"),
+  fontWeight: z.union([z.literal(400), z.literal(700)]),
+  fontSizePx: z.number().int().min(12).max(200),
+  position: z.strictObject({
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1)
+  }),
+  maxWidth: z.number().min(0.1).max(1),
+  textColor: captionColorSchema,
+  highlightColor: captionColorSchema,
+  textTransform: z.enum(["none", "uppercase"]).default("none"),
+  outline: z.strictObject({
+    color: captionColorSchema,
+    widthPx: z.number().min(0).max(20)
+  }),
+  background: z.strictObject({
+    color: captionColorSchema,
+    paddingPx: z.number().min(0).max(100),
+    cornerRadiusPx: z.number().min(0).max(100)
+  })
+});
+export type CaptionStyle = z.infer<typeof captionStyleSchema>;
+
+export const textLayerStyleSchema = z.strictObject({
+  fontFamily: z.literal("Inter"),
+  fontWeight: z.union([z.literal(400), z.literal(700)]),
+  fontSizePx: z.number().int().min(12).max(200),
+  color: captionColorSchema,
+  backgroundColor: captionColorSchema,
+  backgroundPaddingPx: z.number().min(0).max(100),
+  align: z.enum(["left", "center", "right"]),
+  verticalAlign: z.enum(["top", "center", "bottom"]),
+  wrap: z.boolean(),
+  maxLines: z.number().int().min(1).max(20),
+  overflow: z.enum(["clip", "ellipsis"]),
+  textTransform: z.enum(["none", "uppercase"])
+});
+export const textLayerContentSchema = z.union([
+  z.string(),
+  z.null(),
+  z.strictObject({ binding: z.literal("short_title") })
+]);
 const emptyAutomaticCropTrack = {
   frames: [],
   provenance: null,
@@ -563,9 +610,24 @@ export const nonVideoLayerSchema = z.strictObject({
   ...layerBase,
   type: z.enum(["image", "captions", "shape", "logo"])
 });
+export const mediaLayerSchema = z.strictObject({
+  ...layerBase,
+  type: z.literal("media"),
+  source: z.literal("asset")
+});
+export const textLayerSchema = z.strictObject({
+  ...layerBase,
+  type: z.literal("text"),
+  source: z.literal("none"),
+  assetId: z.null(),
+  content: textLayerContentSchema,
+  style: textLayerStyleSchema
+});
 export const layerSchema = z.discriminatedUnion("type", [
   videoLayerSchema,
-  nonVideoLayerSchema
+  nonVideoLayerSchema,
+  mediaLayerSchema,
+  textLayerSchema
 ]);
 export const compositionSchema = z.strictObject({
   width: z.literal(1080),
@@ -577,7 +639,8 @@ export const compositionSchema = z.strictObject({
     bottom: z.number().nonnegative(),
     left: z.number().nonnegative()
   }),
-  layers: z.array(layerSchema)
+  layers: z.array(layerSchema),
+  captionStylePreset: captionStyleSchema.optional()
 });
 export type Composition = z.infer<typeof compositionSchema>;
 
@@ -605,10 +668,6 @@ export const candidateContentPackageAcceptInputSchema = z.strictObject({
   expectedRevision: positiveRevisionSchema,
   contentPackage: contentPackageSchema
 });
-const captionColorSchema = z.string().regex(
-  /^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/,
-  "Caption colors must use #RRGGBB or #RRGGBBAA"
-);
 export const captionWordSchema = timeRangeSchema.extend({
   text: z.string().refine((text) => text.trim().length > 0, "Word text must not be empty")
 });
@@ -647,28 +706,6 @@ export const captionCuesSchema = z.array(captionCueSchema).superRefine((cues, co
     seen.add(cue.id);
   });
 });
-export const captionStyleSchema = z.strictObject({
-  fontFamily: z.literal("Inter"),
-  fontWeight: z.union([z.literal(400), z.literal(700)]),
-  fontSizePx: z.number().int().min(12).max(200),
-  position: z.strictObject({
-    x: z.number().min(0).max(1),
-    y: z.number().min(0).max(1)
-  }),
-  maxWidth: z.number().min(0.1).max(1),
-  textColor: captionColorSchema,
-  highlightColor: captionColorSchema,
-  outline: z.strictObject({
-    color: captionColorSchema,
-    widthPx: z.number().min(0).max(20)
-  }),
-  background: z.strictObject({
-    color: captionColorSchema,
-    paddingPx: z.number().min(0).max(100),
-    cornerRadiusPx: z.number().min(0).max(100)
-  })
-});
-export type CaptionStyle = z.infer<typeof captionStyleSchema>;
 export const captionWarningCodes = [
   "CAPTION_OVERFLOW",
   "CAPTION_SAFE_AREA",

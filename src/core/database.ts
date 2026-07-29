@@ -630,6 +630,31 @@ const migrations: readonly Migration[] = [
       ALTER TABLE schedule_rule_sets ADD COLUMN timezone_database_version TEXT NOT NULL
         DEFAULT 'unknown';
     `)
+  },
+  {
+    version: 17,
+    name: "news brief speaker template and caption text transforms",
+    up: (db) => {
+      const template = starterTemplates.find(({ id }) => id === "news-brief-speaker-v1");
+      if (!template) throw new Error("News Brief + Speaker starter template is unavailable");
+      db.prepare(`
+        INSERT OR IGNORE INTO templates(
+          id,name,description,version,revision,parent_template_id,built_in,
+          composition_json,created_at,updated_at
+        ) VALUES(@id,@name,@description,@version,@revision,@parentTemplateId,1,
+          @composition,@createdAt,@updatedAt)
+      `).run({
+        ...template,
+        composition: JSON.stringify(template.composition)
+      });
+      db.prepare(`
+        UPDATE short_projects
+        SET captions_json=json_set(captions_json, '$.style.textTransform', 'none')
+        WHERE json_valid(captions_json)
+          AND json_type(captions_json, '$.style')='object'
+          AND json_type(captions_json, '$.style.textTransform') IS NULL
+      `).run();
+    }
   }
 ];
 

@@ -27,7 +27,7 @@
     "mcp": {
       "path": "docs/mcp-v1-tools.json",
       "toolCount": 44,
-      "sha256": "b2626ba7bfb858cdbe8205c14e9952d01ca5dc10b6fe67265a988fdd9690975e"
+      "sha256": "bc3585035d5e3532876a50622e9b99ea1c5bfcd5a1b6c20d4d17edf307c283e9"
     }
   },
   "mcpHttpMappings": [

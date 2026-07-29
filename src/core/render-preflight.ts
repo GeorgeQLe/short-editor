@@ -434,11 +434,11 @@ export class RenderPreflightService {
   ): Promise<Array<{ asset: Asset; file: FileSnapshot }>> {
     const bindings = new Map<string, Array<{
       layerId: string;
-      expectedKind: Asset["kind"];
+      expectedKind: Asset["kind"] | "media";
     }>>();
     const addBinding = (
       assetId: string,
-      binding: { layerId: string; expectedKind: Asset["kind"] }
+      binding: { layerId: string; expectedKind: Asset["kind"] | "media" }
     ) => {
       const existing = bindings.get(assetId) ?? [];
       existing.push(binding);
@@ -450,7 +450,11 @@ export class RenderPreflightService {
         : layer.type === "video" ? "video"
           : layer.type === "image" ? "image"
             : "image";
-      addBinding(layer.assetId, { layerId: layer.id, expectedKind });
+      if (layer.type === "captions" || layer.type === "shape") continue;
+      addBinding(layer.assetId, {
+        layerId: layer.id,
+        expectedKind: layer.type === "media" ? "media" : expectedKind
+      });
     }
     if (project.audio.bedAssetId) {
       addBinding(project.audio.bedAssetId, {
@@ -474,10 +478,11 @@ export class RenderPreflightService {
         throw error;
       }
       for (const binding of assetBindings) {
-        if (
-          asset.kind !== binding.expectedKind &&
-          !(binding.expectedKind === "image" && asset.kind === "logo")
-        ) {
+        const kindMismatch = binding.expectedKind === "media"
+          ? asset.kind !== "image" && asset.kind !== "video"
+          : asset.kind !== binding.expectedKind &&
+            !(binding.expectedKind === "image" && asset.kind === "logo");
+        if (kindMismatch) {
           findings.push(finding("ASSET_KIND_MISMATCH", {
             assetId,
             layerId: binding.layerId,

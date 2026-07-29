@@ -759,7 +759,7 @@ export class CoreService {
             startMs: word.startMs, endMs: word.endMs, text: word.text
           }))
         })),
-        style: structuredClone(DEFAULT_CAPTION_STYLE),
+        style: structuredClone(template.composition.captionStylePreset ?? DEFAULT_CAPTION_STYLE),
         warnings: [],
         sidecars: { srt: null, webvtt: null }
       },
@@ -1169,11 +1169,12 @@ export class CoreService {
       if (
         (layer.type === "image" && asset.kind === "image") ||
         (layer.type === "video" && asset.kind === "video") ||
-        (layer.type === "logo" && asset.kind === "logo")
+        (layer.type === "logo" && asset.kind === "logo") ||
+        (layer.type === "media" && (asset.kind === "image" || asset.kind === "video"))
       ) continue;
       throw new AppError("VALIDATION_ERROR", "Asset kind does not match composition layer type", 422, [{
         path: ["composition", "layers", index, "assetId"],
-        message: `Expected ${layer.type} asset, received ${asset.kind}`
+        message: `Expected ${layer.type === "media" ? "image or video" : layer.type} asset, received ${asset.kind}`
       }]);
     }
   }

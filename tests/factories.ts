@@ -19,6 +19,7 @@ export function captionState(cues: CaptionCue[] = []): CaptionState {
       maxWidth: 0.82,
       textColor: "#ffffff",
       highlightColor: "#ffdc5e",
+      textTransform: "none",
       outline: { color: "#000000", widthPx: 4 },
       background: { color: "#00000000", paddingPx: 12, cornerRadiusPx: 8 }
     },

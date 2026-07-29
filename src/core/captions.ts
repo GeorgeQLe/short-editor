@@ -20,6 +20,7 @@ export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
   maxWidth: 0.82,
   textColor: "#ffffff",
   highlightColor: "#ffdc5e",
+  textTransform: "none",
   outline: { color: "#000000", widthPx: 4 },
   background: { color: "#00000000", paddingPx: 12, cornerRadiusPx: 8 }
 };
@@ -58,7 +59,8 @@ export class CaptionEngine {
           "Cue is not wholly contained by a selected source range"
         ));
       }
-      const missing = [...new Set(Array.from(normalizeLines(cue.text))
+      const transformedText = transformText(cue.text, style.textTransform);
+      const missing = [...new Set(Array.from(normalizeLines(transformedText))
         .filter((character) => !/\s/u.test(character) && font.charToGlyph(character).index === 0))];
       if (missing.length) {
         warnings.push(warning(
@@ -67,7 +69,7 @@ export class CaptionEngine {
           `Packaged Inter font is missing: ${missing.join(" ")}`
         ));
       }
-      const layout = layoutCue(cue, style, composition, font);
+      const layout = layoutCue({ ...cue, text: transformedText }, style, composition, font);
       if (layout.lineWidths.some((width) => width > composition.width * style.maxWidth)
         || layout.bounds.left < 0
         || layout.bounds.right > composition.width
@@ -199,6 +201,68 @@ function layoutCue(
   };
 }
 
+const renderFonts = new Map<string, Font>();
+
+function loadInterFont(fontDirectory: string, weight: 400 | 700): Font {
+  const filename = weight === 700 ? "Inter-Bold.otf" : "Inter-Regular.otf";
+  const requestedPath = join(fontDirectory, filename);
+  const path = existsSync(requestedPath)
+    ? requestedPath
+    : join(defaultFontDirectory(), filename);
+  const cached = renderFonts.get(path);
+  if (cached) return cached;
+  const bytes = readFileSync(path);
+  const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  const font = opentype.parse(buffer as ArrayBuffer);
+  renderFonts.set(path, font);
+  return font;
+}
+
+export function layoutCaptionForRender(
+  cue: CaptionCue,
+  style: CaptionStyle,
+  composition: Composition,
+  fontDirectory: string
+): CaptionLayout {
+  const text = transformText(cue.text, style.textTransform);
+  return layoutCue(
+    { ...cue, text },
+    style,
+    composition,
+    loadInterFont(fontDirectory, style.fontWeight)
+  );
+}
+
+export function layoutInterTextLines(
+  text: string,
+  maximumWidth: number,
+  fontSizePx: number,
+  fontWeight: 400 | 700,
+  fontDirectory: string,
+  wrap: boolean
+): { lines: string[]; widths: number[]; lineHeight: number } {
+  const font = loadInterFont(fontDirectory, fontWeight);
+  const lines = normalizeLines(text).split("\n").flatMap((line) =>
+    wrap ? wrapLine(line, maximumWidth, fontSizePx, font) : [line]
+  );
+  const unitsPerEm = font.unitsPerEm;
+  const lineGap = font.tables.hhea?.lineGap ?? 0;
+  return {
+    lines,
+    widths: lines.map((line) => measureText(font, line, fontSizePx)),
+    lineHeight: (font.ascender - font.descender + lineGap) / unitsPerEm * fontSizePx
+  };
+}
+
+export function measureInterText(
+  text: string,
+  fontSizePx: number,
+  fontWeight: 400 | 700,
+  fontDirectory: string
+): number {
+  return measureText(loadInterFont(fontDirectory, fontWeight), text, fontSizePx);
+}
+
 function wrapLine(line: string, maximumWidth: number, fontSize: number, font: Font): string[] {
   if (line === "") return [""];
   const tokens = line.match(/\S+|\s+/gu) ?? [line];
@@ -249,6 +313,10 @@ function formatTimestamp(milliseconds: number, separator: "," | "."): string {
 
 function normalizeLines(text: string): string {
   return text.replace(/\r\n?/g, "\n");
+}
+
+export function transformText(text: string, transform: CaptionStyle["textTransform"]): string {
+  return transform === "uppercase" ? text.toLocaleUpperCase() : text;
 }
 
 function escapeWebVtt(text: string): string {

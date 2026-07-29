@@ -5,7 +5,8 @@ import {
   existsSync,
   readFileSync,
   rmSync,
-  statSync
+  statSync,
+  writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -69,13 +70,16 @@ function graphSnapshot(templateIndex = 1) {
       parentTemplateId: null
     },
     composition: structuredClone(template.composition),
-    captions: captionState([{
+    captions: {
+      ...captionState([{
       id: randomUUID(),
       startMs: 1_000,
       endMs: 2_000,
       text: "It's 50% ready: now",
       words: [{ startMs: 1_000, endMs: 1_400, text: "It's" }]
-    }]),
+      }]),
+      style: structuredClone(template.composition.captionStylePreset ?? captionState().style)
+    },
     audio: {
       sourceGainDb: -1,
       sourceMuted: false,
@@ -161,6 +165,44 @@ function graphSnapshot(templateIndex = 1) {
   });
 }
 
+function mediaGraphSnapshot(kind: "image" | "video") {
+  const snapshot = graphSnapshot(3);
+  const assetId = randomUUID();
+  const layer = snapshot.short.composition.layers.find((item) => item.type === "media")!;
+  layer.assetId = assetId;
+  snapshot.template.materializedComposition = snapshot.short.composition;
+  snapshot.resources.assets.push({
+    identity: {
+      id: assetId,
+      sourcePath: `/media/related.${kind === "image" ? "png" : "mp4"}`,
+      ownedArtifactPath: null,
+      kind,
+      provenance: "fixture",
+      reusable: true,
+      tags: [],
+      width: 1280,
+      height: 720,
+      durationMs: kind === "image" ? null : 1_000,
+      createdAt: "2026-07-28T12:00:00.000Z",
+      updatedAt: "2026-07-28T12:00:00.000Z"
+    },
+    file: {
+      path: `/media/related.${kind === "image" ? "png" : "mp4"}`,
+      before: { size: 100, modifiedAtMs: 100 },
+      after: { size: 100, modifiedAtMs: 100 },
+      contentHash: "b".repeat(64),
+      media: {
+        durationMs: kind === "image" ? null : 1_000,
+        width: 1280,
+        height: 720,
+        videoCodec: kind === "image" ? "png" : "h264",
+        audioCodec: null
+      }
+    }
+  });
+  return snapshot;
+}
+
 describe("explicit FFmpeg render contracts and graph", () => {
   it("defaults sidecars to null and rejects unknown start fields", () => {
     const request = {
@@ -189,7 +231,7 @@ describe("explicit FFmpeg render contracts and graph", () => {
     })).not.toBe(identity);
   });
 
-  it.each([0, 1, 2])(
+  it.each([0, 1, 2, 3])(
     "builds starter template %i deterministically without shell interpolation",
     (templateIndex) => {
     const snapshot = graphSnapshot(templateIndex);
@@ -199,7 +241,15 @@ describe("explicit FFmpeg render contracts and graph", () => {
     expect(first.graphHash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(first.script).toContain("concat=n=2:v=1:a=0");
     expect(first.script).toContain("asplit=2");
-    expect(first.script).toContain("fontcolor=0xffdc5e");
+    expect(first.script).toContain(
+      templateIndex === 3 ? "fontcolor=0x49c7f2" : "fontcolor=0xffdc5e"
+    );
+    if (templateIndex === 3) {
+      expect(first.script).toContain("text='GRAPH'");
+      expect(first.script).toContain("fontfile='/tmp/fonts/Inter-Bold.otf'");
+      expect(first.script).not.toContain("related-media");
+      expect(first.script).toMatch(/fontcolor=0x49c7f2:[^;]+:x=-?\d/);
+    }
     expect(first.script).toContain("if(lt(t\\,");
     expect(first.outputArgs).toContain("/tmp/output file.mp4");
     expect(first.outputArgs).toContain("+faststart");
@@ -216,11 +266,107 @@ describe("explicit FFmpeg render contracts and graph", () => {
       message: "Render normalization failed"
     });
   });
+
+  it.each(["image", "video"] as const)(
+    "renders %s related media for the full composition with final-frame repeat",
+    (kind) => {
+      const graph = buildRenderGraph(
+        mediaGraphSnapshot(kind),
+        "/tmp/filter",
+        "/tmp/output.mp4",
+        "/tmp/fonts"
+      );
+      expect(graph.inputArgs).toEqual(kind === "image"
+        ? ["-i", "/media/Source with spaces.mp4", "-loop", "1", "-framerate", "30", "-i", "/media/related.png"]
+        : ["-i", "/media/Source with spaces.mp4", "-i", "/media/related.mp4"]);
+      expect(graph.script).toContain("overlay=x=0:y=0:eof_action=repeat:shortest=1");
+      expect(graph.script).toContain("overlay=x=0:y=998:eof_action=repeat:shortest=1");
+    }
+  );
 });
 
 describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32")(
   "real FFmpeg composition",
   () => {
+    it("renders the news split with related media, source audio, topic, and captions", () => {
+      if (!execFileSync("ffmpeg", ["-hide_banner", "-filters"], {
+        encoding: "utf8"
+      }).includes(" drawtext ")) return;
+      const directory = mkdtempSync(join(tmpdir(), "short-editor-news-render-"));
+      directories.push(directory);
+      const sourcePath = join(directory, "source.mp4");
+      const imagePath = join(directory, "related.png");
+      const filterPath = join(directory, "filter.txt");
+      const outputPath = join(directory, "news.mp4");
+      execFileSync("ffmpeg", [
+        "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=30:duration=1",
+        "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=1",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", sourcePath
+      ]);
+      execFileSync("ffmpeg", [
+        "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "color=c=navy:s=640x360",
+        "-frames:v", "1", imagePath
+      ]);
+      const snapshot = mediaGraphSnapshot("image");
+      snapshot.resources.episode.file.path = sourcePath;
+      snapshot.resources.assets[0]!.file.path = imagePath;
+      snapshot.resources.assets[0]!.identity.sourcePath = imagePath;
+      snapshot.sourceRanges = [{ startMs: 0, endMs: 1_000 }];
+      snapshot.short.sourceRanges = snapshot.sourceRanges;
+      snapshot.short.captions.cues = [{
+        id: randomUUID(),
+        startMs: 0,
+        endMs: 800,
+        text: "News now",
+        words: [{ startMs: 0, endMs: 400, text: "News" }]
+      }];
+      snapshot.output.durationMs = 1_000;
+      snapshot.decisions.audio = {
+        version: "audio-decisions-v1",
+        outputDurationMs: 1_000,
+        source: [{
+          source: "episode",
+          episodeId: snapshot.short.episodeId,
+          sourceStartMs: 0,
+          sourceEndMs: 1_000,
+          outputStartMs: 0,
+          outputEndMs: 1_000,
+          gainDb: 0,
+          muted: false,
+          fadeInMs: 0,
+          fadeOutMs: 0
+        }],
+        bed: null,
+        warnings: []
+      };
+      const graph = buildRenderGraph(
+        snapshot,
+        filterPath,
+        outputPath,
+        new CaptionEngine().fontDirectory
+      );
+      writeFileSync(filterPath, graph.script);
+      execFileSync("ffmpeg", [
+        "-hide_banner", "-loglevel", "error",
+        ...graph.inputArgs,
+        ...graph.outputArgs
+      ]);
+      const probe = JSON.parse(execFileSync("ffprobe", [
+        "-v", "error",
+        "-show_entries", "stream=codec_type,width,height",
+        "-of", "json",
+        outputPath
+      ], { encoding: "utf8" })) as {
+        streams: Array<{ codec_type: string; width?: number; height?: number }>;
+      };
+      expect(probe.streams).toEqual(expect.arrayContaining([
+        expect.objectContaining({ codec_type: "video", width: 1080, height: 1920 }),
+        expect.objectContaining({ codec_type: "audio" })
+      ]));
+    }, 30_000);
+
     it("establishes and matches normalized evidence while cleaning failed attempts", async () => {
       const directory = mkdtempSync(join(tmpdir(), "short-editor-render-"));
       directories.push(directory);

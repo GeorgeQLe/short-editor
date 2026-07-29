@@ -59,6 +59,99 @@ export const starterTemplates: Template[] = [
         { id: "captions", type: "captions", source: "none", assetId: null, region: { x: 0.06, y: 0.77, width: 0.88, height: 0.14 }, fit: "fit" }
       ]
     }
+  },
+  {
+    id: "news-brief-speaker-v1",
+    name: "News Brief + Speaker",
+    version: 1,
+    revision: 1,
+    parentTemplateId: null,
+    builtIn: true,
+    createdAt: builtInAt,
+    updatedAt: builtInAt,
+    description: "Related media above a tracked speaker with a topic, logo, and split-centered captions.",
+    composition: {
+      width: 1080,
+      height: 1920,
+      background: "#090b10",
+      safeArea,
+      captionStylePreset: {
+        fontFamily: "Inter",
+        fontWeight: 700,
+        fontSizePx: 72,
+        position: { x: 0.5, y: 0.5 },
+        maxWidth: 0.88,
+        textColor: "#ffffff",
+        highlightColor: "#49c7f2",
+        textTransform: "uppercase",
+        outline: { color: "#111111", widthPx: 6 },
+        background: { color: "#00000000", paddingPx: 12, cornerRadiusPx: 8 }
+      },
+      layers: [
+        {
+          id: "related-media",
+          type: "media",
+          source: "asset",
+          assetId: null,
+          region: { x: 0, y: 0, width: 1, height: 0.52 },
+          fit: "fill"
+        },
+        {
+          id: "speaker",
+          type: "video",
+          source: "episode",
+          assetId: null,
+          region: { x: 0, y: 0.52, width: 1, height: 0.48 },
+          fit: "fill",
+          cropTarget: "person",
+          automaticCropTrack: {
+            frames: [],
+            provenance: null,
+            fallback: { mode: "fill", reason: "missing_samples" }
+          },
+          manualCropTrack: []
+        },
+        {
+          id: "topic",
+          type: "text",
+          source: "none",
+          assetId: null,
+          content: { binding: "short_title" },
+          region: { x: 0.056, y: 0.063, width: 0.66, height: 0.13 },
+          fit: "fit",
+          style: {
+            fontFamily: "Inter",
+            fontWeight: 700,
+            fontSizePx: 54,
+            color: "#ffffff",
+            backgroundColor: "#00000099",
+            backgroundPaddingPx: 14,
+            align: "left",
+            verticalAlign: "top",
+            wrap: true,
+            maxLines: 2,
+            overflow: "ellipsis",
+            textTransform: "uppercase"
+          }
+        },
+        {
+          id: "logo",
+          type: "logo",
+          source: "asset",
+          assetId: null,
+          region: { x: 0.784, y: 0.063, width: 0.16, height: 0.1 },
+          fit: "fit"
+        },
+        {
+          id: "captions",
+          type: "captions",
+          source: "none",
+          assetId: null,
+          region: { x: 0.06, y: 0.42, width: 0.88, height: 0.16 },
+          fit: "fit"
+        }
+      ]
+    }
   }
 ];
 

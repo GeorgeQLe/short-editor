@@ -78,6 +78,32 @@ function storedAsset(
 }
 
 describe("Template lineage and Short snapshots", () => {
+  it("ships four immutable built-ins and materializes the news preset from the Short title", () => {
+    const { service, candidate } = setup();
+    expect(starterTemplates).toHaveLength(4);
+    expect(starterTemplates.every((template) => template.builtIn)).toBe(true);
+    const project = service.createShort(candidate.id, "news-brief-speaker-v1");
+    expect(project.title).toBe(candidate.topic);
+    expect(project.captions.style).toMatchObject({
+      fontFamily: "Inter",
+      fontWeight: 700,
+      position: { x: 0.5, y: 0.5 },
+      maxWidth: 0.88,
+      highlightColor: "#49c7f2",
+      textTransform: "uppercase"
+    });
+    expect(project.composition.layers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "related-media", type: "media", assetId: null,
+        region: { x: 0, y: 0, width: 1, height: 0.52 }
+      }),
+      expect.objectContaining({
+        id: "topic", type: "text", content: { binding: "short_title" }
+      }),
+      expect.objectContaining({ id: "logo", type: "logo", assetId: null })
+    ]));
+  });
+
   it("clones built-ins and clones with immediate lineage and independent compositions", () => {
     const { repository, service } = setup();
     const builtIn = starterTemplates[0]!;
@@ -162,6 +188,27 @@ describe("Template lineage and Short snapshots", () => {
       .toThrow(expect.objectContaining({ code: "NOT_FOUND" }));
     expect(service.listTemplates().find((template) => template.id === clone.id)?.revision).toBe(2);
     expect(service.getShort(project.id).revision).toBe(project.revision);
+  });
+
+  it("accepts image or video in media layers and rejects audio and logo assets", () => {
+    const { repository, service } = setup();
+    const image = storedAsset(repository, "image");
+    const video = storedAsset(repository, "video");
+    const audio = storedAsset(repository, "audio");
+    const logo = storedAsset(repository, "logo");
+    const clone = service.cloneTemplate("news-brief-speaker-v1", "Media variants");
+    const bind = (assetId: string) => {
+      const composition = structuredClone(clone.composition);
+      const media = composition.layers.find((layer) => layer.type === "media")!;
+      media.assetId = assetId;
+      return composition;
+    };
+    expect(service.updateTemplate(clone.id, 1, { composition: bind(image.id) }).revision).toBe(2);
+    expect(service.updateTemplate(clone.id, 2, { composition: bind(video.id) }).revision).toBe(3);
+    expect(() => service.updateTemplate(clone.id, 3, { composition: bind(audio.id) }))
+      .toThrow(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+    expect(() => service.updateTemplate(clone.id, 3, { composition: bind(logo.id) }))
+      .toThrow(expect.objectContaining({ code: "VALIDATION_ERROR" }));
   });
 });
 
