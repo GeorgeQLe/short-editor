@@ -1145,6 +1145,10 @@ interactive calendar proof remains assigned to UI-01.5/WIN-03.7.
 
 ### API-03 — Enforce collection bounds, diagnostics redaction, and compatibility
 
+- **Status:** Implemented 2026-07-29. API-01/API-02 pagination and strict
+  contracts are now frozen by exact generated-artifact tests, a digest-bearing
+  release manifest, complete HTTP/MCP mapping, release-facing documentation,
+  and the versioned diagnostic-export filter.
 - **SPEC / gates:** 1, 3.3, 5.4, 7.1–7.3; G2, G8, G9.
 - **Prerequisites / unblocks:** API-01 and API-02; freezes the release contract
   and unblocks UI-01.1, UI-01.2, UI-01.5, and UI-03.
@@ -1161,7 +1165,7 @@ interactive calendar proof remains assigned to UI-01.5/WIN-03.7.
 - **Tests / fixtures / Windows:** >1,000 rows, stable page traversal under inserts,
   redaction corpus, unknown fields, compatibility snapshots, and parity diff.
 - **Milestone / exit criteria:** Frozen route/tool snapshots prove bounded
-  pagination, compatibility, redaction, 40-tool discovery, and zero unexplained
+  pagination, compatibility, redaction, 44-tool discovery, and zero unexplained
   UI-only transitions; suites pass and enable collection-consuming UI plus
   G2/G8/G9.
 - **Computer Use validation:** Exercise collection-consuming UI workflows and

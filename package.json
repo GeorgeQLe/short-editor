@@ -15,6 +15,7 @@
     "test:watch": "vitest --config vitest.config.ts",
     "generate:api-inventory": "tsx scripts/generate-api-route-inventory.ts",
     "generate:mcp-inventory": "tsx scripts/generate-mcp-tool-inventory.ts",
+    "generate:release-interfaces": "npm run generate:api-inventory && npm run generate:mcp-inventory && tsx scripts/generate-release-interface-docs.ts",
     "start:core": "node dist/core/cli.js",
     "start:mcp": "node dist/mcp/server.js",
     "package:win": "npm run build && electron-builder --win nsis"

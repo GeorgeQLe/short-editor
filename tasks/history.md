@@ -2,6 +2,22 @@
 
 ## 2026-07-29
 
+- Completed API-03 by freezing the exact generated HTTP route inventory and MCP
+  Draft-07 input/output schemas behind a deterministic, digest-bearing v1
+  release manifest and generated interface guide.
+- Added bidirectional compatibility evidence: every MCP tool maps to one exact
+  HTTP operation/method/path, generated files fail tests on any drift, and
+  pagination continues after a stable ID without duplication when rows are
+  inserted between pages.
+- Added the versioned `diagnostic-export-v1` filter. Credential keys and
+  recognizable credential strings are always removed; transcript, source, and
+  path detail requires explicit opt-in. Focused interface suites, full
+  verification, production build/typecheck, generation stability, diff hygiene,
+  and secret scanning complete the release contract.
+- The pre-ship adversarial review expanded credential-field and embedded-token
+  coverage for API keys, GitHub/AWS/JWT values, bearer tokens, and private-key
+  blocks; the focused and full suites passed after the correction.
+
 - Completed API-02 with one authoritative 44-tool registry shared by MCP
   discovery, runtime registration, request construction, and deterministic
   generated documentation. Removed the four undocumented MCP helpers while

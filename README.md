@@ -7,6 +7,10 @@ The authoritative v1 engineering requirements and current implementation matrix
 are in [`SPEC.md`](SPEC.md). If this README, source comments, tests, or current
 code conflict with the specification, `SPEC.md` wins.
 
+Release consumers can use the generated
+[`docs/release-interfaces-v1.md`](docs/release-interfaces-v1.md) guide and its
+linked machine-readable HTTP, MCP schema, and compatibility artifacts.
+
 The current vertical slice includes:
 
 - source-in-place media inventory with path/fingerprint deduplication;

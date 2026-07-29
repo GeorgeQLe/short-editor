@@ -1,10 +1,11 @@
 # Current work
 
-- [ ] API-03 — Freeze schemas and generate release-facing interface
-  documentation.
+No task is currently promoted.
 
 ## Completed
 
+- [x] API-03 — Freeze schemas and generate release-facing interface
+  documentation.
 - [x] API-02 — Deliver concrete MCP schemas and complete parity.
 - [x] API-01 — Complete and contract-test the versioned HTTP API.
 - [x] SCH-02 — Complete draft, move, lock, and publication semantics.

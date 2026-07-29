@@ -472,6 +472,28 @@ export const MCP_TOOL_INVENTORY: readonly McpToolDefinition[] = Object.freeze([
 
 export const MCP_TOOL_NAMES = Object.freeze(MCP_TOOL_INVENTORY.map(({ name }) => name));
 
+export function serializeMcpToolInventory(): string {
+  const artifact = MCP_TOOL_INVENTORY
+    .map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      annotations: tool.annotations,
+      http: tool.http,
+      inputSchema: z.toJSONSchema(tool.inputSchema, {
+        target: "draft-07",
+        io: "input",
+        unrepresentable: "any"
+      }),
+      outputSchema: z.toJSONSchema(tool.outputSchema, {
+        target: "draft-07",
+        io: "output",
+        unrepresentable: "any"
+      })
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+  return `${JSON.stringify(artifact, null, 2)}\n`;
+}
+
 export interface McpServerFactoryOptions {
   coreUrl?: string;
   fetch?: typeof globalThis.fetch;

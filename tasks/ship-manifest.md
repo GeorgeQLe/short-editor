@@ -1,5 +1,107 @@
 # Ship manifest
 
+## API-03 shipping boundary — 2026-07-29
+
+### User goal
+
+Freeze schemas and generate release-facing interface documentation.
+
+### Changed files
+
+`README.md`, `SPEC.md`, `IMPLEMENTATION_PLAN.md`, `package.json`,
+`docs/release-interface-v1.json`, `docs/release-interfaces-v1.md`,
+`scripts/generate-mcp-tool-inventory.ts`,
+`scripts/generate-release-interface-docs.ts`, `src/mcp/registry.ts`,
+`src/release/interface-docs.ts`, `src/shared/diagnostics.ts`,
+`tests/api-contract.test.ts`, `tests/api-release-contract.test.ts`,
+`tasks/history.md`, `tasks/ship-manifest.md`, and `tasks/todo.md`.
+
+### Per-file purpose
+
+- `src/release/interface-docs.ts` builds the compatibility manifest and
+  release guide from the authoritative HTTP and MCP registries, validates every
+  tool mapping, and hashes the exact serialized inventories.
+- `src/shared/diagnostics.ts` defines the versioned export filter, including
+  unconditional credential-field removal, recognizable token/private-key
+  redaction, default path removal, circular-value handling, and sensitive-detail
+  opt-in.
+- `src/mcp/registry.ts` exposes the deterministic MCP inventory serializer;
+  `scripts/generate-mcp-tool-inventory.ts` consumes it so runtime, tests, and
+  generated artifacts share one implementation.
+- `scripts/generate-release-interface-docs.ts`, `package.json`,
+  `docs/release-interface-v1.json`, and `docs/release-interfaces-v1.md` provide
+  the repeatable generation command and checked-in machine/human release
+  contracts.
+- `tests/api-release-contract.test.ts` freezes every generated artifact, exact
+  MCP-to-HTTP mapping, and the diagnostic redaction corpus;
+  `tests/api-contract.test.ts` proves stable-ID pagination during concurrent
+  inserts.
+- `README.md`, `SPEC.md`, and `IMPLEMENTATION_PLAN.md` publish and record the
+  completed API-03 boundary; `tasks/todo.md`, `tasks/history.md`, and this
+  manifest close and document the session.
+
+### User-goal mapping
+
+The v1 manifest records exact SHA-256 digests for the 60-operation HTTP
+inventory and all 44 MCP input/output schema pairs, plus every exact
+tool-to-route mapping. The generated Markdown guide explains the compatibility,
+pagination, envelope, access, and diagnostic policies for release consumers.
+Exact-artifact tests turn source or generated-document drift into a failing
+gate. The versioned diagnostic filter always removes credential material and
+requires explicit opt-in for transcript, source, and path detail.
+
+### Tests run
+
+- Executable verification: focused HTTP, MCP, and release-contract suites
+  passed all 3 files and 27 tests.
+- Executable verification: the full suite passed all 41 files and 302 tests,
+  including real FFmpeg coverage. The intentional `Unexpected internal error`
+  stderr line is accepted fixture output from the redacted-500 regression, not
+  an unresolved product warning.
+- Executable verification: production build/typecheck passed without warnings.
+- Artifact verification: two complete release-interface generations produced
+  identical artifacts.
+- Repository verification: `git diff --check` and focused credential-pattern
+  scans passed.
+
+### Skipped tests
+
+- Native Windows packaging and interactive UI diagnostics remain owned by
+  WIN-03 and UI-03. API-03 changes platform-neutral contracts, generation, and
+  filtering only.
+- No lint script exists in `package.json`; typecheck, production build, full
+  tests, deterministic generation, diff hygiene, and credential scanning are
+  the available automated gates.
+
+### Adversarial review
+
+A failure-oriented review served as the equivalent review lane because no
+repository-local `quality-sweep` or `expert-review` command is installed. It
+checked artifact drift, duplicate or missing HTTP/MCP mappings, pagination
+under concurrent inserts, strict compatibility claims, default-sensitive-field
+removal, credential-bearing key variants, recognizable OpenAI/GitHub/AWS/JWT
+values, bearer tokens, private-key blocks, absolute paths, nested values, and
+circular payloads.
+
+The review found that the initial filter omitted common `apiKey`-style field
+names and credential formats beyond bearer and `sk-/pk-` tokens. The filter and
+regression corpus now cover those cases. No blocking finding remains.
+
+### Residual risk
+
+The HTTP artifact freezes route identity and behavior metadata; the MCP artifact
+contains the complete concrete Draft-07 request/response schemas. Interactive
+diagnostic export UI wiring is intentionally deferred to UI-03.
+
+### Rollback note
+
+Revert the API-03 commit. No database migration or durable-state rollback is
+required.
+
+### Next command
+
+No command is currently routed because `tasks/todo.md` has no promoted task.
+
 ## API-02 shipping boundary — 2026-07-29
 
 ### User goal

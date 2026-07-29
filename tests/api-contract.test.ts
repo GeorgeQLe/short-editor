@@ -92,6 +92,25 @@ describe("v1 pagination", () => {
     expect(new Set(seen).size).toBe(ids.length);
   });
 
+  it("continues after the stable last ID when rows are inserted between pages", async () => {
+    let current = ids.slice(0, 4);
+    const base = await start({ listEpisodes: () => current as never });
+    const first = await json(await fetch(`${base}/v1/library/episodes?limit=2`)) as {
+      data: { items: Array<{ id: string }>; nextCursor: string };
+    };
+    const insertedBefore = { id: "00000000-0000-4000-8000-000000000000" };
+    const insertedAfter = { id: "00000000-0000-4000-8000-999999999999" };
+    current = [insertedBefore, ...current, insertedAfter];
+    const second = await json(await fetch(
+      `${base}/v1/library/episodes?limit=10&cursor=${encodeURIComponent(first.data.nextCursor)}`
+    )) as { data: { items: Array<{ id: string }>; nextCursor: null } };
+    expect([
+      ...first.data.items.map(({ id }) => id),
+      ...second.data.items.map(({ id }) => id)
+    ]).toEqual([...ids.slice(0, 4).map(({ id }) => id), insertedAfter.id]);
+    expect(second.data.nextCursor).toBeNull();
+  });
+
   it("rejects malformed, stale, cross-operation, and filter-mismatched cursors", async () => {
     let current = ids.slice(0, 2);
     const base = await start({

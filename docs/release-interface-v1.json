@@ -1,0 +1,299 @@
+{
+  "contractVersion": "v1",
+  "compatibility": {
+    "policy": "additive-only-within-v1",
+    "breakingChange": "requires-a-new-major-interface-version",
+    "unknownMutationFields": "rejected",
+    "responseEnvelope": "{apiVersion,data|error}"
+  },
+  "pagination": {
+    "shape": "{items,nextCursor}",
+    "defaultLimit": 100,
+    "minimumLimit": 1,
+    "maximumLimit": 1000,
+    "cursor": "opaque-operation-and-filter-bound-stable-id-continuation"
+  },
+  "diagnostics": {
+    "policyVersion": "diagnostic-export-v1",
+    "credentials": "always-removed",
+    "transcriptAndPaths": "excluded-unless-explicitly-opted-in"
+  },
+  "artifacts": {
+    "http": {
+      "path": "docs/api-v1-routes.json",
+      "operationCount": 60,
+      "sha256": "d77fb06e4d1156606c17ef95c838d7752725af8569af62b23ba25ce3cd32773a"
+    },
+    "mcp": {
+      "path": "docs/mcp-v1-tools.json",
+      "toolCount": 44,
+      "sha256": "b2626ba7bfb858cdbe8205c14e9952d01ca5dc10b6fe67265a988fdd9690975e"
+    }
+  },
+  "mcpHttpMappings": [
+    {
+      "tool": "analysis.get_transcript",
+      "operationId": "analysis.getTranscript",
+      "method": "GET",
+      "path": "/v1/analysis/:episodeId/transcript"
+    },
+    {
+      "tool": "analysis.start",
+      "operationId": "analysis.start",
+      "method": "POST",
+      "path": "/v1/analysis/start"
+    },
+    {
+      "tool": "analysis.update_transcript",
+      "operationId": "analysis.updateTranscript",
+      "method": "PUT",
+      "path": "/v1/analysis/:episodeId/transcript"
+    },
+    {
+      "tool": "assets.import",
+      "operationId": "assets.import",
+      "method": "POST",
+      "path": "/v1/assets/import"
+    },
+    {
+      "tool": "assets.list",
+      "operationId": "assets.list",
+      "method": "GET",
+      "path": "/v1/assets"
+    },
+    {
+      "tool": "candidates.generate",
+      "operationId": "candidates.generate",
+      "method": "POST",
+      "path": "/v1/candidates/generate"
+    },
+    {
+      "tool": "candidates.list",
+      "operationId": "candidates.list",
+      "method": "GET",
+      "path": "/v1/candidates"
+    },
+    {
+      "tool": "candidates.review",
+      "operationId": "candidates.review",
+      "method": "POST",
+      "path": "/v1/candidates/:id/review"
+    },
+    {
+      "tool": "jobs.cancel",
+      "operationId": "jobs.cancel",
+      "method": "POST",
+      "path": "/v1/jobs/:id/cancel"
+    },
+    {
+      "tool": "jobs.list",
+      "operationId": "jobs.list",
+      "method": "GET",
+      "path": "/v1/jobs"
+    },
+    {
+      "tool": "library.configure_watched_folder",
+      "operationId": "library.configureWatchedFolder",
+      "method": "POST",
+      "path": "/v1/library/watched-folders/configure"
+    },
+    {
+      "tool": "library.get_episode",
+      "operationId": "library.getEpisode",
+      "method": "GET",
+      "path": "/v1/library/episodes/:id"
+    },
+    {
+      "tool": "library.import_paths",
+      "operationId": "library.importPaths",
+      "method": "POST",
+      "path": "/v1/library/import"
+    },
+    {
+      "tool": "library.list_episodes",
+      "operationId": "library.listEpisodes",
+      "method": "GET",
+      "path": "/v1/library/episodes"
+    },
+    {
+      "tool": "library.list_watched_folders",
+      "operationId": "library.listWatchedFolders",
+      "method": "GET",
+      "path": "/v1/library/watched-folders"
+    },
+    {
+      "tool": "library.relink_source",
+      "operationId": "library.relinkSource",
+      "method": "POST",
+      "path": "/v1/library/episodes/:id/relink"
+    },
+    {
+      "tool": "providers.get_status",
+      "operationId": "providers.getStatus",
+      "method": "GET",
+      "path": "/v1/providers/status"
+    },
+    {
+      "tool": "providers.list_capabilities",
+      "operationId": "providers.listCapabilities",
+      "method": "GET",
+      "path": "/v1/providers/capabilities"
+    },
+    {
+      "tool": "renders.list",
+      "operationId": "renders.list",
+      "method": "GET",
+      "path": "/v1/renders"
+    },
+    {
+      "tool": "renders.preflight",
+      "operationId": "renders.preflight",
+      "method": "POST",
+      "path": "/v1/renders/preflight"
+    },
+    {
+      "tool": "renders.retry",
+      "operationId": "renders.retry",
+      "method": "POST",
+      "path": "/v1/renders/:renderId/retry"
+    },
+    {
+      "tool": "renders.start",
+      "operationId": "renders.start",
+      "method": "POST",
+      "path": "/v1/renders/start"
+    },
+    {
+      "tool": "renders.validate",
+      "operationId": "renders.validate",
+      "method": "POST",
+      "path": "/v1/renders/validate"
+    },
+    {
+      "tool": "schedule.draft",
+      "operationId": "schedule.draft",
+      "method": "POST",
+      "path": "/v1/schedule/draft"
+    },
+    {
+      "tool": "schedule.get",
+      "operationId": "schedule.list",
+      "method": "GET",
+      "path": "/v1/schedule"
+    },
+    {
+      "tool": "schedule.get_rules",
+      "operationId": "schedule.getRules",
+      "method": "GET",
+      "path": "/v1/schedule/rules"
+    },
+    {
+      "tool": "schedule.mark_published",
+      "operationId": "schedule.markPublished",
+      "method": "POST",
+      "path": "/v1/schedule/:id/published"
+    },
+    {
+      "tool": "schedule.move",
+      "operationId": "schedule.move",
+      "method": "POST",
+      "path": "/v1/schedule/:id/move"
+    },
+    {
+      "tool": "schedule.update_rules",
+      "operationId": "schedule.updateRules",
+      "method": "PUT",
+      "path": "/v1/schedule/rules"
+    },
+    {
+      "tool": "shorts.add_manual_crop",
+      "operationId": "shorts.addManualCropControl",
+      "method": "POST",
+      "path": "/v1/shorts/:id/layers/:layerId/crops/manual"
+    },
+    {
+      "tool": "shorts.approve",
+      "operationId": "shorts.approve",
+      "method": "POST",
+      "path": "/v1/shorts/:id/approve"
+    },
+    {
+      "tool": "shorts.create",
+      "operationId": "shorts.create",
+      "method": "POST",
+      "path": "/v1/shorts"
+    },
+    {
+      "tool": "shorts.get",
+      "operationId": "shorts.get",
+      "method": "GET",
+      "path": "/v1/shorts/:id"
+    },
+    {
+      "tool": "shorts.move_manual_crop",
+      "operationId": "shorts.moveManualCropControl",
+      "method": "PUT",
+      "path": "/v1/shorts/:id/layers/:layerId/crops/manual/:controlId"
+    },
+    {
+      "tool": "shorts.reanalyze_crops",
+      "operationId": "shorts.reanalyzeCrops",
+      "method": "POST",
+      "path": "/v1/shorts/:id/crops/reanalyze"
+    },
+    {
+      "tool": "shorts.remove_manual_crop",
+      "operationId": "shorts.removeManualCropControl",
+      "method": "DELETE",
+      "path": "/v1/shorts/:id/layers/:layerId/crops/manual/:controlId"
+    },
+    {
+      "tool": "shorts.update_audio",
+      "operationId": "shorts.updateAudio",
+      "method": "PUT",
+      "path": "/v1/shorts/:id/audio"
+    },
+    {
+      "tool": "shorts.update_captions",
+      "operationId": "shorts.updateCaptions",
+      "method": "PUT",
+      "path": "/v1/shorts/:id/captions"
+    },
+    {
+      "tool": "shorts.update_composition",
+      "operationId": "shorts.updateComposition",
+      "method": "PUT",
+      "path": "/v1/shorts/:id/composition"
+    },
+    {
+      "tool": "shorts.update_copy",
+      "operationId": "shorts.updateCopy",
+      "method": "PUT",
+      "path": "/v1/shorts/:id/copy"
+    },
+    {
+      "tool": "shorts.update_timeline",
+      "operationId": "shorts.updateTimeline",
+      "method": "PUT",
+      "path": "/v1/shorts/:id/timeline"
+    },
+    {
+      "tool": "templates.clone",
+      "operationId": "templates.clone",
+      "method": "POST",
+      "path": "/v1/templates/:id/clone"
+    },
+    {
+      "tool": "templates.list",
+      "operationId": "templates.list",
+      "method": "GET",
+      "path": "/v1/templates"
+    },
+    {
+      "tool": "templates.update",
+      "operationId": "templates.update",
+      "method": "PUT",
+      "path": "/v1/templates/:id"
+    }
+  ]
+}
