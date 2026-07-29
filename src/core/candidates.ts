@@ -248,7 +248,8 @@ export function compareCandidates(a: ClipCandidate, b: ClipCandidate): number {
   }
   return a.startMs - b.startMs
     || a.endMs - b.endMs
-    || lexicalCompare(normalizedTranscript(a.transcript), normalizedTranscript(b.transcript));
+    || lexicalCompare(normalizedTranscript(a.transcript), normalizedTranscript(b.transcript))
+    || lexicalCompare(a.id, b.id);
 }
 
 function aggregateScore(scores: ClipCandidate["scores"]): number {

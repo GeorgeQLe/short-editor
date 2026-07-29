@@ -2,6 +2,27 @@
 
 ## 2026-07-28
 
+- Completed API-01 by replacing ad hoc Express registration with one
+  authoritative 60-operation inventory: 54 ordinary routes and six
+  desktop-token gates carry stable operation IDs plus access, mutation,
+  revision, and long-operation classifications. The deterministic generated
+  JSON inventory exposes no HTTP endpoint and contains no durable-entity
+  deletion operation.
+- All ten unbounded collections now return `{items,nextCursor}` in the v1
+  success envelope with default 100, limits from 1–1,000, deterministic
+  repository ID tie-breakers, and opaque operation/filter-bound cursors that
+  reject malformed, stale, cross-route, and cross-filter use. The UI unwraps
+  its first pages and the current MCP adapter traverses pages to retain its
+  existing behavior pending API-02 schemas.
+- Every route now uses the shared success/error boundary. Mutations and queries
+  are strict, empty-body actions reject fields, malformed JSON and unknown
+  routes/methods use redacted registered envelopes, unexpected exceptions stay
+  redacted, and the production listener shares the contract-tested
+  `127.0.0.1` default. A ship review found and closed missing unknown-query
+  rejection on the four queryless reads. Added focused inventory, pagination,
+  fallback, redaction, no-deletion, loopback, and desktop-token coverage.
+  Promoted API-02 while MCP envelope/schema parity remains partial.
+
 - Completed SCH-02 with transactional eligibility checks, stable priority/ID
   drafting, existing-entry Episode spacing, duplicate scheduling protection,
   and camel-case domain reads.

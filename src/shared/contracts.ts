@@ -13,6 +13,16 @@ import {
   wallTimeSchema
 } from "./validators.js";
 
+export interface Page<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export const pageSchema = <T extends z.ZodType>(itemSchema: T) => z.strictObject({
+  items: z.array(itemSchema),
+  nextCursor: z.string().min(1).nullable()
+});
+
 export type ImportRejectionCode = "VALIDATION_ERROR" | "DEPENDENCY_UNAVAILABLE";
 
 export interface ImportRejectedResult {

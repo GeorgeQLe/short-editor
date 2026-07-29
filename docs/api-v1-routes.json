@@ -1,0 +1,602 @@
+[
+  {
+    "operationId": "analysis.getTranscript",
+    "method": "GET",
+    "path": "/v1/analysis/:episodeId/transcript",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "analysis.listArtifacts",
+    "method": "GET",
+    "path": "/v1/analysis/:episodeId/artifacts",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "analysis.localTranscriptionStatus",
+    "method": "GET",
+    "path": "/v1/analysis/local-transcription/status",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "analysis.ollamaStatus",
+    "method": "GET",
+    "path": "/v1/analysis/ollama/status",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "analysis.start",
+    "method": "POST",
+    "path": "/v1/analysis/start",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": true
+  },
+  {
+    "operationId": "analysis.startOllama",
+    "method": "POST",
+    "path": "/v1/analysis/ollama/start",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": true
+  },
+  {
+    "operationId": "analysis.startOpenAi",
+    "method": "POST",
+    "path": "/v1/analysis/openai/start",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": true
+  },
+  {
+    "operationId": "analysis.updateTranscript",
+    "method": "PUT",
+    "path": "/v1/analysis/:episodeId/transcript",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "assets.import",
+    "method": "POST",
+    "path": "/v1/assets/import",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "assets.list",
+    "method": "GET",
+    "path": "/v1/assets",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "candidates.acceptContentPackage",
+    "method": "PUT",
+    "path": "/v1/candidates/:id/content-package",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "candidates.generate",
+    "method": "POST",
+    "path": "/v1/candidates/generate",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "candidates.getContentPackage",
+    "method": "GET",
+    "path": "/v1/candidates/:id/content-package",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "candidates.list",
+    "method": "GET",
+    "path": "/v1/candidates",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "candidates.review",
+    "method": "POST",
+    "path": "/v1/candidates/:id/review",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "desktop.credentialRemoved",
+    "method": "POST",
+    "path": "/v1/desktop/credentials/:handle/removed",
+    "access": "desktop-token",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "desktop.grantCloudAuthorization",
+    "method": "POST",
+    "path": "/v1/desktop/cloud-authorizations",
+    "access": "desktop-token",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "desktop.listCloudAuthorizations",
+    "method": "GET",
+    "path": "/v1/desktop/cloud-authorizations",
+    "access": "desktop-token",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "desktop.revokeCloudAuthorization",
+    "method": "POST",
+    "path": "/v1/desktop/cloud-authorizations/:id/revoke",
+    "access": "desktop-token",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "desktop.synchronizeCredentials",
+    "method": "POST",
+    "path": "/v1/desktop/credentials/synchronize",
+    "access": "desktop-token",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "desktop.validateCloudAuthorization",
+    "method": "POST",
+    "path": "/v1/desktop/cloud-authorizations/validate",
+    "access": "desktop-token",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "jobs.cancel",
+    "method": "POST",
+    "path": "/v1/jobs/:id/cancel",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "jobs.list",
+    "method": "GET",
+    "path": "/v1/jobs",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "library.configureWatchedFolder",
+    "method": "POST",
+    "path": "/v1/library/watched-folders/configure",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "library.confirmRelink",
+    "method": "POST",
+    "path": "/v1/library/episodes/:id/relink/confirm",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "library.getEpisode",
+    "method": "GET",
+    "path": "/v1/library/episodes/:id",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "library.importPaths",
+    "method": "POST",
+    "path": "/v1/library/import",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "library.listEpisodes",
+    "method": "GET",
+    "path": "/v1/library/episodes",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "library.listWatchedFolders",
+    "method": "GET",
+    "path": "/v1/library/watched-folders",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "library.relinkSource",
+    "method": "POST",
+    "path": "/v1/library/episodes/:id/relink",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "library.rescanWatchedFolder",
+    "method": "POST",
+    "path": "/v1/library/watched-folders/:id/rescan",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": true
+  },
+  {
+    "operationId": "providers.getStatus",
+    "method": "GET",
+    "path": "/v1/providers/status",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "providers.listCapabilities",
+    "method": "GET",
+    "path": "/v1/providers/capabilities",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "renders.list",
+    "method": "GET",
+    "path": "/v1/renders",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "renders.preflight",
+    "method": "POST",
+    "path": "/v1/renders/preflight",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "renders.retry",
+    "method": "POST",
+    "path": "/v1/renders/:renderId/retry",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": true
+  },
+  {
+    "operationId": "renders.start",
+    "method": "POST",
+    "path": "/v1/renders/start",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": true
+  },
+  {
+    "operationId": "renders.validate",
+    "method": "POST",
+    "path": "/v1/renders/validate",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "schedule.draft",
+    "method": "POST",
+    "path": "/v1/schedule/draft",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "schedule.getRules",
+    "method": "GET",
+    "path": "/v1/schedule/rules",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "schedule.list",
+    "method": "GET",
+    "path": "/v1/schedule",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "schedule.markPublished",
+    "method": "POST",
+    "path": "/v1/schedule/:id/published",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "schedule.move",
+    "method": "POST",
+    "path": "/v1/schedule/:id/move",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "schedule.updateRules",
+    "method": "PUT",
+    "path": "/v1/schedule/rules",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": "after-initial-creation",
+    "longRunning": false
+  },
+  {
+    "operationId": "shorts.addManualCropControl",
+    "method": "POST",
+    "path": "/v1/shorts/:id/layers/:layerId/crops/manual",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "shorts.approve",
+    "method": "POST",
+    "path": "/v1/shorts/:id/approve",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "shorts.create",
+    "method": "POST",
+    "path": "/v1/shorts",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "shorts.get",
+    "method": "GET",
+    "path": "/v1/shorts/:id",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "shorts.moveManualCropControl",
+    "method": "PUT",
+    "path": "/v1/shorts/:id/layers/:layerId/crops/manual/:controlId",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "shorts.reanalyzeCrops",
+    "method": "POST",
+    "path": "/v1/shorts/:id/crops/reanalyze",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": true
+  },
+  {
+    "operationId": "shorts.removeManualCropControl",
+    "method": "DELETE",
+    "path": "/v1/shorts/:id/layers/:layerId/crops/manual/:controlId",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "shorts.updateAudio",
+    "method": "PUT",
+    "path": "/v1/shorts/:id/audio",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "shorts.updateCaptions",
+    "method": "PUT",
+    "path": "/v1/shorts/:id/captions",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "shorts.updateComposition",
+    "method": "PUT",
+    "path": "/v1/shorts/:id/composition",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "shorts.updateCopy",
+    "method": "PUT",
+    "path": "/v1/shorts/:id/copy",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "shorts.updateTimeline",
+    "method": "PUT",
+    "path": "/v1/shorts/:id/timeline",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  },
+  {
+    "operationId": "system.health",
+    "method": "GET",
+    "path": "/v1/health",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "templates.clone",
+    "method": "POST",
+    "path": "/v1/templates/:id/clone",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "templates.list",
+    "method": "GET",
+    "path": "/v1/templates",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
+    "operationId": "templates.update",
+    "method": "PUT",
+    "path": "/v1/templates/:id",
+    "access": "public",
+    "mutation": true,
+    "destructive": false,
+    "revisionRequired": true,
+    "longRunning": false
+  }
+]

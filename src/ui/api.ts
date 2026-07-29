@@ -1,4 +1,4 @@
-import type { ApiResult, Episode, ImportRejectedResult, Job } from "../shared/domain";
+import type { ApiResult, Episode, ImportRejectedResult, Job, Page } from "../shared/domain";
 
 const coreUrl = "http://127.0.0.1:43120/v1";
 
@@ -12,9 +12,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (body as ApiResult<T>).data;
 }
 
+async function requestAll<T>(path: string): Promise<T[]> {
+  const items: T[] = [];
+  let cursor: string | null = null;
+  do {
+    const separator = path.includes("?") ? "&" : "?";
+    const page: Page<T> = await request<Page<T>>(
+      cursor === null ? path : `${path}${separator}cursor=${encodeURIComponent(cursor)}`
+    );
+    items.push(...page.items);
+    cursor = page.nextCursor;
+  } while (cursor !== null);
+  return items;
+}
+
 export const api = {
-  episodes: (search = "") => request<Episode[]>(`/library/episodes?search=${encodeURIComponent(search)}`),
-  jobs: () => request<Job[]>("/jobs"),
+  episodes: (search = "") =>
+    requestAll<Episode>(`/library/episodes?search=${encodeURIComponent(search)}`),
+  jobs: () => requestAll<Job>("/jobs"),
   importPaths: (paths: string[]) => request<{
     imported: Episode[];
     duplicates: Episode[];

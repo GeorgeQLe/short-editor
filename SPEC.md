@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Specification version | 1.1.0 |
+| Specification version | 1.3.0 |
 | Status | Active; owner review required before acceptance |
 | Last updated | 2026-07-27 |
 | Owners | Short Editor maintainers |
@@ -612,9 +612,11 @@ This externally controlled rule MUST be reverified before release.
   at least `id`, `type`, `state`, `progress`, and `stage`.
 - Mutations of revisioned entities MUST require `expectedRevision`.
 - API payloads and responses MUST NOT contain plaintext credentials.
-- Unknown fields SHOULD be rejected on security-sensitive or mutation requests.
-- Pagination MUST be added before any unbounded collection can exceed 1,000
-  records; cursor behavior then becomes part of v1 compatibility.
+- Unknown fields MUST be rejected on mutation requests and all query parameters
+  MUST be validated.
+- Every unbounded collection MUST return `{items,nextCursor}`. The default page
+  size is 100, `limit` accepts 1–1,000, and opaque cursors MUST be bound to the
+  operation and active filters and continue after a stable item ID.
 
 ### 7.2 MCP contract
 
@@ -736,7 +738,7 @@ Queued job types without installed handlers are not complete functionality.
 | Render validation, retry, and determinism contract | Implemented | RND-02–RND-04 in [`src/shared/contracts.ts`](src/shared/contracts.ts), [`src/core/render.ts`](src/core/render.ts), [`src/core/repository.ts`](src/core/repository.ts), and migrations 13–15 bind attempts to passing preflights, expose immutable three-attempt lineage, require typed ffprobe validation, stream-decode canonical `yuv420p` and PCM evidence, and serialize first-baseline or repeated-match completion by a decision/graph/encoder/FFmpeg identity. Manual retry reuses the exact revision/preflight/sidecar snapshot; cancellation and recovery clean the new attempt without modifying prior success. [`tests/render.test.ts`](tests/render.test.ts), [`tests/domain-contracts.test.ts`](tests/domain-contracts.test.ts), [`tests/job-messages.test.ts`](tests/job-messages.test.ts), and [`tests/migrations.test.ts`](tests/migrations.test.ts) cover real repeated rendering, retry lineage/limits, queued cancellation, metadata exclusion, independent pixel/sample changes, mismatch cleanup, strict schemas, and every prior migration. Packaged Windows/release-FFmpeg acceptance remains WIN-03.6. |
 | FFmpeg composition renderer | Implemented | [`src/core/render-composition.ts`](src/core/render-composition.ts), [`src/core/render.ts`](src/core/render.ts), [`src/core/artifact-store.ts`](src/core/artifact-store.ts), and [`src/core/bootstrap.ts`](src/core/bootstrap.ts) implement explicit snapshot-derived filter scripts, direct no-shell spawning, original-source range concatenation, stored-order fit/fill layers, independent crops, assets, caption burn-in, source/bed audio, silence fallback, progress, dependency/input identity rechecks, and atomic validated MP4/sidecar finalization. [`tests/render.test.ts`](tests/render.test.ts) covers strict start contracts, deterministic graphs, special/spaced paths, real H.264/AAC composition, validation, provenance, sidecars, and unchanged originals. |
 | Deterministic scheduling | Implemented | SCH-01–02 are implemented in [`src/shared/contracts.ts`](src/shared/contracts.ts), [`src/core/scheduler.ts`](src/core/scheduler.ts), [`src/core/database.ts`](src/core/database.ts), [`src/core/repository.ts`](src/core/repository.ts), [`src/core/service.ts`](src/core/service.ts), [`src/core/api.ts`](src/core/api.ts), and [`src/mcp/server.ts`](src/mcp/server.ts): revisioned persisted rules, machine-timezone-independent DST handling, approved/current/validated Render eligibility, stable deterministic drafting, existing-entry spacing, legal collision-free moves, exact entry CAS, rerender protection, manual optional YouTube URL recording, and permanent publication locks. [`tests/scheduler.test.ts`](tests/scheduler.test.ts), [`tests/schedule-rules.test.ts`](tests/schedule-rules.test.ts), [`tests/schedule-semantics.test.ts`](tests/schedule-semantics.test.ts), [`tests/render-preflight.test.ts`](tests/render-preflight.test.ts), [`tests/migrations.test.ts`](tests/migrations.test.ts), and [`tests/persistence.test.ts`](tests/persistence.test.ts) cover DST anomalies, caps, ties, eligibility, spacing, moves, conflicts, locks, URLs, Content ID warnings, transports, and upgrades. Interactive calendar and packaged Windows proof remain UI-01.5/WIN-03.7. |
-| Versioned localhost HTTP API | Partial | [`src/core/api.ts`](src/core/api.ts) exposes a loopback-oriented `/v1` service with success envelopes and validation. Errors lack the required v1 envelope/retryable field, and complete workflow endpoints are pending. |
+| Versioned localhost HTTP API | Implemented | API-01 is implemented by the authoritative 60-operation registration table in [`src/core/api.ts`](src/core/api.ts) and generated [`docs/api-v1-routes.json`](docs/api-v1-routes.json): 54 ordinary and six desktop-token-gated routes have stable operation IDs, access/mutation/revision/long-operation classifications, universal v1 envelopes, strict mutation/query validation, redacted malformed/internal failures, structured unknown-route handling, and explicit IPv4-loopback default binding. All ten unbounded collections use operation/filter-bound opaque cursor pages with 1–1,000 limits and deterministic ID tie-breakers. [`tests/api-contract.test.ts`](tests/api-contract.test.ts) covers inventory drift, pagination boundaries/traversal/cursor isolation, envelope strictness, redaction, no durable deletion, loopback, and desktop-token denial; the existing workflow suites cover domain success and registered failures. |
 | Typed MCP adapter | Partial | [`src/mcp/server.ts`](src/mcp/server.ts) exposes the original tools over the core API. Several inputs are arbitrary records, structured errors are flattened, `apiVersion` is discarded, and the parity additions in section 7.2 are pending. |
 | Electron/React shell and library UI | Partial | [`src/electron/main.ts`](src/electron/main.ts), [`src/electron/preload.ts`](src/electron/preload.ts), and [`src/ui/App.tsx`](src/ui/App.tsx) provide a desktop shell, native MP4 import, searchable inventory, metrics, job polling, and local-analysis queue action. Candidate, editor, and calendar views are placeholders. |
 | Accessibility | Partial | The library uses semantic tables, labels, live status, keyboard-native controls, and non-color text states in [`src/ui/App.tsx`](src/ui/App.tsx). No formal WCAG/keyboard/text-scaling audit covers the full workflow. |
@@ -863,6 +865,18 @@ supporting evidence, not release acceptance.
   crash logs, and absence of source deletion.
 
 ## 10. Changelog
+
+### 1.3.0 — 2026-07-28
+
+- Froze the 60-operation `/v1` HTTP inventory with universal success/error
+  envelopes, strict request boundaries, structured fallback errors, and a
+  directly testable IPv4-loopback default.
+- Adopted `{items,nextCursor}` pagination for all unbounded collections with
+  operation/filter-bound opaque cursors, stable ID continuation, and 1–1,000
+  limits before v1 compatibility is frozen.
+- Kept manual crop-control removal as a non-destructive editing operation and
+  added no durable-entity deletion route. MCP contract completion remains
+  assigned to API-02.
 
 ### 1.2.0 — 2026-07-28
 

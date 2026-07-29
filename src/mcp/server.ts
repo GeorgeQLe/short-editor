@@ -32,24 +32,47 @@ const expectedRevision = z.number().int().positive();
 
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 async function core(path: string, method: Method = "GET", body?: unknown): Promise<unknown> {
-  const response = await fetch(`${coreUrl}${path}`, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body)
-  });
-  const payload = await response.json() as {
-    data?: unknown;
-    error?: { code?: string; message?: string; details?: unknown };
+  const fetchPage = async (requestPath: string) => {
+    const response = await fetch(`${coreUrl}${requestPath}`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
+    const payload = await response.json() as {
+      data?: unknown;
+      error?: { code?: string; message?: string; details?: unknown };
+    };
+    if (!response.ok) {
+      const details = payload.error?.details == null
+        ? ""
+        : ` ${JSON.stringify(payload.error.details)}`;
+      throw new Error(
+        `${payload.error?.code ?? "CORE_ERROR"}: ${payload.error?.message ?? "Core request failed"}${details}`
+      );
+    }
+    return payload.data;
   };
-  if (!response.ok) {
-    const details = payload.error?.details == null
-      ? ""
-      : ` ${JSON.stringify(payload.error.details)}`;
-    throw new Error(
-      `${payload.error?.code ?? "CORE_ERROR"}: ${payload.error?.message ?? "Core request failed"}${details}`
-    );
+  const first = await fetchPage(path);
+  if (method !== "GET" || !isPage(first)) return first;
+  const items = [...first.items];
+  let cursor = first.nextCursor;
+  while (cursor !== null) {
+    const separator = path.includes("?") ? "&" : "?";
+    const next = await fetchPage(`${path}${separator}cursor=${encodeURIComponent(cursor)}`);
+    if (!isPage(next)) throw new Error("CORE_ERROR: Paginated response changed shape");
+    items.push(...next.items);
+    cursor = next.nextCursor;
   }
-  return payload.data;
+  return items;
+}
+
+function isPage(value: unknown): value is { items: unknown[]; nextCursor: string | null } {
+  return typeof value === "object"
+    && value !== null
+    && "items" in value
+    && Array.isArray(value.items)
+    && "nextCursor" in value
+    && (typeof value.nextCursor === "string" || value.nextCursor === null);
 }
 
 const result = (value: unknown) => ({

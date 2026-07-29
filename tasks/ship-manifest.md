@@ -1,5 +1,120 @@
 # Ship manifest
 
+## API-01 shipping boundary — 2026-07-28
+
+### User goal
+
+Complete, harden, and freeze the versioned loopback HTTP API without removing
+existing workflow operations or introducing durable-entity deletion.
+
+### Changed files
+
+`SPEC.md`, `docs/api-v1-routes.json`, `package.json`,
+`scripts/generate-api-route-inventory.ts`, `src/core/api.ts`,
+`src/core/candidates.ts`, `src/core/cli.ts`, `src/core/repository.ts`,
+`src/core/service.ts`, `src/mcp/server.ts`, `src/shared/contracts.ts`,
+`src/ui/api.ts`, `tasks/history.md`, `tasks/ship-manifest.md`, `tasks/todo.md`,
+and `tests/api-contract.test.ts`.
+
+Generated local agent configuration directories remain unrelated and excluded.
+
+### Per-file purpose
+
+- `src/core/api.ts` centralizes registration, classification, strict input
+  parsing, pagination, envelopes, redaction, and loopback defaults for all 60
+  operations.
+- `src/shared/contracts.ts` defines reusable page contracts;
+  `src/core/repository.ts` and `src/core/candidates.ts` add stable ID
+  tie-breakers; `src/core/service.ts` closes the final non-strict import input.
+- `src/core/cli.ts` consumes the exported loopback default; `src/ui/api.ts`
+  unwraps HTTP pages; `src/mcp/server.ts` traverses pages to retain its current
+  list behavior until API-02.
+- `scripts/generate-api-route-inventory.ts`, `package.json`, and
+  `docs/api-v1-routes.json` provide a deterministic offline inventory command
+  and checked-in artifact.
+- `tests/api-contract.test.ts` covers inventory uniqueness, classifications,
+  paging, cursor isolation/staleness, strict query/body rejection, envelopes,
+  redaction, loopback binding, desktop-token gates, and the absence of durable
+  deletion.
+- `SPEC.md` freezes the completed v1 behavior; `tasks/todo.md`,
+  `tasks/history.md`, and this manifest close API-01, record evidence, and route
+  API-02.
+
+### User-goal mapping
+
+The authoritative table prevents route-registration and documentation drift.
+Strict inputs and universal envelopes harden every HTTP boundary. Stable
+repository ordering plus operation/filter-bound cursors make every unbounded
+collection finite and repeatably traversable. The UI/MCP adapters preserve
+their existing caller behavior, while the inventory, focused regressions, and
+specification freeze the exact API-01 compatibility boundary without adding
+durable deletion.
+
+### Tests run
+
+- Executable verification: `npm test` passed all 39 test files and 288 tests,
+  including real FFmpeg coverage.
+- Post-review executable verification:
+  `npx vitest run --config vitest.config.ts tests/api-contract.test.ts` passed
+  all 14 focused tests after the unknown-query fix.
+- Executable verification: `npm run build` passed TypeScript typecheck, Vite
+  production build, and Node TypeScript compilation after the review fix.
+- Generated-artifact verification: two inventory generations were
+  byte-identical before review; the post-review generation changed no route
+  metadata.
+- Repository/security verification: `git diff --check` passed and the focused
+  changed-boundary credential signature scan returned zero matches.
+
+### Skipped tests
+
+- Native Windows NSIS packaging and packaged loopback/firewall behavior were
+  skipped because the current host is macOS; WIN-03 owns release-platform
+  acceptance, and this boundary does not change packaging.
+- Interactive UI workflow testing was skipped because the UI change only
+  unwraps the same paginated Episode/job data into its existing arrays; UI-01
+  owns end-to-end workflow acceptance.
+- No lint script or repository task-doc audit script exists. Typecheck,
+  production build, full/focused tests, generation stability, diff hygiene,
+  and the focused credential scan are the available automated gates.
+
+### Adversarial review
+
+A failure-oriented review traced all 60 route classifications, the sole
+non-destructive `DELETE`, every paginated collection, cursor decoding and
+operation/filter binding, stable ordering, strict mutation bodies, fallback and
+internal-error envelopes, desktop-token comparisons, UI/MCP traversal, and
+generated-inventory drift.
+
+The review found that four queryless GET routes accepted unknown parameters
+despite the specification requiring validation on every query surface.
+`system.health`, Episode detail, Candidate content-package detail, and Short
+detail now parse a strict empty query, and one regression exercises all four.
+The focused suite and production build pass after the fix. The intentional
+`Unexpected internal error` stderr line is accepted because that test
+deliberately exercises and verifies the redacted 500 path. No blocking finding
+remains.
+
+### Residual risk
+
+Pagination operates over current in-memory query results rather than a database
+snapshot, so concurrent insertions can move page boundaries; cursors reject a
+missing last item and stable ID tie-breakers prevent ambiguous equal-sort
+positions, but snapshot isolation is not promised in v1. API-02 still owns
+exact MCP tool inventory, structured MCP envelopes, and concrete output
+schemas. UI and packaged Windows loopback acceptance remain in their existing
+tasks.
+
+### Rollback note
+
+This boundary adds no database migration. Reverting these source, generated,
+test, and documentation changes restores array list responses and the prior
+per-route Express registration without changing persisted data.
+
+### Next command
+
+Run `npx skillpacks install exec-loop` from the project shell before invoking
+`$exec` for API-02 typed MCP parity.
+
 ## SCH-02 shipping boundary — 2026-07-28
 
 ### User goal

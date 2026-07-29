@@ -107,7 +107,7 @@ export class Repository {
 
   listWatchedFolders(): WatchedFolder[] {
     return (this.db.prepare(
-      "SELECT * FROM watched_folders ORDER BY created_at"
+      "SELECT * FROM watched_folders ORDER BY created_at,id"
     ).all() as Row[]).map(mapWatchedFolder);
   }
 
@@ -146,7 +146,7 @@ export class Repository {
         (SELECT COUNT(*) FROM schedule_entries se WHERE se.episode_id=e.id) scheduled_count
       FROM episodes e
       WHERE (? = '' OR e.source_path LIKE ?)
-      ORDER BY e.created_at DESC
+      ORDER BY e.created_at DESC,e.id
     `).all(search ?? "", wildcard) as Row[];
     return rows.map(mapEpisode);
   }
@@ -1166,7 +1166,7 @@ export class Repository {
 
   listAnalysisArtifacts(entityId: string): AnalysisArtifact[] {
     return (this.db.prepare(`
-      SELECT * FROM analysis_artifacts WHERE entity_id=? ORDER BY created_at
+      SELECT * FROM analysis_artifacts WHERE entity_id=? ORDER BY created_at,id
     `).all(entityId) as Row[]).map(mapAnalysisArtifact);
   }
 
@@ -1296,7 +1296,7 @@ export class Repository {
   }
 
   listAssets(): Asset[] {
-    return (this.db.prepare("SELECT * FROM assets ORDER BY created_at").all() as Row[]).map(mapAsset);
+    return (this.db.prepare("SELECT * FROM assets ORDER BY created_at,id").all() as Row[]).map(mapAsset);
   }
 
   insertRender(render: Render): Render {
@@ -1332,8 +1332,8 @@ export class Repository {
 
   listRenders(shortId?: string): Render[] {
     const rows = shortId
-      ? this.db.prepare("SELECT * FROM renders WHERE short_id=? ORDER BY created_at").all(shortId)
-      : this.db.prepare("SELECT * FROM renders ORDER BY created_at").all();
+      ? this.db.prepare("SELECT * FROM renders WHERE short_id=? ORDER BY created_at,id").all(shortId)
+      : this.db.prepare("SELECT * FROM renders ORDER BY created_at,id").all();
     return (rows as Row[]).map(mapRender);
   }
 
@@ -2038,9 +2038,9 @@ export class Repository {
   listCloudAuthorizations(scopeId?: string): CloudAuthorization[] {
     const rows = scopeId
       ? this.db.prepare(
-        "SELECT * FROM cloud_authorizations WHERE scope_id=? ORDER BY granted_at"
+        "SELECT * FROM cloud_authorizations WHERE scope_id=? ORDER BY granted_at,id"
       ).all(scopeId)
-      : this.db.prepare("SELECT * FROM cloud_authorizations ORDER BY granted_at").all();
+      : this.db.prepare("SELECT * FROM cloud_authorizations ORDER BY granted_at,id").all();
     return (rows as Row[]).map(mapCloudAuthorization);
   }
 
@@ -2058,7 +2058,7 @@ export class Repository {
   }
 
   listJobs(): Job[] {
-    return (this.db.prepare("SELECT * FROM jobs ORDER BY created_at DESC").all() as Row[]).map(mapJob);
+    return (this.db.prepare("SELECT * FROM jobs ORDER BY created_at DESC,id").all() as Row[]).map(mapJob);
   }
 
   reconcileRenderArtifacts(): number {

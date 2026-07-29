@@ -1,9 +1,10 @@
 # Current work
 
-- [ ] API-01 — Complete and contract-test the versioned HTTP API.
+- [ ] API-02 — Deliver concrete MCP schemas and complete parity.
 
 ## Completed
 
+- [x] API-01 — Complete and contract-test the versioned HTTP API.
 - [x] SCH-02 — Complete draft, move, lock, and publication semantics.
 - [x] SCH-01 — Persist revisioned schedule rules with a documented DST policy.
 - [x] RND-04 — Add safe cancellation, retry attempts, and crash recovery.

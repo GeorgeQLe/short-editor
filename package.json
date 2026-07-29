@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
+    "generate:api-inventory": "tsx scripts/generate-api-route-inventory.ts",
     "start:core": "node dist/core/cli.js",
     "start:mcp": "node dist/mcp/server.js",
     "package:win": "npm run build && electron-builder --win nsis"

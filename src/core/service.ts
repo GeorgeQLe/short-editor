@@ -1414,7 +1414,7 @@ function cropTimestampError(atMs: number, durationMs: number): AppError {
   });
 }
 
-export const importPathsInput = z.object({ paths: z.array(z.string()).min(1) });
+export const importPathsInput = z.strictObject({ paths: z.array(z.string()).min(1) });
 export const watchedFolderConfigurationInput = watchedFolderConfigurationInputSchema;
 export const relinkSourceInput = z.strictObject({
   candidatePath: z.string().min(1)
