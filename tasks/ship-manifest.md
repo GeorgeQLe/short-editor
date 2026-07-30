@@ -1,19 +1,19 @@
 # Ship manifest
 
-## UI-01.4 render workflow checkpoint — 2026-07-30
+## UI-01.4 completed render workflow acceptance — 2026-07-30
 
 ### User goal
 
-Ship the current UI-01.4 approval, preflight, render progress, cancellation,
-recovery, and retry implementation checkpoint while preserving the incomplete
-macOS acceptance boundary honestly and routing the remaining fixture proof.
+Close UI-01.4 after a reproducible credential-free macOS walkthrough proves
+approval, preflight, visible progress, cancellation, immutable retry, successful
+MP4/SRT output, determinism evidence, and restart recovery in one fresh fixture.
 
 ### Changed files
 
-`src/ui/App.tsx`, `src/ui/EditorWorkspace.tsx`, `src/ui/api.ts`,
-`src/ui/styles.css`, `tests/ui-api.test.ts`, `tests/ui-workflows.test.tsx`,
-`vitest.config.ts`, `docs/ui-01.4-macos-uat.md`, `tasks/todo.md`,
-`tasks/history.md`, and `tasks/ship-manifest.md`.
+This acceptance completion changes only `docs/ui-01.4-macos-uat.md`,
+`tasks/todo.md`, `tasks/history.md`, and `tasks/ship-manifest.md`. The
+implementation checkpoint is already committed and is not part of this
+shipping boundary.
 
 Generated local pack material under `.agents/skillpacks/`, `.claude/`, and
 `.codex/` is excluded from this boundary and remains untracked. No generated
@@ -21,65 +21,53 @@ skill-root file is tracked or modified.
 
 ### Per-file purpose
 
-- `src/ui/App.tsx` lets blocking source findings route from Render to the
-  Episode Library.
-- `src/ui/EditorWorkspace.tsx` adds the Render tab, exact approval/preflight
-  guards, sidecar selection, start/cancel/retry actions, polling, actionable
-  findings, and durable attempt lineage/provenance presentation.
-- `src/ui/api.ts` adds typed approval and render reads/mutations using the
-  frozen v1 HTTP contracts and existing paginated request helper.
-- `src/ui/styles.css` lays out findings, snapshot metadata, attempt progress,
-  provenance, validation, determinism, and responsive actions.
-- `tests/ui-api.test.ts` freezes exact paths, pagination, request bodies,
-  revisions, preflight identity, sidecar choice, and retry calls.
-- `tests/ui-workflows.test.tsx` covers approval/start, unsaved-state blocking,
-  persisted progress, duplicate cancellation suppression, restart-equivalent
-  durable history, successful-output retention, and newest-failure retry.
-- `vitest.config.ts` raises the per-test ceiling from the five-second default to
-  15 seconds so MCP process startup remains reliable under parallel suite load.
-- `docs/ui-01.4-macos-uat.md` records the isolated desktop walkthrough and its
-  exact fixture-local FFmpeg blocker.
-- Task documents record the checkpoint, validation, open acceptance boundary,
-  rollback, and next route without falsely closing UI-01.4.
+- `docs/ui-01.4-macos-uat.md` records the reproducible source/model/render
+  fixture, drawtext-capable FFmpeg selection, accepted cancellation/retry
+  lineage, independent artifact checks, hashes, and restart proof.
+- `tasks/todo.md` closes UI-01.4 and promotes UI-01.5 as the sole executable
+  current task while retaining native packaged Windows acceptance in the
+  existing release gate.
+- `tasks/history.md` records the completed acceptance boundary and the exact
+  discarded-fixture diagnosis.
+- `tasks/ship-manifest.md` records this four-file shipping boundary, its proof,
+  residual risk, rollback, and next route.
 
 ### User-goal mapping
 
-The renderer now exposes every implemented core render lifecycle operation in
-one revision-safe desktop workflow and retains immutable attempt evidence across
-restarts. Exact API and component tests freeze the critical state transitions.
-The task and UAT records make the remaining cancellation-to-success fixture
-proof the only executable current task instead of advancing prematurely to
-UI-01.5.
+The renderer exposes every implemented core render lifecycle operation in one
+revision-safe desktop workflow and retains immutable attempt evidence across
+restarts. The accepted lineage
+`de09a110-ce6d-4026-a673-11d575debaa7` proves the complete UI-01.4 user goal:
+attempt 1 cancelled with `JOB_CANCELLED`, attempt 2 succeeded from the persisted
+snapshot, and the MP4/SRT plus provenance and determinism evidence survived a
+complete restart.
 
 ### Tests run
 
-- Executable verification: `npm test` passed all 48 files and 346 tests after
-  the timeout fix. The intentional `Unexpected internal error` stderr line is
-  the existing redacted-500 fixture, not a regression.
-- Executable verification after the adversarial-review test addition:
-  `npx vitest run --config vitest.config.ts tests/ui-workflows.test.tsx` passed
-  all 11 workflow tests.
+- Focused executable verification:
+  `npx vitest run --config vitest.config.ts tests/render.test.ts tests/ui-workflows.test.tsx`
+  passed both files and all 23 tests, including the real-FFmpeg normalized
+  composition test and all 11 UI workflow tests.
+- Executable verification: `npm test` passed all 48 files and 347 tests. The
+  intentional `Unexpected internal error` stderr line is the existing
+  redacted-500 fixture, not a regression.
 - Executable verification: `npm run build` passed TypeScript typecheck, Vite
   production compilation, and Node TypeScript compilation without warnings.
 - Executable verification: `npm run smoke:preload` passed with all 11 Electron
   bridge functions present.
-- Repository verification: `git diff --check` passed before task-document
-  updates. Focused changed-path scanning found no credential or secret-like
-  file names.
+- Repository verification: `git diff --check` passed on the final documentation
+  diff. No media, database, model, package, credential, screenshot, or rendered
+  artifact is tracked.
 - Interactive verification: the isolated macOS Electron walkthrough passed
-  exact approval, missing-source preflight blocking, Library relink recovery,
-  passing preflight, default-SRT start, failed-attempt retry lineage, and
+  accepted transcript/Candidate/Short creation, exact approval, passing
+  preflight, default-SRT start, visible 55% encoding, one cancellation,
+  immutable retry success, independent MP4/SRT/source validation, and full
   restart persistence.
 
 ### Skipped tests
 
 - Native packaged Windows acceptance is unavailable on this macOS host and
   remains owned by the existing Windows release gate.
-- The macOS fixture did not prove cancellation or successful output because its
-  local FFmpeg process exited with code 8 at 3% on both attempts. Automated UI
-  coverage proves progress and idempotent cancellation requests, while the
-  existing real FFmpeg suite proves composition, validation, and determinism;
-  the combined evidence does not replace the remaining interactive checkpoint.
 - No lint script or task-document audit script exists. TypeScript checking is
   included in the successful production build, and diff hygiene is checked
   separately.
@@ -92,26 +80,34 @@ UI-01.5.
 
 A failure-oriented changed-file review served as the explicit equivalent review
 lane because no repository-local `quality-sweep` or `expert-review` command is
-installed. It checked exact revision/preflight identity, dirty and conflict
-guards, stale result suppression, pagination, polling ownership, job/render
-pairing, duplicate submissions, cancellation state, retry lineage limits,
-successful-output preservation, relink routing, generated-root exclusion, and
-the incomplete UAT boundary.
+installed. The implementation-checkpoint review checked exact
+revision/preflight identity, dirty and conflict guards, stale result
+suppression, pagination, polling ownership, job/render pairing, duplicate
+submissions, cancellation state, retry lineage limits, successful-output
+preservation, and relink routing.
 
 The review found that cancellation and visible in-progress state were not
 directly frozen by the new component tests. A focused regression now proves
 persisted 42% encoding progress, the exact job cancellation call, synchronous
 duplicate suppression, and the disabled cancellation-requested state. No
-blocking review finding remains.
+blocking implementation finding remains.
+
+The acceptance-documentation review independently checked the preserved
+fixture's MP4, SRT, and source hashes against the UAT record; confirmed the
+current diff contains no media, database, model, package, screenshot, rendered
+artifact, or generated skill root; checked that the task, history, UAT, and
+manifest records agree on the accepted lineage and next task; and scanned the
+diff for credential material. It found and fixed stale source/test entries in
+this manifest's exact changed-file purpose list. No blocking documentation
+finding remains.
 
 ### Residual risk
 
-The synthetic macOS fixture still cannot demonstrate cancellation or success
-because FFmpeg exits with code 8 before either checkpoint. A user relying on the
-desktop render lifecycle would notice this during the next named-fixture run.
-Core real-FFmpeg tests and UI cancellation tests reduce implementation risk,
-but UI-01.4 remains open until the fixture is repaired or replaced and the
-interactive cancellation-to-success path is recorded.
+The host Homebrew FFmpeg 8.1.2 build lacks `drawtext`; the accepted fixture
+therefore pins a credential-free FFmpeg 6.0 binary with the required filter
+inside `/tmp`. Production packaging must continue to supply a compatible
+FFmpeg build. Native packaged Windows verification remains the authoritative
+release gate for that bundled dependency.
 
 The 15-second Vitest ceiling can delay reporting a genuine hang, but it is
 bounded and targeted to individual tests; it addresses observed 5–7 second MCP
@@ -119,15 +115,15 @@ startup under parallel load without disabling concurrency.
 
 ### Rollback note
 
-Revert the UI-01.4 checkpoint commit to remove the Render-tab workflow, API
-client surface, UI tests, and task/UAT records. Revert the separate test
-reliability commit to restore Vitest's five-second default. No schema or
-persisted-data rollback is required.
+Revert this acceptance-documentation change to reopen UI-01.4 without changing
+runtime behavior. Revert the earlier UI-01.4 checkpoint commit to remove the
+Render-tab workflow, API client surface, and UI tests. No schema or persisted
+data rollback is required.
 
 ### Next command
 
-Run `$guide` to repair or replace the isolated UI-01.4 macOS fixture, then prove
-cancellation, successful output/sidecar validation, and restart persistence.
+Continue with UI-01.5 schedule rules, list/calendar, move, collision, and
+publication-recording acceptance.
 
 ## UI-01.3 editor acceptance boundary — 2026-07-30
 

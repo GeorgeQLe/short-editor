@@ -31,17 +31,20 @@
     `8aa0c506ef48afbd95586d52881cbafaef268178d30a87aa8088125b356390da`.
     Native packaged Windows acceptance remains assigned to the Windows release
     gate.
-- [ ] UI-01.4 — Complete approval, preflight, render progress, cancellation,
+- [x] UI-01.4 — Complete approval, preflight, render progress, cancellation,
   recovery, and retry workflow.
-  - The implementation checkpoint adds exact-revision approval and preflight,
-    immutable-snapshot render start with SRT/WebVTT selection, persisted attempt
-    progress/provenance, idempotent cancellation, bounded lineage retry, and
-    restart recovery in the Editor's Render tab.
-  - Isolated macOS UAT passed approval, blocking preflight and relink recovery,
-    exact-snapshot start, failed-attempt retry, and restart persistence. It
-    remains open because the synthetic fixture's FFmpeg process exited with
-    code 8 before cancellation and a successful render could be demonstrated.
-    Continue from `docs/ui-01.4-macos-uat.md`.
+  - Named-fixture macOS acceptance passed on the working tree using isolated,
+    credential-free fixture `UI-01.4-macos-2026-07-30-v2`. Exact approval and
+    preflight, visible encoding, single cancellation, immutable retry,
+    successful MP4/SRT validation, provenance, determinism, unchanged source
+    bytes, and full restart persistence passed in lineage
+    `de09a110-ce6d-4026-a673-11d575debaa7`.
+  - The fixture explicitly pins a native arm64 drawtext-capable FFmpeg 6.0
+    binary because the host FFmpeg 8.1.2 build lacks `drawtext`. Final evidence
+    remains outside git as `UI-01.4-macos-2026-07-30-v2.png`, SHA-256
+    `b8c16af623862ac2753d3bf18d15b53b5e244ca900063ad5927e19652837bcc3`.
+    Native packaged Windows acceptance remains assigned to the Windows release
+    gate.
 - [ ] UI-01.5 — Complete schedule rules, list/calendar, move, collision, and
   publication-recording workflow.
 

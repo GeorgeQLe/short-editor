@@ -2,6 +2,20 @@
 
 ## 2026-07-30
 
+- Closed UI-01.4 with the fresh credential-free macOS fixture
+  `UI-01.4-macos-2026-07-30-v2`. The accepted lineage visibly encoded, cancelled
+  once with both Job and Render at `cancelled`/`JOB_CANCELLED`, retried from the
+  immutable snapshot, and succeeded with independently verified 1080×1920
+  H.264/AAC output, a valid non-empty UTF-8 SRT, completed provenance and
+  determinism evidence, unchanged source bytes, and identical-environment
+  restart persistence.
+- Diagnosed the discarded manual fixture boundary precisely: the host FFmpeg
+  8.1.2 build lacks the `drawtext` filter used by captioned compositions. The
+  reproducible replacement fixture pins a credential-free native arm64 static
+  FFmpeg 6.0 under `/tmp`; no production dependency, API, schema, renderer, or
+  UI change was required. Final attach-only evidence is
+  `UI-01.4-macos-2026-07-30-v2.png`, SHA-256
+  `b8c16af623862ac2753d3bf18d15b53b5e244ca900063ad5927e19652837bcc3`.
 - Added the UI-01.4 implementation checkpoint: the Editor now approves exact
   Short revisions, runs typed preflight with actionable findings and Library
   relink routing, starts the exact passing immutable snapshot with selectable
