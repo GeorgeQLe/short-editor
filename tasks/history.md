@@ -2,6 +2,26 @@
 
 ## 2026-07-29
 
+- Added the UI-01.1 inventory/provider implementation: complete paginated
+  Episode and watched-folder reads, per-input import outcomes, missing-source
+  prioritization and relink confirmation, watched-folder configuration/rescan,
+  provider readiness and exact model selection, explicit private-network
+  disclosure, user-only cloud authorization gates, and cancellable provider
+  job status.
+- Split the React workflow into focused library, cloud-access, desktop-bridge,
+  and utility modules; added native directory/relink pickers, the strict Ollama
+  endpoint status contract, structured API errors, and component/API
+  transition coverage.
+- A live Electron smoke test found that development launched the core under
+  Electron's native-module ABI. The launcher now uses npm's host Node in
+  development and preserves Electron for packaged builds; focused regression
+  coverage and a successful app/core launch verify the fix.
+- Full automated verification passes 44 test files and 321 tests, production
+  build/typecheck and diff hygiene pass, and the live core reports ready.
+  UI-01.1 remains open because the required named-fixture Computer Use
+  walkthrough and screenshot could not run: the Computer Use native pipe
+  failed to start twice.
+
 - Added the immutable News Brief + Speaker starter template with a related-media
   upper region, tracked speaker lower region, Short-title topic binding, logo
   slot, and split-centered uppercase captions.

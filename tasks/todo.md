@@ -2,6 +2,11 @@
 
 - [ ] UI-01.1 — Complete the library, watched-folder, relink, provider-status,
   and cloud-authorization workflow.
+  - Implementation and automated transition coverage are complete. Acceptance
+    remains blocked on the named-fixture macOS Computer Use walkthrough and
+    screenshot: the app/core smoke test passes after the development ABI fix,
+    but the Computer Use runtime failed to start on two attempts with
+    `Sky Computer Use native pipe startup failed`.
 - [ ] UI-01.2 — Complete transcript editing, Candidate review, and accepted-copy
   workflow.
 - [ ] UI-01.3 — Complete timeline, composition, crop, caption, and audio editing
