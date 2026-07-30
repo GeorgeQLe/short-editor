@@ -10,6 +10,7 @@ import {
   type OpenAiBridgeEvent
 } from "../shared/domain.js";
 import { normalizeError } from "../shared/errors.js";
+import { resolveCoreExecutable } from "./core-launch.js";
 import { OpenAiHttpAdapter } from "./openai-adapter.js";
 
 const directory = fileURLToPath(new URL(".", import.meta.url));
@@ -64,13 +65,21 @@ app.whenReady().then(() => {
   ipcMain.handle("cloud-authorizations:revoke", (_event, id: string) =>
     desktopRequest(`/desktop/cloud-authorizations/${encodeURIComponent(id)}/revoke`, "POST")
   );
-  core = spawn(process.execPath, [join(directory, "../core/cli.js")], {
+  core = spawn(
+    resolveCoreExecutable(app.isPackaged, process.execPath, process.env.npm_node_execpath),
+    [join(directory, "../core/cli.js")],
+    {
     env: coreEnvironment(),
     windowsHide: true,
     stdio: ["ignore", "inherit", "inherit", "ipc"]
-  });
+    }
+  );
   core.on("message", handleCoreMessage);
-  void waitForCore().then(synchronizeCredentialHandles);
+  void waitForCore()
+    .then(synchronizeCredentialHandles)
+    .catch((error) => console.error(
+      error instanceof Error ? error.message : "Local core did not start"
+    ));
   createWindow();
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
