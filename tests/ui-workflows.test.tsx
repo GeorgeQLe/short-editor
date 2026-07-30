@@ -5,10 +5,13 @@ import userEvent from "@testing-library/user-event";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProviderCapability, WatchedFolder } from "../src/shared/domain";
-import { api } from "../src/ui/api";
+import type { ShortProject, Template } from "../src/shared/domain";
+import { starterTemplates } from "../src/shared/templates";
+import { ApiClientError, api } from "../src/ui/api";
+import { EditorWorkspace } from "../src/ui/EditorWorkspace";
 import { LibraryWorkspace } from "../src/ui/LibraryWorkspace";
 import type { DesktopBridge } from "../src/ui/desktop";
-import { episode } from "./factories";
+import { captionState, episode } from "./factories";
 
 afterEach(() => {
   cleanup();
@@ -49,6 +52,55 @@ function desktop(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
     },
     ...overrides
   };
+}
+
+function shortProject(template: Template, episodeId: string): ShortProject {
+  const now = "2026-07-30T16:00:00.000Z";
+  return {
+    id: randomUUID(),
+    episodeId,
+    candidateId: randomUUID(),
+    title: "UI fixture Short",
+    sourceRanges: [{ startMs: 0, endMs: 30_000 }],
+    templateId: template.id,
+    templateLineage: {
+      templateId: template.id,
+      templateVersion: template.version,
+      parentTemplateId: template.parentTemplateId
+    },
+    composition: structuredClone(template.composition),
+    captions: captionState(),
+    audio: {
+      sourceGainDb: 0,
+      sourceMuted: false,
+      cutFadeMs: 25,
+      bedAssetId: null,
+      bedGainDb: null,
+      warnings: []
+    },
+    copy: {
+      cleanedTranscript: "",
+      rewrite: "",
+      hookVariants: [],
+      titles: [],
+      description: "",
+      hashtags: [],
+      thumbnailText: ""
+    },
+    copyState: "accepted",
+    copySource: "user_accepted",
+    approved: false,
+    revision: 6,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function mockEditorLauncher(shorts: ShortProject[] = []) {
+  vi.spyOn(api, "shorts").mockResolvedValue(shorts);
+  vi.spyOn(api, "templates").mockResolvedValue(starterTemplates);
+  vi.spyOn(api, "assets").mockResolvedValue([]);
+  vi.spyOn(api, "candidates").mockResolvedValue([]);
 }
 
 describe("Library workflow", () => {
@@ -172,5 +224,75 @@ describe("Library workflow", () => {
       modelId: "gemma3",
       networkDisclosed: true
     }));
+  });
+});
+
+describe("Editor desktop workflow", () => {
+  it("uses an in-app form to clone a built-in template", async () => {
+    const user = userEvent.setup();
+    const prompt = vi.spyOn(window, "prompt");
+    const cloned = {
+      ...starterTemplates[0]!,
+      id: randomUUID(),
+      name: "Desktop clone",
+      builtIn: false,
+      parentTemplateId: starterTemplates[0]!.id
+    };
+    let resolveClone!: (value: Template) => void;
+    const cloneResult = new Promise<Template>((resolve) => { resolveClone = resolve; });
+    mockEditorLauncher();
+    const clone = vi.spyOn(api, "cloneTemplate").mockReturnValue(cloneResult);
+    render(<EditorWorkspace episodes={[]} announce={vi.fn()} onChanged={vi.fn()} />);
+
+    await screen.findByRole("heading", { name: "Create from an approved Candidate" });
+    await user.click(screen.getByRole("button", { name: "Clone" }));
+    const name = screen.getByLabelText("Clone name");
+    await user.clear(name);
+    await user.type(name, "Desktop clone");
+    const form = name.closest("form");
+    expect(form).not.toBeNull();
+    fireEvent.submit(form!);
+    fireEvent.submit(form!);
+
+    await waitFor(() => expect(clone).toHaveBeenCalledWith(
+      starterTemplates[0]!.id,
+      "Desktop clone",
+      starterTemplates[0]!.description
+    ));
+    expect(clone).toHaveBeenCalledTimes(1);
+    resolveClone(cloned);
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Create clone" })).not.toBeInTheDocument()
+    );
+    expect(prompt).not.toHaveBeenCalled();
+  });
+
+  it("shows exact conflict revisions and retains the dirty audio draft", async () => {
+    const user = userEvent.setup();
+    window.desktop = desktop({ mediaUrl: () => "data:video/mp4;base64," });
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+    const selectedEpisode = episode();
+    const project = shortProject(starterTemplates[0]!, selectedEpisode.id);
+    mockEditorLauncher([project]);
+    vi.spyOn(api, "updateAudio").mockRejectedValue(new ApiClientError(
+      "REVISION_CONFLICT",
+      "Short was edited by another client",
+      { expectedRevision: 6, actualRevision: 7 },
+      false,
+      409
+    ));
+    render(<EditorWorkspace episodes={[selectedEpisode]} announce={vi.fn()} onChanged={vi.fn()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Open editor" }));
+    await user.click(screen.getByRole("tab", { name: "Audio" }));
+    const gain = screen.getByLabelText("Source gain (dB)");
+    fireEvent.change(gain, { target: { value: "-2" } });
+    await user.click(screen.getByRole("button", { name: "Save Audio" }));
+
+    expect(await screen.findByText(
+      "Revision conflict: expected 6, actual 7. Local draft retained."
+    )).toBeInTheDocument();
+    expect(screen.getByLabelText("Source gain (dB)")).toHaveValue(-2);
+    expect(screen.getByText(/A newer server revision exists/)).toBeInTheDocument();
   });
 });

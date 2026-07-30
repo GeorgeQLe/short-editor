@@ -227,6 +227,11 @@ td small { color: #687181; margin-top: 4px; max-width: 400px; overflow: hidden; 
   color: #fff; padding: 8px 10px;
 }
 .template-actions { display: flex; gap: 12px; }
+.template-editor { margin: 0 0 16px auto; max-width: 560px; display: grid;
+  grid-template-columns: minmax(240px,1fr) auto auto; gap: 8px; align-items: end; }
+.template-editor label { display: grid; gap: 6px; color: #aab1bf; font-size: 12px; }
+.template-editor input { width: 100%; border: 1px solid #2b3240; border-radius: 7px;
+  background: #0c1017; color: #fff; padding: 8px 10px; }
 .project-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); gap: 10px; }
 .project-grid article { border: 1px solid #2a3140; background: #0d1119; border-radius: 10px;
   padding: 14px; display: grid; gap: 12px; }

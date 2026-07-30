@@ -17,17 +17,20 @@
     accepted-copy conflict recovery, regeneration retention, and insufficient
     material guidance all passed. The attach-only evidence is
     `UI-01.2-macos-2026-07-29.png`.
-- [ ] UI-01.3 — Complete timeline, composition, crop, caption, and audio editing
+- [x] UI-01.3 — Complete timeline, composition, crop, caption, and audio editing
   with session undo/redo.
-  - The implementation checkpoint is complete on the 2026-07-30 working tree:
-    durable Short reopening/creation, template clone/edit entry points,
-    source-aware preview and transport, section-scoped revision-safe saves,
-    conflict rebase/discard, layer/asset/crop/caption/audio controls, visibility,
-    and session undo/redo are present. Automated verification passes all 48
-    test files and 340 tests, production build/typecheck, deterministic release
-    interface regeneration, the 11-function preload smoke, and diff hygiene.
-  - Completion remains blocked on the isolated named-fixture macOS walkthrough
-    and credential-free evidence capture for the full UI-01.3 workflow.
+  - Named-fixture macOS acceptance passed on the working tree based on commit
+    `6c7cd70` using isolated fixture `UI-01.3-macos-2026-07-30` on macOS
+    26.5.2 (25F84). Template cloning/renaming, durable Short creation/reopening,
+    source-aware timeline editing, layer/asset/crop/caption/audio saves,
+    cross-section undo/redo, exact stale-save recovery, invalidation semantics,
+    and full restart persistence passed through revision 10.
+  - The fixture-local native picker imported and bound a credential-free image
+    with explicit provenance. The final evidence remains outside git as
+    `UI-01.3-macos-2026-07-30.png`, SHA-256
+    `8aa0c506ef48afbd95586d52881cbafaef268178d30a87aa8088125b356390da`.
+    Native packaged Windows acceptance remains assigned to the Windows release
+    gate.
 - [ ] UI-01.4 — Complete approval, preflight, render progress, cancellation,
   recovery, and retry workflow.
 - [ ] UI-01.5 — Complete schedule rules, list/calendar, move, collision, and

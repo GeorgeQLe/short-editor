@@ -19,9 +19,47 @@
   11-function Electron preload smoke, focused credential-signature scanning,
   and diff hygiene. The intentional `Unexpected internal error` stderr line is
   the existing redacted-500 fixture.
-- UI-01.3 remains open pending its isolated named-fixture macOS walkthrough and
-  credential-free evidence capture. Native packaged Windows acceptance remains
-  deferred to the existing Windows release gate.
+- Closed UI-01.3 on the working tree based on commit `6c7cd70` after the
+  isolated `UI-01.3-macos-2026-07-30` Electron walkthrough passed on macOS
+  26.5.2 (25F84). The app and Electron profile used fixture-local directories,
+  npm's host Node, and an environment with inherited OpenAI variables removed;
+  the database retained zero cloud authorizations and the profile contained no
+  protected credential file.
+- Cloned News Brief + Speaker through the in-app desktop form, renamed the
+  clone to `UI-01.3 Final News Brief`, created and reopened
+  `UI-01.3 Primary Short`, and preserved its cloned template lineage. Timeline
+  transport and exact range editing saved two ordered ranges with 32 seconds
+  output and visible output/source mapping. Composition covered layer movement,
+  sizing, order, visibility, fit, safe area, background, automatic crop
+  provenance, edited manual controls, and automatic resume.
+- Imported the deterministic local PNG through the native picker with an
+  explicit provenance note, bound the newly imported asset, and confirmed the
+  binding after restart. Caption cue text/timing, word timing, weight,
+  transform, position, and color persisted with visible overflow, safe-area,
+  and outside-source warnings. Audio persisted source gain `-2`, unmuted state,
+  1 ms cut fade, the local AAC bed, and `-19` dB bed gain.
+- Cross-section undo/redo preserved unrelated dirty sections. A second local
+  HTTP client advanced revision 6 to 7 while Audio remained dirty; the UI
+  displayed `Revision conflict: expected 6, actual 7. Local draft retained.`,
+  rebased the retained draft onto revision 7, and saved successfully. The final
+  native asset binding produced revision 10, which reopened with every saved
+  timeline, composition, crop, caption, audio, asset, and template decision.
+- Render-affecting saves cleared approval, marked the seeded successful render
+  stale, and left the draft schedule at `needs_rerender=1`. The locked
+  published schedule remained byte-for-byte at revision 1 with its original
+  timestamps and publication URL. Acceptance also replaced unsupported
+  Electron `window.prompt` template actions with an in-app form and surfaced
+  structured expected/actual conflict revisions; component regressions cover
+  both discoveries. Failure-oriented review additionally found and fixed a
+  repeated-submission race in the template form; the component regression now
+  proves that two immediate submits produce one mutation.
+- The readable credential-free Composition & Crops evidence remains outside git
+  at `UI-01.3-macos-2026-07-30.png`, SHA-256
+  `8aa0c506ef48afbd95586d52881cbafaef268178d30a87aa8088125b356390da`.
+  Final verification includes all 48 test files and 342 tests, a post-review
+  7-test component run, production build/typecheck, the 11-function Electron
+  preload smoke, and `git diff --check`. Native packaged Windows acceptance
+  remains deferred to the existing Windows release gate.
 
 ## 2026-07-29
 

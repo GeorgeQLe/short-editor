@@ -55,6 +55,12 @@ export function EditorWorkspace({ episodes, announce, onChanged }: Props) {
   const [history, setHistory] = useState<EditorHistory | null>(null);
   const [conflict, setConflict] = useState(false);
   const [busy, setBusy] = useState(false);
+  const templateSubmitting = useRef(false);
+  const [templateAction, setTemplateAction] = useState<{
+    mode: "clone" | "edit";
+    template: Template;
+    name: string;
+  } | null>(null);
 
   const refreshLauncher = useCallback(async () => {
     try {
@@ -121,31 +127,40 @@ export function EditorWorkspace({ episodes, announce, onChanged }: Props) {
       setSelectedTemplate={setSelectedTemplate}
       openProject={openProject}
       createProject={createProject}
-      cloneTemplate={async (template) => {
-        const name = window.prompt("Name for the cloned template", `${template.name} copy`);
-        if (!name?.trim()) return;
+      templateAction={templateAction}
+      setTemplateAction={setTemplateAction}
+      submitTemplateAction={async () => {
+        if (templateSubmitting.current || busy || !templateAction?.name.trim()) return;
+        templateSubmitting.current = true;
+        setBusy(true);
         try {
-          const cloned = await api.cloneTemplate(template.id, name.trim(), template.description);
-          await refreshLauncher();
-          setSelectedTemplate(cloned.id);
-          announce(`Cloned template “${cloned.name}”.`);
+          if (templateAction.mode === "clone") {
+            const cloned = await api.cloneTemplate(
+              templateAction.template.id,
+              templateAction.name.trim(),
+              templateAction.template.description
+            );
+            await refreshLauncher();
+            setSelectedTemplate(cloned.id);
+            announce(`Cloned template “${cloned.name}”.`);
+          } else {
+            await api.updateTemplate(
+              templateAction.template.id,
+              templateAction.template.revision,
+              { name: templateAction.name.trim() }
+            );
+            await refreshLauncher();
+            announce("Template metadata updated.");
+          }
+          setTemplateAction(null);
         } catch (error) {
-          announce(errorMessage(error, "Template clone failed"));
-        }
-      }}
-      editTemplate={async (template) => {
-        if (template.builtIn) {
-          announce("Built-in templates are immutable. Clone this template to edit it.");
-          return;
-        }
-        const name = window.prompt("Template name", template.name);
-        if (!name?.trim()) return;
-        try {
-          await api.updateTemplate(template.id, template.revision, { name: name.trim() });
-          await refreshLauncher();
-          announce("Template metadata updated.");
-        } catch (error) {
-          announce(errorMessage(error, "Template update failed"));
+          announce(errorMessage(
+            error,
+            templateAction.mode === "clone" ? "Template clone failed" : "Template update failed"
+          ));
+        } finally {
+          templateSubmitting.current = false;
+          setBusy(false);
         }
       }}
       busy={busy}
@@ -185,8 +200,11 @@ function EditorLauncher(props: {
   setSelectedTemplate(value: string): void;
   openProject(short: ShortProject): void;
   createProject(candidate: Candidate): void;
-  cloneTemplate(template: Template): void;
-  editTemplate(template: Template): void;
+  templateAction: { mode: "clone" | "edit"; template: Template; name: string } | null;
+  setTemplateAction(
+    action: { mode: "clone" | "edit"; template: Template; name: string } | null
+  ): void;
+  submitTemplateAction(): void;
   busy: boolean;
 }) {
   const episodeName = (id: string) => fileName(props.episodes.find((row) => row.id === id)?.sourcePath);
@@ -216,19 +234,45 @@ function EditorLauncher(props: {
               <option key={template.id} value={template.id}>{template.name}</option>)}
           </select>
           <span className="template-actions">
-            <button className="link-button" type="button" disabled={!props.selectedTemplate}
+            <button className="link-button" type="button"
+              disabled={props.busy || !props.selectedTemplate}
               onClick={() => {
                 const template = props.templates.find((row) => row.id === props.selectedTemplate);
-                if (template) props.cloneTemplate(template);
+                if (template) props.setTemplateAction({
+                  mode: "clone", template, name: `${template.name} copy`
+                });
               }}>Clone</button>
-            <button className="link-button" type="button" disabled={!props.selectedTemplate}
+            <button className="link-button" type="button"
+              disabled={props.busy || !props.selectedTemplate}
               onClick={() => {
                 const template = props.templates.find((row) => row.id === props.selectedTemplate);
-                if (template) props.editTemplate(template);
+                if (!template) return;
+                if (template.builtIn) {
+                  props.setTemplateAction({
+                    mode: "clone", template, name: `${template.name} copy`
+                  });
+                } else {
+                  props.setTemplateAction({ mode: "edit", template, name: template.name });
+                }
               }}>Edit</button>
           </span>
         </label>
       </div>
+      {props.templateAction && <form className="template-editor" onSubmit={(event) => {
+        event.preventDefault();
+        props.submitTemplateAction();
+      }}>
+        <label>{props.templateAction.mode === "clone" ? "Clone name" : "Template name"}
+          <input autoFocus value={props.templateAction.name} onChange={(event) =>
+            props.setTemplateAction({ ...props.templateAction!, name: event.target.value })} />
+        </label>
+        <button className="primary" type="submit"
+          disabled={props.busy || !props.templateAction.name.trim()}>
+          {props.templateAction.mode === "clone" ? "Create clone" : "Save name"}
+        </button>
+        <button className="secondary" type="button" disabled={props.busy}
+          onClick={() => props.setTemplateAction(null)}>Cancel</button>
+      </form>}
       <div className="candidate-create-list">
         {props.candidates.map((candidate) => {
           const count = props.shorts.filter((short) => short.candidateId === candidate.id).length;
@@ -397,6 +441,20 @@ function ProjectEditor(props: {
     } catch (error) {
       if (error instanceof ApiClientError && error.code === "REVISION_CONFLICT") {
         props.setConflict(true);
+        const details = error.details as {
+          expectedRevision?: unknown;
+          actualRevision?: unknown;
+        } | null;
+        if (
+          typeof details?.expectedRevision === "number" &&
+          typeof details.actualRevision === "number"
+        ) {
+          setSectionError((old) => ({
+            ...old,
+            [section]: `Revision conflict: expected ${details.expectedRevision}, actual ${details.actualRevision}. Local draft retained.`
+          }));
+          return;
+        }
       }
       setSectionError((old) => ({ ...old, [section]: errorMessage(error, "Save failed") }));
     } finally {

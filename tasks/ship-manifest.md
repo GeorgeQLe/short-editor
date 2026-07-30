@@ -1,139 +1,126 @@
 # Ship manifest
 
-## UI-01.3 editor implementation checkpoint — 2026-07-30
+## UI-01.3 editor acceptance boundary — 2026-07-30
 
 ### User goal
 
-Implement and ship the desktop Short editor slice covering durable project
-creation/reopening, timeline, composition, crop, caption, and audio editing with
-session undo/redo, while preserving the existing revision and render contracts.
+Close and ship UI-01.3 after its isolated macOS acceptance walkthrough, fix the
+desktop-only template and conflict-reporting defects discovered during that
+walkthrough, and preserve the accepted editor behavior with component
+regressions.
 
 ### Changed files
 
-`docs/api-v1-routes.json`, `docs/mcp-v1-tools.json`,
-`docs/release-interface-v1.json`, `docs/release-interfaces-v1.md`,
-`src/core/api.ts`, `src/core/database.ts`, `src/core/render-composition.ts`,
-`src/core/render-preflight.ts`, `src/core/repository.ts`,
-`src/core/service.ts`, `src/electron/main.ts`,
-`src/electron/preload-smoke.ts`, `src/electron/preload.cts`,
-`src/mcp/registry.ts`, `src/shared/contracts.ts`,
-`src/shared/templates.ts`, `src/ui/App.tsx`, `src/ui/api.ts`,
-`src/ui/desktop.ts`, `src/ui/EditorWorkspace.tsx`,
-`src/ui/editor-state.ts`, `src/ui/styles.css`,
-`tests/api-contract.test.ts`, `tests/api-release-contract.test.ts`,
-`tests/editor-state.test.ts`, `tests/mcp-contract.test.ts`,
-`tests/migrations.test.ts`, `tests/render.test.ts`, `tasks/todo.md`,
-`tasks/history.md`, and `tasks/ship-manifest.md`.
+`src/ui/EditorWorkspace.tsx`, `src/ui/styles.css`,
+`tests/ui-workflows.test.tsx`, `tasks/todo.md`, `tasks/history.md`, and
+`tasks/ship-manifest.md`.
 
 Generated local pack material under `.agents/skillpacks/`, `.claude/`, and
 `.codex/` is excluded from this boundary and remains untracked.
 
 ### Per-file purpose
 
-- `src/ui/EditorWorkspace.tsx`, `src/ui/editor-state.ts`, `src/ui/App.tsx`,
-  `src/ui/api.ts`, `src/ui/desktop.ts`, and `src/ui/styles.css` implement the
-  Editor route, durable launcher, source-aware preview/transport, four editing
-  surfaces, asset selection, revision-safe section saves, conflict recovery,
-  and session history.
-- `src/core/api.ts`, `src/core/repository.ts`, `src/core/service.ts`, and
-  `src/mcp/registry.ts` expose paginated, optionally Episode-filtered Short
-  listing through the frozen HTTP and MCP interfaces.
-- `src/shared/contracts.ts`, `src/shared/templates.ts`, and
-  `src/core/database.ts` add default-visible composition layers and migrate
-  legacy Template and Short JSON in migration 18.
-- `src/core/render-composition.ts` and `src/core/render-preflight.ts` consistently
-  exclude hidden layers from render inputs, captions, crop analysis, asset
-  binding, and preflight validation.
-- `src/electron/main.ts`, `src/electron/preload.cts`, and
-  `src/electron/preload-smoke.ts` add the native asset picker and validated
-  inventory-media protocol with byte-range support, then freeze the expanded
-  bridge in the Electron smoke.
-- The four generated `docs/` artifacts publish the added HTTP operation and MCP
-  tool with stable schemas, mappings, counts, and digests.
-- The six changed/new test files freeze pagination and release compatibility,
-  migration defaults, hidden-layer rendering, and editor history, dirty-section,
-  source-time, crop, and canonical-save behavior.
-- Task documents record this implementation checkpoint without closing the
-  still-required interactive acceptance gate.
+- `src/ui/EditorWorkspace.tsx` replaces Electron-incompatible prompt dialogs
+  with an in-app clone/edit form, routes built-in edits through cloning, exposes
+  structured expected/actual conflict revisions while retaining the dirty
+  draft, and prevents repeated form submission while a mutation is pending.
+- `src/ui/styles.css` lays out and styles the in-app template form consistently
+  with the existing desktop launcher.
+- `tests/ui-workflows.test.tsx` covers prompt-free template cloning, rejects
+  duplicate in-flight submissions, and covers exact conflict revisions plus
+  dirty audio-draft retention.
+- `tasks/todo.md` closes UI-01.3 with its named-fixture acceptance evidence and
+  preserves packaged Windows work in the release gate.
+- `tasks/history.md` records the accepted workflow, persistence and
+  invalidation checks, credential-free evidence, implementation discoveries,
+  and final verification.
+- `tasks/ship-manifest.md` records this exact six-file shipping boundary and its
+  proof.
 
 ### User-goal mapping
 
-Approved Candidates can create durable Shorts from an explicit Template, and
-existing projects can be reopened after restart. The portrait preview maps the
-Short playhead through ordered source ranges and displays visible composition
-layers, captions, safe area, selected assets, and effective crops. Each editing
-section maintains local drafts, saves with exact compare-and-swap revisions,
-retains unrelated dirty work after canonical responses, and pauses on conflict
-until the user explicitly discards or rebases drafts. Session undo/redo covers
-all editor content. Layer visibility is persisted and honored by both preview
-and executable render paths.
+The in-app form makes template cloning and renaming usable in packaged Electron,
+and the structured conflict message gives the operator the exact stale and
+current revisions without losing local edits. The tests freeze both discoveries
+from the walkthrough, while the task records close UI-01.3 only after the full
+named-fixture workflow and restart persistence checks passed.
 
 ### Tests run
 
-- Executable verification: `npm test` passed all 48 files and 340 tests,
-  including the real FFmpeg render regression. The intentional
+- Executable verification: `npm test` passed all 48 files and 342 tests,
+  including the real FFmpeg render regression, before the adversarial-review
+  submission guard was added. The intentional
   `Unexpected internal error` stderr line is the existing redacted-500 fixture,
   not a warning or regression.
-- Executable verification: `npm run build` passed TypeScript typecheck, Vite
-  production compilation, and Node TypeScript compilation without warnings.
+- Executable verification on the final diff:
+  `npx vitest run --config vitest.config.ts tests/ui-workflows.test.tsx` passed
+  all 7 component tests, including the new repeated-submission assertion.
+- Executable verification on the final diff: `npm run build` passed TypeScript
+  typecheck, Vite production compilation, and Node TypeScript compilation
+  without warnings.
 - Executable verification: `npm run smoke:preload` passed in Electron with all
   11 picker, media, credential, and authorization bridge functions present.
-- Generated-contract verification: `npm run generate:release-interfaces`
-  completed, and the subsequent working-tree comparison retained the exact
-  checked-in generated boundary.
 - Repository verification: `git diff --check` passed. Focused
-  credential-signature scanning found only the deliberate redaction fixtures in
-  `tests/api-release-contract.test.ts`, not new credential material.
+  credential-signature scanning found no credential material in this diff.
+- Interactive verification: the isolated fixture
+  `UI-01.3-macos-2026-07-30` passed on macOS 26.5.2 (25F84), using the working
+  tree based on commit `6c7cd70`, fixture-local application/Electron data,
+  npm's host Node, and no inherited OpenAI variables. The walkthrough covered
+  template clone/rename, durable creation/reopening, timeline source mapping,
+  all four editing sections, native-picker asset import/binding, cross-section
+  history, exact conflict rebase, invalidation, and two restart checks through
+  revision 10.
+- Persistence verification confirmed approval `0`, the prior successful Render
+  `stale`, the draft schedule `needs_rerender=1`, and the locked published row
+  unchanged at revision 1. The database has zero cloud authorizations and the
+  isolated profile has no `protected-credentials.json`.
+- Evidence verification visually rechecked
+  `UI-01.3-macos-2026-07-30.png` and scanned its public metadata without finding
+  credential-like values. The evidence remains outside git with SHA-256
+  `8aa0c506ef48afbd95586d52881cbafaef268178d30a87aa8088125b356390da`.
 
 ### Skipped tests
 
-- The isolated UI-01.3 macOS named-fixture walkthrough and screenshot were not
-  completed in this session. The task therefore remains open; the residual
-  interaction risk is not represented as automated closure.
+- The complete 48-file suite was not repeated after adding the narrow
+  repeated-submission guard: it had just passed on the preceding diff, and the
+  final targeted component run plus full build directly cover the only
+  post-suite source and test changes.
 - Native packaged Windows acceptance is unavailable on this macOS host and
   remains owned by the existing Windows release gate.
 - No lint script or task-document audit script exists. TypeScript checking is
   included in the successful production build, and diff hygiene passed
   separately.
+- Release-interface regeneration was skipped because this boundary changes no
+  HTTP, MCP, shared schema, or generated contract artifact.
 
 ### Adversarial review
 
 A failure-oriented changed-file review served as the explicit equivalent review
 lane because no repository-local `quality-sweep` or `expert-review` command is
-installed. It traced the revision boundary through every section save,
-canonical merge, conflict discard/rebase, and reanalysis path; checked dirty
-draft retention and invalidation messaging; checked source/output time mapping,
-manual-crop duration guards, hidden-layer handling from migration through
-preflight/render, pagination/filter binding, media UUID validation and range
-handling, generated-interface stability, and exclusion of generated skill
-roots.
-
-No blocking defect remained after review and executable validation. The lack of
-an end-to-end Editor component regression and named-fixture walkthrough is
-explicitly retained as residual risk rather than being treated as proof of UI
-completion.
+installed. It checked form cancellation and failure retention, built-in edit
+semantics, stale template revisions, conflict-detail fallback behavior,
+dirty-draft retention, generated-root exclusion, and exact manifest ownership.
+It found that rapid repeated submission could issue duplicate template
+mutations. A synchronous ref guard, disabled pending controls, and a regression
+asserting one API call fixed the finding. No blocking issue remains.
 
 ### Residual risk
 
-Complex pointer, media playback, asset-import, cross-section dirty-save, and
-conflict interactions have state-helper and contract coverage but still need
-the named macOS walkthrough. The custom media handler reads the requested file
-before returning a byte range, so very large local media may have higher
-transient memory use; the browser's normal range requests bound the response
-body but not the initial file read. Packaged Windows protocol and native-dialog
-behavior remain unproved until the Windows gate.
+Packaged Windows behavior remains unproved on this macOS host and is explicitly
+owned by the existing Windows release gate. The changed form and conflict paths
+have both component coverage and accepted macOS desktop evidence; no other
+meaningful risk remains in this boundary.
 
 ### Rollback note
 
-Revert the Editor UI/client/bridge changes, Short-list HTTP/MCP contract and
-generated artifacts, visibility migration/schema/template changes, hidden-layer
-render behavior, tests, and task records together. Migration 18 is additive and
-only writes `visible: true` where the field was absent.
+Revert this acceptance-boundary commit to restore prompt-based template actions,
+generic conflict reporting, the prior component fixtures, and the open UI-01.3
+task state. No schema or persisted-data rollback is required.
 
 ### Next command
 
-Run `$guide` for the isolated UI-01.3 macOS acceptance walkthrough and
-credential-free evidence capture.
+Run `$exec` for UI-01.4 approval, preflight, render progress, cancellation,
+recovery, and retry workflow.
 
 ## UI-01.2 transcript/Candidate/copy boundary — 2026-07-29
 
