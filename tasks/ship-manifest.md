@@ -1,5 +1,139 @@
 # Ship manifest
 
+## UI-01.2 transcript/Candidate/copy boundary — 2026-07-29
+
+### User goal
+
+Replace the Candidates placeholder with the complete Episode-scoped transcript
+editing, Candidate generation/review, and accepted-copy workflow while consuming
+the frozen v1 HTTP contracts unchanged.
+
+### Changed files
+
+`src/ui/App.tsx`, `src/ui/api.ts`, `src/ui/CandidatesWorkspace.tsx`,
+`src/ui/styles.css`, `tests/ui-api.test.ts`,
+`tests/candidates-workspace.test.tsx`, `tasks/todo.md`, `tasks/history.md`, and
+`tasks/ship-manifest.md`.
+
+Generated local pack material under `.agents/skillpacks/`, `.claude/`, and
+`.codex/` is excluded from this boundary and remains untracked. The isolated
+fixture, SQLite database, media, and screenshot remain outside git under
+`/tmp/short-editor-ui-01.2-macos-20260729/`.
+
+### Per-file purpose
+
+- `src/ui/App.tsx` routes Candidates to the implemented workspace and removes
+  it from the placeholder path.
+- `src/ui/api.ts` adds typed paginated artifact/Candidate reads and exact
+  transcript, generation, review, and content-package mutations.
+- `src/ui/CandidatesWorkspace.tsx` implements Episode selection, complete
+  transcript snapshots, explicit conflict recovery, generation controls and
+  diagnostics, deterministic Candidate review/detail, and immutable proposed
+  versus editable accepted copy.
+- `src/ui/styles.css` supplies the responsive transcript cards, generation
+  controls, split Candidate/detail layout, review/provenance metadata, and
+  validation/conflict/diagnostic states.
+- `tests/ui-api.test.ts` freezes exact paths, pagination, request bodies,
+  expected revisions, and structured conflict propagation.
+- `tests/candidates-workspace.test.tsx` covers shell routing, selection and
+  missing transcript guidance, word preservation, validation and conflict
+  recovery, both modes/strategies, accepted-artifact filtering, deterministic
+  scores/diagnostics, review, accepted copy, and stale-copy recovery.
+- Task documents close UI-01.2 and route remaining desktop work to UI-01.3.
+
+### User-goal mapping
+
+Transcript saves send every segment, including untouched word arrays, against
+the accepted revision and show manual provenance plus downstream invalidation
+semantics. Transcript and copy conflicts retain local drafts and disable retry
+until explicit reload. Candidate generation supports 5–10 heuristic or
+explicit accepted-analysis proposals with append/replace pending strategies and
+always refetches the complete active list. Candidate cards expose stable rank,
+timing, transcript/provider provenance, three-decimal score breakdowns,
+duplicate groups, revision, and review state. The detail editor keeps proposed
+copy immutable, labels rewrites as planning aids, and edits every content-package
+field with one-item-per-line arrays.
+
+### Tests run
+
+- `npm test`: all 47 files and 333 tests passed. The intentional
+  `Unexpected internal error` line is the existing redacted-500 fixture.
+- `npm run build`: TypeScript typecheck, Vite production compilation, and Node
+  TypeScript compilation passed.
+- `npm run smoke:preload`: the hidden sandboxed Electron window exposed all
+  nine desktop bridge functions.
+- `git diff --check`: passed.
+
+### Skipped tests
+
+- The executable checks above were already completed in this session against
+  the exact working-tree boundary, so ship-end did not duplicate them.
+- No lint script or task-document audit script exists. TypeScript checking is
+  included in `npm run build`, and repository diff hygiene passed separately.
+- Native packaged Windows acceptance is unavailable on this macOS host and
+  remains assigned to WIN-03.3. The current UI logic is covered by component,
+  API-contract, production-build, preload-smoke, and interactive macOS checks.
+
+### Adversarial review
+
+A failure-oriented changed-file review served as the explicit equivalent review
+lane because no repository-local `quality-sweep` or `expert-review` command is
+installed. It checked complete transcript snapshots and preserved word arrays,
+revision-conflict draft retention, validation detail rendering, artifact-state
+filtering, exact generation modes and pending strategies, post-mutation
+refetches, stable Candidate ordering and score formatting, proposed-copy
+immutability, accepted-copy revision synchronization, shell routing, responsive
+layout, and exclusion of generated skill roots.
+
+The review found no additional defect. Focused secret-signature scanning found
+no credential material in the shipping boundary, and the generated
+`.agents/skillpacks/`, `.claude/`, and `.codex/` trees remain untracked and
+excluded.
+
+### Interactive acceptance
+
+- Computer Use's `sky.list_apps()` discovery gate passed. Fixture
+  `UI-01.2-macos-2026-07-29` ran on macOS 26.5.2 (25F84) against the working
+  tree based on commit `bf73dd3`.
+- Transcript text, start timing, and speaker edits were visible with preserved
+  word counts. A second local HTTP client advanced the revision; the UI showed
+  exact `expected 1, actual 2`, preserved the draft, required reload, and then
+  saved the reapplied revision successfully.
+- Persisted checks confirmed the dependent Shorts became unapproved, the
+  succeeded draft Render became stale, the draft schedule required rerender,
+  and the published schedule stayed unchanged.
+- Heuristic append and accepted-analysis replace generation both passed with
+  deterministic ordering, scores, duplicate groups, transcript revision, and
+  provider provenance. One Candidate was approved, another rejected, and the
+  approved Candidate's complete copy package was accepted.
+- A second local client advanced Candidate copy; the UI showed exact
+  `expected 3, actual 4`, retained the unsaved draft, required reload, and
+  accepted the reapplied copy at revision 5. Regeneration retained the approved
+  and rejected decisions plus accepted copy while inserting six pending
+  proposals.
+- The short Episode visibly returned `INSUFFICIENT_MATERIAL`, exact rejection
+  counts, and recovery guidance. The final credential-free full-window evidence
+  shows the named primary Episode, approved/rejected decisions, provider scores,
+  and accepted-copy state. It remains outside git as
+  `UI-01.2-macos-2026-07-29.png` with SHA-256
+  `85ba172352205f6a29826f20cfc772c509ccfe3025e44c2655fcbb1f68a13650`.
+
+### Residual risk
+
+Native packaged Windows validation remains deferred to WIN-03.3. UI-01.2 does
+not create Shorts or expose Editor/Calendar controls; those remain UI-01.3
+through UI-01.5.
+
+### Rollback note
+
+This slice adds no migration or core contract change. Revert the UI component,
+client, route, styles, tests, and task-document entries together.
+
+### Next command
+
+Implement UI-01.3 timeline, composition, crop, caption, and audio editing with
+session undo/redo.
+
 ## UI-01.1 acceptance-fix boundary — 2026-07-29
 
 ### User goal

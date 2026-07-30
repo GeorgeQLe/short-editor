@@ -2,6 +2,40 @@
 
 ## 2026-07-29
 
+- Completed UI-01.2 with an Episode-scoped Transcript/Candidates workspace,
+  exact revision-safe transcript snapshots, preserved word timings, structured
+  validation details, explicit conflict reloads, accepted-analysis selection,
+  deterministic Candidate diagnostics/review, and immutable-proposal versus
+  editable accepted-copy handling.
+- Added typed renderer clients for artifact and Candidate pagination,
+  transcript updates, generation/review, and Candidate content packages. Added
+  component/API coverage for missing transcript recovery, draft preservation,
+  both generation modes and pending strategies, accepted-artifact filtering,
+  score/provenance display, insufficient material, decision/copy revision
+  synchronization, regeneration retention, and removal of the Candidates
+  placeholder.
+- The isolated `UI-01.2-macos-2026-07-29` Electron walkthrough passed on the
+  working tree based on commit `bf73dd3`, macOS 26.5.2 (25F84). A second local
+  client produced the visible transcript conflict `expected 1, actual 2` and
+  copy conflict `expected 3, actual 4`; both local drafts remained intact until
+  explicit reload, then reapplied saves succeeded.
+- Persisted fixture checks confirmed transcript revision 4 with edited text,
+  50 ms start, `moderator`, and one preserved word timestamp; both dependent
+  Shorts unapproved; the succeeded draft Render stale; draft schedule
+  `needs_rerender`; and the published schedule unchanged. The final active
+  Candidate set contains one approved, one rejected, and six pending rows, and
+  retains accepted copy at Candidate revision 5 after regeneration.
+- Heuristic append and accepted-analysis replace runs passed, including a
+  retained-decision regeneration with six new pending proposals. The short
+  Episode returned deterministic `INSUFFICIENT_MATERIAL` with eligible/rejection
+  counts and recovery guidance. The credential-free full-window evidence
+  `UI-01.2-macos-2026-07-29.png` remains outside git under the isolated fixture
+  directory and has SHA-256
+  `85ba172352205f6a29826f20cfc772c509ccfe3025e44c2655fcbb1f68a13650`.
+- Final verification passes all 47 test files and 333 tests, production
+  build/typecheck, the nine-function preload smoke, and `git diff --check`.
+  Native packaged Windows acceptance remains deferred to WIN-03.3.
+
 - Closed UI-01.1 after a clean rerun of fixture
   `UI-01.1-macos-2026-07-29` on commit `af8ab23`, macOS 26.5.2 (25F84).
   The Electron bridge now unwraps the core's paginated cloud-authorization

@@ -1,6 +1,12 @@
 import type {
   ApiErrorCode,
   ApiResult,
+  AnalysisArtifact,
+  Candidate,
+  CandidateContentPackage,
+  CandidateGenerationInput,
+  CandidateGenerationResult,
+  ContentPackage,
   Episode,
   ImportRejectedResult,
   Job,
@@ -10,6 +16,7 @@ import type {
   ProviderStatus,
   RelinkSourceResult,
   TranscriptRevision,
+  TranscriptUpdateInput,
   WatchedFolder,
   WatchedFolderConfigurationInput
 } from "../shared/domain";
@@ -120,6 +127,40 @@ export const api = {
     ),
   transcript: (episodeId: string) =>
     request<TranscriptRevision>(`/analysis/${encodeURIComponent(episodeId)}/transcript`),
+  analysisArtifacts: (episodeId: string) =>
+    requestAll<AnalysisArtifact>(`/analysis/${encodeURIComponent(episodeId)}/artifacts`),
+  updateTranscript: (episodeId: string, input: TranscriptUpdateInput) =>
+    request<TranscriptRevision>(`/analysis/${encodeURIComponent(episodeId)}/transcript`, {
+      method: "PUT", body: JSON.stringify(input)
+    }),
+  candidates: (episodeId: string) =>
+    requestAll<Candidate>(`/candidates?episodeId=${encodeURIComponent(episodeId)}`),
+  generateCandidates: (input: CandidateGenerationInput) =>
+    request<CandidateGenerationResult>("/candidates/generate", {
+      method: "POST", body: JSON.stringify(input)
+    }),
+  reviewCandidate: (
+    candidateId: string,
+    expectedRevision: number,
+    status: Exclude<Candidate["reviewStatus"], "pending">
+  ) => request<Candidate>(`/candidates/${encodeURIComponent(candidateId)}/review`, {
+    method: "POST", body: JSON.stringify({ expectedRevision, status })
+  }),
+  candidateContentPackage: (candidateId: string) =>
+    request<CandidateContentPackage>(
+      `/candidates/${encodeURIComponent(candidateId)}/content-package`
+    ),
+  acceptCandidateContentPackage: (
+    candidateId: string,
+    expectedRevision: number,
+    contentPackage: ContentPackage
+  ) => request<CandidateContentPackage>(
+    `/candidates/${encodeURIComponent(candidateId)}/content-package`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ expectedRevision, contentPackage })
+    }
+  ),
   startTranscription: (options: TranscriptionOptions) => request<Job>("/analysis/start", {
     method: "POST",
     body: JSON.stringify({

@@ -8,8 +8,15 @@
     provider readiness, private-network acknowledgement reset, and protected
     credential authorization/revocation/removal all passed. The attach-only
     evidence is `UI-01.1-macos-2026-07-29.png`.
-- [ ] UI-01.2 — Complete transcript editing, Candidate review, and accepted-copy
+- [x] UI-01.2 — Complete transcript editing, Candidate review, and accepted-copy
   workflow.
+  - Named-fixture macOS acceptance passed on the working tree based on commit
+    `bf73dd3` with isolated fixture `UI-01.2-macos-2026-07-29`. Transcript
+    snapshot editing/conflict recovery, downstream invalidation, heuristic and
+    accepted-analysis generation, append/replace behavior, Candidate decisions,
+    accepted-copy conflict recovery, regeneration retention, and insufficient
+    material guidance all passed. The attach-only evidence is
+    `UI-01.2-macos-2026-07-29.png`.
 - [ ] UI-01.3 — Complete timeline, composition, crop, caption, and audio editing
   with session undo/redo.
 - [ ] UI-01.4 — Complete approval, preflight, render progress, cancellation,

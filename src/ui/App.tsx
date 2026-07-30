@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Episode, Job, ProviderCapability, WatchedFolder } from "../shared/domain";
 import { api, type ImportBatchResult } from "./api";
 import { CloudAccess, type CloudAccessTarget } from "./CloudAccess";
+import { CandidatesWorkspace } from "./CandidatesWorkspace";
 import { LibraryWorkspace, type LibraryTab } from "./LibraryWorkspace";
 import "./desktop";
 import { errorMessage } from "./utils";
@@ -127,6 +128,8 @@ export function App() {
               openCloudAccess={openCloudAccess}
             />
           </>
+        ) : view === "Candidates" ? (
+          <CandidatesWorkspace episodes={episodes} announce={setMessage} onChanged={refresh} />
         ) : view === "Cloud Access" ? (
           <CloudAccess
             episodes={episodes}
@@ -144,9 +147,8 @@ function Metric({ label, value }: { label: string; value: number }) {
   return <article><span>{label}</span><strong>{value}</strong></article>;
 }
 
-function ComingSoon({ view }: { view: Exclude<View, "Library" | "Cloud Access"> }) {
+function ComingSoon({ view }: { view: Exclude<View, "Library" | "Candidates" | "Cloud Access"> }) {
   const copy = {
-    Candidates: "Generate and review sentence-aligned highlight proposals after an episode has a transcript.",
     Editor: "Approved candidates open in the normalized 1080×1920 composition editor.",
     Calendar: "Approved, validated renders can be assigned to deterministic legal publishing slots."
   }[view];

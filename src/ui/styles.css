@@ -135,6 +135,86 @@ td small { color: #687181; margin-top: 4px; max-width: 400px; overflow: hidden; 
 .link-button { border: 0; background: transparent; color: #a99dff; text-decoration: underline; padding: 7px 0; text-align: left; }
 .job-list { border: 1px solid #2a3140; border-radius: 11px; overflow: hidden; }
 .job-list h2 { padding: 15px 20px; border-bottom: 1px solid #2a3140; }
+.candidates-workspace { min-height: 610px; overflow: visible; }
+.candidate-toolbar { padding: 19px 22px; display: flex; gap: 24px; align-items: center;
+  justify-content: space-between; border-bottom: 1px solid #242a36; }
+.candidate-toolbar p, .candidate-list-heading span { margin: 0; font-size: 12px; color: #7d8695; }
+.candidate-empty { min-height: 310px; display: grid; align-content: center; justify-items: center;
+  text-align: center; padding: 38px; }
+.candidate-empty > div { color: #9a8cff; font-size: 27px; margin-bottom: 12px; }
+.candidate-empty p { max-width: 520px; margin: 4px 0; line-height: 1.5; }
+.transcript-editor { padding: 20px 22px; }
+.revision-banner { border: 1px solid #373354; background: #171725; border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 16px; }
+.revision-banner span { color: #9ba3b2; font-size: 12px; }
+.revision-banner p { font-size: 12px; line-height: 1.5; margin: 8px 0 0; color: #d6b978; }
+.conflict-box, .validation-box, .insufficient-box { border-radius: 9px; margin: 14px 0;
+  padding: 13px 15px; font-size: 12px; }
+.conflict-box { border: 1px solid #75464d; background: #311d23; color: #ffc1c1; display: grid;
+  grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center; }
+.conflict-box span { grid-column: 1; color: #dca5aa; }
+.conflict-box button { grid-column: 2; grid-row: 1 / span 2; }
+.validation-box { background: #30241b; border: 1px solid #76572f; color: #ffd18f; }
+.validation-box ul { margin: 7px 0 0; padding-left: 20px; }
+.transcript-actions { display: flex; align-items: end; justify-content: space-between; gap: 16px;
+  padding: 4px 0 17px; }
+.transcript-actions label, .segment-card label, .copy-editor label, .generation-form label {
+  display: grid; gap: 6px; color: #aab1bf; font-size: 12px;
+}
+.transcript-actions input, .segment-card input, .segment-card textarea, .copy-editor textarea,
+.generation-form select { width: 100%; border: 1px solid #2b3240; border-radius: 8px;
+  background: #0c1017; color: #fff; padding: 9px 11px; }
+.transcript-actions label { width: 210px; }
+.segment-list { display: grid; gap: 11px; max-height: 600px; overflow: auto; padding-right: 5px; }
+.segment-card { border: 1px solid #272e3b; border-radius: 10px; background: #0e1219; padding: 14px; }
+.segment-heading { display: flex; justify-content: space-between; margin-bottom: 11px; }
+.segment-heading small { color: #717b8b; }
+.segment-card textarea { min-height: 70px; resize: vertical; }
+.segment-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+.generation-form { padding: 15px 20px; display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)) auto;
+  gap: 12px; align-items: end; border-bottom: 1px solid #242a36; background: #0e1219; }
+.generation-form .primary { white-space: nowrap; }
+.generation-form + .notice { margin: 12px 20px; }
+.insufficient-box { margin: 13px 20px; border: 1px solid #6e5430; background: #2b2218; color: #efc77f; }
+.insufficient-box p { color: #d2b982; margin: 6px 0; }
+.insufficient-box span, .insufficient-box small { display: block; line-height: 1.5; }
+.insufficient-box small { color: #a99570; margin-top: 5px; }
+.candidate-split { display: grid; grid-template-columns: minmax(440px, .95fr) minmax(390px, 1.05fr);
+  min-height: 530px; border-top: 1px solid #242a36; }
+.candidate-list { border-right: 1px solid #242a36; max-height: 760px; overflow: auto; }
+.candidate-list-heading { padding: 16px 18px; position: sticky; top: 0; z-index: 2; background: #11151d;
+  border-bottom: 1px solid #242a36; }
+.candidate-card { padding: 15px 17px; border-bottom: 1px solid #242a36; }
+.candidate-card.selected { background: #191827; box-shadow: inset 3px 0 #8170f3; }
+.candidate-summary { width: 100%; display: grid; grid-template-columns: 35px 1fr auto; gap: 9px;
+  align-items: center; text-align: left; border: 0; background: transparent; color: #eef1f7; padding: 0; }
+.candidate-summary strong, .candidate-summary small { display: block; }
+.candidate-summary small { color: #7a8494; margin-top: 4px; }
+.candidate-rank { color: #988bff; font-weight: 800; }
+.review-pill, .copy-state { border-radius: 100px; padding: 4px 8px; font-size: 10px; text-transform: uppercase; }
+.review-pill.pending, .copy-state.proposed { color: #dfc682; background: #3c3220; }
+.review-pill.approved, .copy-state.accepted { color: #79dfae; background: #18362d; }
+.review-pill.rejected { color: #ff9a9a; background: #3c2025; }
+.candidate-card > p { font-size: 12px; margin: 10px 0; line-height: 1.45; }
+.candidate-meta { display: flex; flex-wrap: wrap; gap: 5px; }
+.candidate-meta span { color: #8b94a4; background: #202632; border-radius: 5px; padding: 4px 6px; font-size: 10px; }
+.candidate-reason { color: #757f90 !important; }
+.candidate-review-actions { display: flex; gap: 7px; margin-top: 11px; }
+.candidate-detail { max-height: 760px; overflow: auto; background: #0e1219; }
+.copy-editor { padding: 18px 20px 30px; }
+.copy-heading { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.copy-heading span { color: #7f8998; font-size: 11px; }
+.proposed-copy { border: 1px solid #2d3442; border-radius: 9px; margin: 15px 0 20px; background: #131824; }
+.proposed-copy summary { padding: 11px 13px; cursor: pointer; color: #b6bdcb; font-size: 12px; font-weight: 700; }
+.proposed-copy dl { margin: 0; padding: 0 13px 13px; display: grid; grid-template-columns: 125px 1fr;
+  gap: 7px 11px; font-size: 11px; }
+.proposed-copy dt { color: #747e8e; }
+.proposed-copy dd { margin: 0; color: #b6bdc9; overflow-wrap: anywhere; }
+.copy-editor h3 { margin: 0; font-size: 14px; }
+.planning-note { margin: 5px 0 13px; font-size: 11px; }
+.copy-editor label { margin: 11px 0; }
+.copy-editor textarea { min-height: 70px; resize: vertical; }
+.accept-copy { margin-top: 7px; width: 100%; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 1050px) {
   main { padding: 28px 25px; }
@@ -142,4 +222,8 @@ td small { color: #687181; margin-top: 4px; max-width: 400px; overflow: hidden; 
   .cloud-grid { grid-template-columns: 1fr; }
   .split-workspace, .operation-grid { grid-template-columns: 1fr; }
   .workspace-list { border-right: 0; border-bottom: 1px solid #242a36; }
+  .generation-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .candidate-split { grid-template-columns: 1fr; }
+  .candidate-list { border-right: 0; border-bottom: 1px solid #242a36; max-height: none; }
+  .candidate-detail { max-height: none; }
 }
