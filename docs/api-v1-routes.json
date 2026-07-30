@@ -480,6 +480,16 @@
     "longRunning": false
   },
   {
+    "operationId": "shorts.list",
+    "method": "GET",
+    "path": "/v1/shorts",
+    "access": "public",
+    "mutation": false,
+    "destructive": false,
+    "revisionRequired": false,
+    "longRunning": false
+  },
+  {
     "operationId": "shorts.moveManualCropControl",
     "method": "PUT",
     "path": "/v1/shorts/:id/layers/:layerId/crops/manual/:controlId",

@@ -29,7 +29,7 @@ describe("frozen v1 release interface", () => {
 
   it("maps every MCP tool to one exact HTTP route", () => {
     const routeByOperation = new Map(API_ROUTE_INVENTORY.map((route) => [route.operationId, route]));
-    expect(releaseInterfaceManifest().mcpHttpMappings).toHaveLength(44);
+    expect(releaseInterfaceManifest().mcpHttpMappings).toHaveLength(45);
     for (const tool of MCP_TOOL_INVENTORY) {
       const route = routeByOperation.get(tool.http.operationId);
       expect(route, tool.name).toBeDefined();

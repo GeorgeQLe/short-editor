@@ -778,6 +778,7 @@ export class CoreService {
     });
   }
   getShort(id: string) { return this.repository.getShort(id); }
+  listShorts(episodeId?: string) { return this.repository.listShorts(episodeId); }
   updateComposition(id: string, expectedRevision: number, composition: Composition) {
     this.validateCompositionAssets(composition);
     return this.repository.updateShort(id, expectedRevision, { composition });

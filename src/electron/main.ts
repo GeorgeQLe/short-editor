@@ -1,5 +1,6 @@
-import { app, BrowserWindow, dialog, ipcMain, safeStorage } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, protocol, safeStorage } from "electron";
 import { randomBytes } from "node:crypto";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -23,6 +24,13 @@ let credentialVault: ProtectedCredentialVault;
 const openAiAdapter = new OpenAiHttpAdapter();
 const openAiOperations = new Map<string, AbortController>();
 
+protocol.registerSchemesAsPrivileged([{
+  scheme: "short-editor-media",
+  privileges: {
+    standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true
+  }
+}]);
+
 function createWindow() {
   const window = new BrowserWindow(createBrowserWindowOptions(directory));
   if (app.isPackaged) void window.loadFile(join(directory, "../ui/index.html"));
@@ -41,6 +49,8 @@ app.whenReady().then(() => {
   ipcMain.handle("dialog:select-media", selectMediaFiles);
   ipcMain.handle("dialog:select-watched-directory", selectWatchedDirectory);
   ipcMain.handle("dialog:select-relink-candidate", selectRelinkCandidate);
+  ipcMain.handle("dialog:select-asset", selectAssetFile);
+  protocol.handle("short-editor-media", serveInventoryMedia);
   ipcMain.handle("credentials:list", () => credentialVault.list());
   ipcMain.handle("credentials:save", async (_event, input) => {
     const credential = credentialVault.save(input);
@@ -114,6 +124,137 @@ export async function selectRelinkCandidate(): Promise<string | null> {
     ]
   });
   return result.canceled ? null : result.filePaths[0] ?? null;
+}
+
+export async function selectAssetFile(): Promise<string | null> {
+  const result = await dialog.showOpenDialog({
+    title: "Choose composition asset",
+    properties: ["openFile"],
+    filters: [
+      {
+        name: "Supported assets",
+        extensions: [
+          "png", "jpg", "jpeg", "webp", "gif", "svg",
+          "mp4", "mov", "mkv", "webm", "m4v",
+          "mp3", "wav", "m4a", "aac", "flac", "ogg"
+        ]
+      },
+      { name: "Images and logos", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg"] },
+      { name: "Video", extensions: ["mp4", "mov", "mkv", "webm", "m4v"] },
+      { name: "Audio", extensions: ["mp3", "wav", "m4a", "aac", "flac", "ogg"] }
+    ]
+  });
+  return result.canceled ? null : result.filePaths[0] ?? null;
+}
+
+async function serveInventoryMedia(request: Request): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    const kind = url.hostname;
+    const id = decodeURIComponent(url.pathname.slice(1));
+    if (
+      (kind !== "episode" && kind !== "asset") ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+    ) return new Response("Not found", { status: 404 });
+    const path = await resolveInventoryPath(kind, id);
+    if (!path) return new Response("Not found", { status: 404 });
+    const info = await stat(path);
+    if (!info.isFile()) return new Response("Not found", { status: 404 });
+    const range = parseByteRange(request.headers.get("range"), info.size);
+    if (range === "invalid") {
+      return new Response(null, {
+        status: 416,
+        headers: { "Content-Range": `bytes */${info.size}`, "Accept-Ranges": "bytes" }
+      });
+    }
+    const bytes = await readFile(path);
+    const body = range ? bytes.subarray(range.start, range.end + 1) : bytes;
+    return new Response(body, {
+      status: range ? 206 : 200,
+      headers: {
+        "Accept-Ranges": "bytes",
+        "Content-Length": String(body.byteLength),
+        "Content-Type": mediaContentType(path),
+        ...(range
+          ? { "Content-Range": `bytes ${range.start}-${range.end}/${info.size}` }
+          : {})
+      }
+    });
+  } catch {
+    return new Response("Not found", { status: 404 });
+  }
+}
+
+async function resolveInventoryPath(
+  kind: "episode" | "asset",
+  id: string
+): Promise<string | null> {
+  if (kind === "episode") {
+    const episode = await publicCoreRequest(`/library/episodes/${encodeURIComponent(id)}`) as {
+      sourcePath?: unknown;
+      missing?: unknown;
+    };
+    return episode.missing === true || typeof episode.sourcePath !== "string"
+      ? null
+      : episode.sourcePath;
+  }
+  let cursor: string | null = null;
+  do {
+    const page = await publicCoreRequest(`/assets?limit=1000${
+      cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
+    }`) as {
+      items?: Array<{ id?: unknown; sourcePath?: unknown; ownedArtifactPath?: unknown }>;
+      nextCursor?: unknown;
+    };
+    const asset = page.items?.find((item) => item.id === id);
+    if (asset) return typeof asset.sourcePath === "string" ? asset.sourcePath : null;
+    cursor = typeof page.nextCursor === "string" ? page.nextCursor : null;
+  } while (cursor);
+  return null;
+}
+
+async function publicCoreRequest(path: string): Promise<unknown> {
+  const response = await fetch(`${coreUrl}${path}`);
+  if (!response.ok) return null;
+  const payload = await response.json() as { data?: unknown };
+  return payload.data;
+}
+
+function parseByteRange(
+  header: string | null,
+  size: number
+): { start: number; end: number } | null | "invalid" {
+  if (!header) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header);
+  if (!match) return "invalid";
+  const startText = match[1]!;
+  const endText = match[2]!;
+  if (!startText && !endText) return "invalid";
+  let start: number;
+  let end: number;
+  if (!startText) {
+    const suffix = Number(endText);
+    if (!Number.isInteger(suffix) || suffix <= 0) return "invalid";
+    start = Math.max(0, size - suffix);
+    end = size - 1;
+  } else {
+    start = Number(startText);
+    end = endText ? Number(endText) : size - 1;
+  }
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || start >= size || end < start) {
+    return "invalid";
+  }
+  return { start, end: Math.min(end, size - 1) };
+}
+
+function mediaContentType(path: string): string {
+  const extension = path.split(".").pop()?.toLowerCase();
+  return ({
+    mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm", mkv: "video/x-matroska",
+    mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", aac: "audio/aac",
+    flac: "audio/flac", ogg: "audio/ogg", png: "image/png", jpg: "image/jpeg",
+    jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml"
+  } as Record<string, string>)[extension ?? ""] ?? "application/octet-stream";
 }
 
 async function synchronizeCredentialHandles(): Promise<void> {

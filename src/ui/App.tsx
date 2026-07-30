@@ -4,6 +4,7 @@ import { api, type ImportBatchResult } from "./api";
 import { CloudAccess, type CloudAccessTarget } from "./CloudAccess";
 import { CandidatesWorkspace } from "./CandidatesWorkspace";
 import { LibraryWorkspace, type LibraryTab } from "./LibraryWorkspace";
+import { EditorWorkspace } from "./EditorWorkspace";
 import "./desktop";
 import { errorMessage } from "./utils";
 
@@ -130,6 +131,8 @@ export function App() {
           </>
         ) : view === "Candidates" ? (
           <CandidatesWorkspace episodes={episodes} announce={setMessage} onChanged={refresh} />
+        ) : view === "Editor" ? (
+          <EditorWorkspace episodes={episodes} announce={setMessage} onChanged={refresh} />
         ) : view === "Cloud Access" ? (
           <CloudAccess
             episodes={episodes}
@@ -147,9 +150,8 @@ function Metric({ label, value }: { label: string; value: number }) {
   return <article><span>{label}</span><strong>{value}</strong></article>;
 }
 
-function ComingSoon({ view }: { view: Exclude<View, "Library" | "Candidates" | "Cloud Access"> }) {
+function ComingSoon({ view }: { view: "Calendar" }) {
   const copy = {
-    Editor: "Approved candidates open in the normalized 1080×1920 composition editor.",
     Calendar: "Approved, validated renders can be assigned to deterministic legal publishing slots."
   }[view];
   return <section className="panel empty"><div className="empty-icon" aria-hidden="true">◇</div>

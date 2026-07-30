@@ -226,6 +226,33 @@ describe("database migrations", () => {
     `).get() as { count: number }).count).toBe(1);
   });
 
+  it("defaults every legacy template and Short composition layer to visible", () => {
+    const db = new Database(":memory:");
+    databases.push(db);
+    migrateDatabase(db, databaseMigrations.slice(0, 17));
+    const rows = db.prepare("SELECT id,composition_json FROM templates").all() as Array<{
+      id: string;
+      composition_json: string;
+    }>;
+    const update = db.prepare("UPDATE templates SET composition_json=? WHERE id=?");
+    for (const row of rows) {
+      const composition = JSON.parse(row.composition_json) as { layers: Record<string, unknown>[] };
+      update.run(JSON.stringify({
+        ...composition,
+        layers: composition.layers.map(({ visible: _visible, ...layer }) => layer)
+      }), row.id);
+    }
+    migrateDatabase(db);
+    const migrated = db.prepare("SELECT composition_json FROM templates").all() as Array<{
+      composition_json: string;
+    }>;
+    expect(migrated.length).toBeGreaterThan(0);
+    expect(migrated.every((row) => {
+      const composition = JSON.parse(row.composition_json) as { layers: Array<{ visible?: unknown }> };
+      return composition.layers.every((layer) => layer.visible === true);
+    })).toBe(true);
+  });
+
   it("demotes pre-RND-03 successes while preserving their legacy outputs", () => {
     const path = join(mkdtempSync(join(tmpdir(), "short-editor-determinism-migration-")), "fixture.db");
     const legacy = new Database(path);

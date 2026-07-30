@@ -21,6 +21,8 @@ export interface DesktopBridge {
   selectMedia(): Promise<string[]>;
   selectWatchedDirectory(): Promise<string | null>;
   selectRelinkCandidate(): Promise<string | null>;
+  selectAsset?(): Promise<string | null>;
+  mediaUrl?(kind: "episode" | "asset", id: string): string;
   credentials: {
     list(): Promise<CredentialSummary[]>;
     save(input: {

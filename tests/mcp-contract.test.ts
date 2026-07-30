@@ -14,7 +14,7 @@ import { episode } from "./factories.js";
 const expectedNames = [
   "library.list_episodes", "library.get_episode", "library.import_paths",
   "analysis.start", "jobs.list", "jobs.cancel", "candidates.list",
-  "candidates.generate", "candidates.review", "shorts.create", "shorts.get",
+  "candidates.generate", "candidates.review", "shorts.create", "shorts.get", "shorts.list",
   "shorts.update_composition", "shorts.update_copy", "renders.start",
   "renders.validate", "renders.list", "schedule.get", "schedule.draft",
   "schedule.move", "schedule.mark_published", "templates.list", "assets.list",
@@ -30,9 +30,9 @@ const expectedNames = [
 ].sort();
 
 describe("authoritative MCP registry", () => {
-  it("freezes exactly the 44 SPEC tools with concrete strict schemas and safe annotations", () => {
+  it("freezes exactly the 45 SPEC tools with concrete strict schemas and safe annotations", () => {
     expect([...MCP_TOOL_NAMES].sort()).toEqual(expectedNames);
-    expect(new Set(MCP_TOOL_NAMES).size).toBe(44);
+    expect(new Set(MCP_TOOL_NAMES).size).toBe(45);
     for (const tool of MCP_TOOL_INVENTORY) {
       const input = z.toJSONSchema(tool.inputSchema, {
         io: "input",
@@ -79,7 +79,7 @@ describe("authoritative MCP registry", () => {
   it("keeps the checked-in generated discovery artifact stable and sorted", async () => {
     const artifact = JSON.parse(await readFile("docs/mcp-v1-tools.json", "utf8")) as
       Array<{ name: string }>;
-    expect(artifact).toHaveLength(44);
+    expect(artifact).toHaveLength(45);
     expect(artifact.map(({ name }) => name)).toEqual(expectedNames);
   });
 });
@@ -144,13 +144,15 @@ describe("MCP HTTP envelope translation", () => {
   it("passes one opaque cursor page and every list filter through without traversal", async () => {
     const listNames = [
       "library.list_episodes", "library.list_watched_folders", "jobs.list",
-      "candidates.list", "renders.list", "schedule.get", "templates.list", "assets.list"
+      "candidates.list", "shorts.list", "renders.list", "schedule.get", "templates.list",
+      "assets.list"
     ];
     for (const name of listNames) {
       const tool = MCP_TOOL_INVENTORY.find((candidate) => candidate.name === name)!;
       const input: Record<string, unknown> = { limit: 7, cursor: "opaque+/=" };
       if (name === "library.list_episodes") input.search = "one & two";
       if (name === "candidates.list") input.episodeId = id;
+      if (name === "shorts.list") input.episodeId = id;
       if (name === "renders.list") input.shortId = id;
       const request = tool.request(input);
       expect(request.method, name).toBe("GET");

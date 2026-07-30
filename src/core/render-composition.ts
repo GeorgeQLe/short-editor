@@ -45,7 +45,7 @@ export function buildRenderGraph(
   const assetLayerLabels = new Map<string, string[]>();
   for (const { identity } of assets) {
     const uses = snapshot.short.composition.layers.filter(
-      (layer) => layer.source === "asset" && layer.assetId === identity.id &&
+      (layer) => layer.visible && layer.source === "asset" && layer.assetId === identity.id &&
         (layer.type === "image" || layer.type === "logo" || layer.type === "video" ||
           layer.type === "media")
     ).length;
@@ -60,7 +60,7 @@ export function buildRenderGraph(
     }
   }
   const episodeLayers = snapshot.short.composition.layers.filter(
-    (layer) => layer.type === "video" && layer.source === "episode"
+    (layer) => layer.visible && layer.type === "video" && layer.source === "episode"
   );
   if (episodeLayers.length) {
     const ranges = snapshot.sourceRanges;
@@ -96,6 +96,7 @@ export function buildRenderGraph(
   let canvasIndex = 0;
   let episodeLayerIndex = 0;
   for (const layer of snapshot.short.composition.layers) {
+    if (!layer.visible) continue;
     if (layer.type === "captions") {
       if (snapshot.short.captions.enabled) {
         const input = `[canvas_${canvasIndex}]`;

@@ -6,6 +6,14 @@ contextBridge.exposeInMainWorld("desktop", {
     ipcRenderer.invoke("dialog:select-watched-directory"),
   selectRelinkCandidate: (): Promise<string | null> =>
     ipcRenderer.invoke("dialog:select-relink-candidate"),
+  selectAsset: (): Promise<string | null> => ipcRenderer.invoke("dialog:select-asset"),
+  mediaUrl: (kind: "episode" | "asset", id: string): string => {
+    if (kind !== "episode" && kind !== "asset") throw new Error("Unsupported media kind");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      throw new Error("Media ID must be a UUID");
+    }
+    return `short-editor-media://${kind}/${id}`;
+  },
   credentials: {
     list: () => ipcRenderer.invoke("credentials:list"),
     save: (input: unknown) => ipcRenderer.invoke("credentials:save", input),

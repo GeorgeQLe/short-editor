@@ -3,8 +3,8 @@
 This document is generated. The checked-in JSON artifacts are the exact
 machine-readable compatibility boundary:
 
-- [HTTP route inventory](api-v1-routes.json) — 60 operations, SHA-256 `d77fb06e4d1156606c17ef95c838d7752725af8569af62b23ba25ce3cd32773a`
-- [MCP tool schemas](mcp-v1-tools.json) — 44 tools with Draft-07 input/output schemas, SHA-256 `bc3585035d5e3532876a50622e9b99ea1c5bfcd5a1b6c20d4d17edf307c283e9`
+- [HTTP route inventory](api-v1-routes.json) — 61 operations, SHA-256 `8d353b7cb3a5c01c270f137bbc5a7a6cf95689253b691fe5d0fc4d5bd4e75dd1`
+- [MCP tool schemas](mcp-v1-tools.json) — 45 tools with Draft-07 input/output schemas, SHA-256 `a5103d7e6ddc5c1c999e0656504eb158293520c3af2bd3c0766ab4e40678a83e`
 - [Compatibility manifest](release-interface-v1.json) — policy, artifact digests, and exact MCP-to-HTTP mappings
 
 ## Compatibility policy
@@ -16,7 +16,7 @@ rejected. Successes use `{apiVersion:"v1",data}`; failures use
 `{apiVersion:"v1",error:{code,message,details,retryable}}`.
 
 All 10 unbounded HTTP collections return
-`{items,nextCursor}`; 8 of them are exposed through MCP
+`{items,nextCursor}`; 9 of them are exposed through MCP
 with the same page contract. The default limit is 100 and the accepted range is
 1–1,000. Cursors are opaque, bound to the operation and active filters, and
 continue after a stable item ID. Invalid, stale, cross-operation, and
@@ -29,7 +29,7 @@ sensitive-detail opt-in.
 
 ## HTTP v1
 
-The core binds to `127.0.0.1` by default. 54 operations are public
+The core binds to `127.0.0.1` by default. 55 operations are public
 to the loopback client and 6 credential/cloud-security operations
 also require the per-launch desktop token. No durable-entity deletion operation
 is exposed.
@@ -84,6 +84,7 @@ is exposed.
 | `shorts.approve` | POST | `/v1/shorts/:id/approve` | public | true | false |
 | `shorts.create` | POST | `/v1/shorts` | public | false | false |
 | `shorts.get` | GET | `/v1/shorts/:id` | public | false | false |
+| `shorts.list` | GET | `/v1/shorts` | public | false | false |
 | `shorts.moveManualCropControl` | PUT | `/v1/shorts/:id/layers/:layerId/crops/manual/:controlId` | public | true | false |
 | `shorts.reanalyzeCrops` | POST | `/v1/shorts/:id/crops/reanalyze` | public | true | true |
 | `shorts.removeManualCropControl` | DELETE | `/v1/shorts/:id/layers/:layerId/crops/manual/:controlId` | public | true | false |
@@ -139,6 +140,7 @@ management intentionally remain desktop-only.
 | `shorts.approve` | `shorts.approve` | POST | write |
 | `shorts.create` | `shorts.create` | POST | write |
 | `shorts.get` | `shorts.get` | GET | read |
+| `shorts.list` | `shorts.list` | GET | read |
 | `shorts.move_manual_crop` | `shorts.moveManualCropControl` | PUT | write |
 | `shorts.reanalyze_crops` | `shorts.reanalyzeCrops` | POST | write |
 | `shorts.remove_manual_crop` | `shorts.removeManualCropControl` | DELETE | write |

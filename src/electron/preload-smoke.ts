@@ -7,6 +7,8 @@ const expectedFunctions = [
   "selectMedia",
   "selectWatchedDirectory",
   "selectRelinkCandidate",
+  "selectAsset",
+  "mediaUrl",
   "credentials.list",
   "credentials.save",
   "credentials.remove",

@@ -21,13 +21,13 @@
   "artifacts": {
     "http": {
       "path": "docs/api-v1-routes.json",
-      "operationCount": 60,
-      "sha256": "d77fb06e4d1156606c17ef95c838d7752725af8569af62b23ba25ce3cd32773a"
+      "operationCount": 61,
+      "sha256": "8d353b7cb3a5c01c270f137bbc5a7a6cf95689253b691fe5d0fc4d5bd4e75dd1"
     },
     "mcp": {
       "path": "docs/mcp-v1-tools.json",
-      "toolCount": 44,
-      "sha256": "bc3585035d5e3532876a50622e9b99ea1c5bfcd5a1b6c20d4d17edf307c283e9"
+      "toolCount": 45,
+      "sha256": "a5103d7e6ddc5c1c999e0656504eb158293520c3af2bd3c0766ab4e40678a83e"
     }
   },
   "mcpHttpMappings": [
@@ -228,6 +228,12 @@
       "operationId": "shorts.get",
       "method": "GET",
       "path": "/v1/shorts/:id"
+    },
+    {
+      "tool": "shorts.list",
+      "operationId": "shorts.list",
+      "method": "GET",
+      "path": "/v1/shorts"
     },
     {
       "tool": "shorts.move_manual_crop",

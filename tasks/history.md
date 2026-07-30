@@ -1,5 +1,28 @@
 # Session history
 
+## 2026-07-30
+
+- Added the UI-01.3 implementation checkpoint: durable Short project listing,
+  reopening, creation from approved Candidates, explicit duplicate creation,
+  and template clone/edit entry points now replace the Editor placeholder.
+- Added a source-aware portrait preview and transport plus section-scoped
+  timeline, composition/layer, automatic/manual crop, caption, and audio
+  editors. Local history supports undo/redo; saves use exact Short revisions,
+  preserve unrelated dirty sections, and expose explicit discard-or-rebase
+  recovery after conflicts.
+- Added composition-layer visibility with migration 18 and made preflight and
+  render graph generation omit hidden layers. Added secure inventory media URLs,
+  byte-range responses, an asset picker, paginated Short listing across HTTP
+  and MCP, and regenerated the frozen release-interface artifacts.
+- Automated verification passes all 48 test files and 340 tests, production
+  build/typecheck, deterministic release-interface regeneration, the
+  11-function Electron preload smoke, focused credential-signature scanning,
+  and diff hygiene. The intentional `Unexpected internal error` stderr line is
+  the existing redacted-500 fixture.
+- UI-01.3 remains open pending its isolated named-fixture macOS walkthrough and
+  credential-free evidence capture. Native packaged Windows acceptance remains
+  deferred to the existing Windows release gate.
+
 ## 2026-07-29
 
 - Completed UI-01.2 with an Episode-scoped Transcript/Candidates workspace,

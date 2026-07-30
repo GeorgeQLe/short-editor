@@ -6,6 +6,10 @@ import type {
   CandidateContentPackage,
   CandidateGenerationInput,
   CandidateGenerationResult,
+  Asset,
+  AudioUpdateResult,
+  CaptionUpdateResult,
+  Composition,
   ContentPackage,
   Episode,
   ImportRejectedResult,
@@ -14,6 +18,8 @@ import type {
   Page,
   ProviderCapability,
   ProviderStatus,
+  ShortProject,
+  Template,
   RelinkSourceResult,
   TranscriptRevision,
   TranscriptUpdateInput,
@@ -135,6 +141,65 @@ export const api = {
     }),
   candidates: (episodeId: string) =>
     requestAll<Candidate>(`/candidates?episodeId=${encodeURIComponent(episodeId)}`),
+  shorts: (episodeId?: string) => requestAll<ShortProject>(
+    `/shorts${episodeId ? `?episodeId=${encodeURIComponent(episodeId)}` : ""}`
+  ),
+  short: (shortId: string) =>
+    request<ShortProject>(`/shorts/${encodeURIComponent(shortId)}`),
+  createShort: (candidateId: string, templateId: string) =>
+    request<ShortProject>("/shorts", {
+      method: "POST", body: JSON.stringify({ candidateId, templateId })
+    }),
+  templates: () => requestAll<Template>("/templates"),
+  cloneTemplate: (templateId: string, name: string, description?: string) =>
+    request<Template>(`/templates/${encodeURIComponent(templateId)}/clone`, {
+      method: "POST", body: JSON.stringify({ name, ...(description ? { description } : {}) })
+    }),
+  updateTemplate: (
+    templateId: string,
+    expectedRevision: number,
+    patch: { name?: string; description?: string; composition?: Composition }
+  ) => request<Template>(`/templates/${encodeURIComponent(templateId)}`, {
+    method: "PUT", body: JSON.stringify({ expectedRevision, ...patch })
+  }),
+  assets: () => requestAll<Asset>("/assets"),
+  importAsset: (path: string, provenance: string, reusable: boolean) =>
+    request<Asset>("/assets/import", {
+      method: "POST", body: JSON.stringify({ path, provenance, reusable })
+    }),
+  updateTimeline: (
+    shortId: string,
+    expectedRevision: number,
+    sourceRanges: ShortProject["sourceRanges"]
+  ) => request<ShortProject>(`/shorts/${encodeURIComponent(shortId)}/timeline`, {
+    method: "PUT", body: JSON.stringify({ expectedRevision, sourceRanges })
+  }),
+  updateComposition: (
+    shortId: string,
+    expectedRevision: number,
+    composition: Composition
+  ) => request<ShortProject>(`/shorts/${encodeURIComponent(shortId)}/composition`, {
+    method: "PUT", body: JSON.stringify({ expectedRevision, composition })
+  }),
+  updateCaptions: (
+    shortId: string,
+    expectedRevision: number,
+    captions: Pick<ShortProject["captions"], "enabled" | "cues" | "style">
+  ) => request<CaptionUpdateResult>(`/shorts/${encodeURIComponent(shortId)}/captions`, {
+    method: "PUT", body: JSON.stringify({ expectedRevision, ...captions })
+  }),
+  updateAudio: (
+    shortId: string,
+    expectedRevision: number,
+    audio: Omit<ShortProject["audio"], "warnings">
+  ) => request<AudioUpdateResult>(`/shorts/${encodeURIComponent(shortId)}/audio`, {
+    method: "PUT", body: JSON.stringify({ expectedRevision, ...audio })
+  }),
+  reanalyzeCrops: (shortId: string, expectedRevision: number, layerIds?: string[]) =>
+    request<ShortProject>(`/shorts/${encodeURIComponent(shortId)}/crops/reanalyze`, {
+      method: "POST",
+      body: JSON.stringify({ expectedRevision, ...(layerIds ? { layerIds } : {}) })
+    }),
   generateCandidates: (input: CandidateGenerationInput) =>
     request<CandidateGenerationResult>("/candidates/generate", {
       method: "POST", body: JSON.stringify(input)

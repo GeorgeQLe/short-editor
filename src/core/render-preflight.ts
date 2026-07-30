@@ -212,12 +212,15 @@ export class RenderPreflightService {
 
     let captionAnalysis: ReturnType<CaptionEngine["analyze"]> | null = null;
     try {
+      const captionsVisible = project.composition.layers.some(
+        (layer) => layer.visible && layer.type === "captions"
+      );
       captionAnalysis = this.captionEngine.analyze(
         project.captions.cues,
         project.captions.style,
         project.composition,
         project.sourceRanges,
-        project.captions.enabled
+        project.captions.enabled && captionsVisible
       );
       for (const warning of captionAnalysis.warnings) {
         findings.push(finding(warning.code, { cueId: warning.cueId }));
@@ -281,7 +284,10 @@ export class RenderPreflightService {
           generatorVersion: CROP_GENERATOR_VERSION,
           smoothingVersion: CROP_SMOOTHING_VERSION,
           layers: project.composition.layers
-            .filter((layer) => layer.type === "video")
+            .filter((layer): layer is Extract<
+              ShortProject["composition"]["layers"][number],
+              { type: "video" }
+            > => layer.visible && layer.type === "video")
             .map((layer) => ({
               layerId: layer.id,
               automatic: layer.automaticCropTrack,
@@ -445,6 +451,7 @@ export class RenderPreflightService {
       bindings.set(assetId, existing);
     };
     for (const layer of project.composition.layers) {
+      if (!layer.visible) continue;
       if (!layer.assetId) continue;
       const expectedKind: Asset["kind"] = layer.type === "logo" ? "logo"
         : layer.type === "video" ? "video"
@@ -557,6 +564,7 @@ export class RenderPreflightService {
       safe.top + safe.bottom >= 1920
     ) findings.push(finding("SAFE_AREA_INVALID"));
     for (const layer of project.composition.layers) {
+      if (!layer.visible) continue;
       if (layer.type !== "video") continue;
       for (const control of [
         ...layer.automaticCropTrack.frames,

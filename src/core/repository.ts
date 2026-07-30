@@ -937,6 +937,17 @@ export class Repository {
     return mapShort(row);
   }
 
+  listShorts(episodeId?: string): ShortProject[] {
+    const rows = episodeId
+      ? this.db.prepare(
+        "SELECT * FROM short_projects WHERE episode_id=? ORDER BY created_at,id"
+      ).all(episodeId) as Row[]
+      : this.db.prepare(
+        "SELECT * FROM short_projects ORDER BY created_at,id"
+      ).all() as Row[];
+    return rows.map(mapShort);
+  }
+
   updateShort(id: string, expectedRevision: number, patch: {
     composition?: Composition;
     copy?: ShortProject["copy"];

@@ -655,6 +655,14 @@ const migrations: readonly Migration[] = [
           AND json_type(captions_json, '$.style.textTransform') IS NULL
       `).run();
     }
+  },
+  {
+    version: 18,
+    name: "composition layer visibility",
+    up: (db) => {
+      addCompositionLayerVisibility(db, "templates");
+      addCompositionLayerVisibility(db, "short_projects");
+    }
   }
 ];
 
@@ -757,6 +765,37 @@ function normalizeCompositionLayers(
       ) return layer;
       changed = true;
       return { ...layer, assetId: null };
+    });
+    if (changed) update.run(JSON.stringify({ ...composition, layers }), row.id);
+  }
+}
+
+function addCompositionLayerVisibility(
+  db: SqliteDatabase,
+  table: "templates" | "short_projects"
+): void {
+  const rows = db.prepare(`SELECT id,composition_json FROM ${table}`).all() as Array<{
+    id: string;
+    composition_json: string;
+  }>;
+  const update = db.prepare(`UPDATE ${table} SET composition_json=? WHERE id=?`);
+  for (const row of rows) {
+    let composition: { layers?: unknown[] };
+    try {
+      composition = JSON.parse(row.composition_json) as { layers?: unknown[] };
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(composition.layers)) continue;
+    let changed = false;
+    const layers = composition.layers.map((value) => {
+      if (
+        typeof value !== "object" ||
+        value === null ||
+        Object.prototype.hasOwnProperty.call(value, "visible")
+      ) return value;
+      changed = true;
+      return { ...value, visible: true };
     });
     if (changed) update.run(JSON.stringify({ ...composition, layers }), row.id);
   }

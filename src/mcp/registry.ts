@@ -86,6 +86,7 @@ const pagingFields = {
 const pageInput = z.strictObject(pagingFields);
 const episodeListInput = z.strictObject({ search: z.string().optional(), ...pagingFields });
 const candidateListInput = z.strictObject({ episodeId: uuid, ...pagingFields });
+const shortListInput = z.strictObject({ episodeId: uuid.optional(), ...pagingFields });
 const renderListInput = z.strictObject({ shortId: uuid.optional(), ...pagingFields });
 const providerStatusInput = z.strictObject({
   episodeId: uuid.optional(),
@@ -351,6 +352,9 @@ export const MCP_TOOL_INVENTORY: readonly McpToolDefinition[] = Object.freeze([
   define("shorts.create", "Create a non-destructive Short project from an approved candidate.",
     shortCreateInput, shortProjectSchema, "shorts.create", "POST", "/v1/shorts",
     (input) => mutate("POST", "/shorts", input)),
+  define("shorts.list", "List reopenable Short projects, optionally for one Episode.",
+    shortListInput, pageSchema(shortProjectSchema), "shorts.list", "GET",
+    "/v1/shorts", (input) => get(queryPath("/shorts", input))),
   define("shorts.get", "Get a Short project and its current revision.",
     z.strictObject({ shortId: uuid }), shortProjectSchema, "shorts.get", "GET",
     "/v1/shorts/:id", ({ shortId }) => get(`/shorts/${shortId}`)),

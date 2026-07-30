@@ -550,6 +550,7 @@ export const manualCropTrackSchema = orderedUniqueTimes(manualCropControlSchema)
 
 const layerBase = {
   id: z.string().min(1),
+  visible: z.boolean().default(true),
   source: z.enum(["episode", "asset", "none"]),
   assetId: idSchema.nullable(),
   region: normalizedRectangleSchema,

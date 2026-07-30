@@ -1,5 +1,140 @@
 # Ship manifest
 
+## UI-01.3 editor implementation checkpoint — 2026-07-30
+
+### User goal
+
+Implement and ship the desktop Short editor slice covering durable project
+creation/reopening, timeline, composition, crop, caption, and audio editing with
+session undo/redo, while preserving the existing revision and render contracts.
+
+### Changed files
+
+`docs/api-v1-routes.json`, `docs/mcp-v1-tools.json`,
+`docs/release-interface-v1.json`, `docs/release-interfaces-v1.md`,
+`src/core/api.ts`, `src/core/database.ts`, `src/core/render-composition.ts`,
+`src/core/render-preflight.ts`, `src/core/repository.ts`,
+`src/core/service.ts`, `src/electron/main.ts`,
+`src/electron/preload-smoke.ts`, `src/electron/preload.cts`,
+`src/mcp/registry.ts`, `src/shared/contracts.ts`,
+`src/shared/templates.ts`, `src/ui/App.tsx`, `src/ui/api.ts`,
+`src/ui/desktop.ts`, `src/ui/EditorWorkspace.tsx`,
+`src/ui/editor-state.ts`, `src/ui/styles.css`,
+`tests/api-contract.test.ts`, `tests/api-release-contract.test.ts`,
+`tests/editor-state.test.ts`, `tests/mcp-contract.test.ts`,
+`tests/migrations.test.ts`, `tests/render.test.ts`, `tasks/todo.md`,
+`tasks/history.md`, and `tasks/ship-manifest.md`.
+
+Generated local pack material under `.agents/skillpacks/`, `.claude/`, and
+`.codex/` is excluded from this boundary and remains untracked.
+
+### Per-file purpose
+
+- `src/ui/EditorWorkspace.tsx`, `src/ui/editor-state.ts`, `src/ui/App.tsx`,
+  `src/ui/api.ts`, `src/ui/desktop.ts`, and `src/ui/styles.css` implement the
+  Editor route, durable launcher, source-aware preview/transport, four editing
+  surfaces, asset selection, revision-safe section saves, conflict recovery,
+  and session history.
+- `src/core/api.ts`, `src/core/repository.ts`, `src/core/service.ts`, and
+  `src/mcp/registry.ts` expose paginated, optionally Episode-filtered Short
+  listing through the frozen HTTP and MCP interfaces.
+- `src/shared/contracts.ts`, `src/shared/templates.ts`, and
+  `src/core/database.ts` add default-visible composition layers and migrate
+  legacy Template and Short JSON in migration 18.
+- `src/core/render-composition.ts` and `src/core/render-preflight.ts` consistently
+  exclude hidden layers from render inputs, captions, crop analysis, asset
+  binding, and preflight validation.
+- `src/electron/main.ts`, `src/electron/preload.cts`, and
+  `src/electron/preload-smoke.ts` add the native asset picker and validated
+  inventory-media protocol with byte-range support, then freeze the expanded
+  bridge in the Electron smoke.
+- The four generated `docs/` artifacts publish the added HTTP operation and MCP
+  tool with stable schemas, mappings, counts, and digests.
+- The six changed/new test files freeze pagination and release compatibility,
+  migration defaults, hidden-layer rendering, and editor history, dirty-section,
+  source-time, crop, and canonical-save behavior.
+- Task documents record this implementation checkpoint without closing the
+  still-required interactive acceptance gate.
+
+### User-goal mapping
+
+Approved Candidates can create durable Shorts from an explicit Template, and
+existing projects can be reopened after restart. The portrait preview maps the
+Short playhead through ordered source ranges and displays visible composition
+layers, captions, safe area, selected assets, and effective crops. Each editing
+section maintains local drafts, saves with exact compare-and-swap revisions,
+retains unrelated dirty work after canonical responses, and pauses on conflict
+until the user explicitly discards or rebases drafts. Session undo/redo covers
+all editor content. Layer visibility is persisted and honored by both preview
+and executable render paths.
+
+### Tests run
+
+- Executable verification: `npm test` passed all 48 files and 340 tests,
+  including the real FFmpeg render regression. The intentional
+  `Unexpected internal error` stderr line is the existing redacted-500 fixture,
+  not a warning or regression.
+- Executable verification: `npm run build` passed TypeScript typecheck, Vite
+  production compilation, and Node TypeScript compilation without warnings.
+- Executable verification: `npm run smoke:preload` passed in Electron with all
+  11 picker, media, credential, and authorization bridge functions present.
+- Generated-contract verification: `npm run generate:release-interfaces`
+  completed, and the subsequent working-tree comparison retained the exact
+  checked-in generated boundary.
+- Repository verification: `git diff --check` passed. Focused
+  credential-signature scanning found only the deliberate redaction fixtures in
+  `tests/api-release-contract.test.ts`, not new credential material.
+
+### Skipped tests
+
+- The isolated UI-01.3 macOS named-fixture walkthrough and screenshot were not
+  completed in this session. The task therefore remains open; the residual
+  interaction risk is not represented as automated closure.
+- Native packaged Windows acceptance is unavailable on this macOS host and
+  remains owned by the existing Windows release gate.
+- No lint script or task-document audit script exists. TypeScript checking is
+  included in the successful production build, and diff hygiene passed
+  separately.
+
+### Adversarial review
+
+A failure-oriented changed-file review served as the explicit equivalent review
+lane because no repository-local `quality-sweep` or `expert-review` command is
+installed. It traced the revision boundary through every section save,
+canonical merge, conflict discard/rebase, and reanalysis path; checked dirty
+draft retention and invalidation messaging; checked source/output time mapping,
+manual-crop duration guards, hidden-layer handling from migration through
+preflight/render, pagination/filter binding, media UUID validation and range
+handling, generated-interface stability, and exclusion of generated skill
+roots.
+
+No blocking defect remained after review and executable validation. The lack of
+an end-to-end Editor component regression and named-fixture walkthrough is
+explicitly retained as residual risk rather than being treated as proof of UI
+completion.
+
+### Residual risk
+
+Complex pointer, media playback, asset-import, cross-section dirty-save, and
+conflict interactions have state-helper and contract coverage but still need
+the named macOS walkthrough. The custom media handler reads the requested file
+before returning a byte range, so very large local media may have higher
+transient memory use; the browser's normal range requests bound the response
+body but not the initial file read. Packaged Windows protocol and native-dialog
+behavior remain unproved until the Windows gate.
+
+### Rollback note
+
+Revert the Editor UI/client/bridge changes, Short-list HTTP/MCP contract and
+generated artifacts, visibility migration/schema/template changes, hidden-layer
+render behavior, tests, and task records together. Migration 18 is additive and
+only writes `visible: true` where the field was absent.
+
+### Next command
+
+Run `$guide` for the isolated UI-01.3 macOS acceptance walkthrough and
+credential-free evidence capture.
+
 ## UI-01.2 transcript/Candidate/copy boundary — 2026-07-29
 
 ### User goal

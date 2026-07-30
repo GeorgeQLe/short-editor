@@ -11275,6 +11275,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
+                          },
                           "source": {
                             "type": "string",
                             "enum": [
@@ -11598,6 +11602,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -11615,6 +11620,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -11687,6 +11696,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -11701,6 +11711,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -11764,6 +11778,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -11778,6 +11793,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -11947,6 +11966,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -12878,6 +12898,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
+                          },
                           "source": {
                             "type": "string",
                             "enum": [
@@ -13201,6 +13225,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -13218,6 +13243,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -13290,6 +13319,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -13304,6 +13334,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -13367,6 +13401,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -13381,6 +13416,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -13550,6 +13589,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -14479,6 +14519,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
+                          },
                           "source": {
                             "type": "string",
                             "enum": [
@@ -14802,6 +14846,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -14819,6 +14864,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -14891,6 +14940,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -14905,6 +14955,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -14968,6 +15022,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -14982,6 +15037,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -15151,6 +15210,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -16076,6 +16136,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
+                          },
                           "source": {
                             "type": "string",
                             "enum": [
@@ -16399,6 +16463,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -16416,6 +16481,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -16488,6 +16557,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -16502,6 +16572,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -16565,6 +16639,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -16579,6 +16654,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -16748,6 +16827,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -17495,6 +17575,1653 @@
     }
   },
   {
+    "name": "shorts.list",
+    "description": "List reopenable Short projects, optionally for one Episode.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "http": {
+      "operationId": "shorts.list",
+      "method": "GET",
+      "path": "/v1/shorts"
+    },
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "episodeId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "type": "string",
+          "const": "v1"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "episodeId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "candidateId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sourceRanges": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "startMs": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "endMs": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "startMs",
+                        "endMs"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "templateId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "templateLineage": {
+                    "type": "object",
+                    "properties": {
+                      "templateId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "templateVersion": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "parentTemplateId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "templateId",
+                      "templateVersion",
+                      "parentTemplateId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "composition": {
+                    "type": "object",
+                    "properties": {
+                      "width": {
+                        "type": "number",
+                        "const": 1080
+                      },
+                      "height": {
+                        "type": "number",
+                        "const": 1920
+                      },
+                      "background": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "safeArea": {
+                        "type": "object",
+                        "properties": {
+                          "top": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "right": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "bottom": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "left": {
+                            "type": "number",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "top",
+                          "right",
+                          "bottom",
+                          "left"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "layers": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "visible": {
+                                  "default": true,
+                                  "type": "boolean"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "episode",
+                                    "asset",
+                                    "none"
+                                  ]
+                                },
+                                "assetId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "region": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "fit": {
+                                  "type": "string",
+                                  "enum": [
+                                    "fill",
+                                    "fit"
+                                  ]
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "video"
+                                },
+                                "cropTarget": {
+                                  "default": "auto",
+                                  "type": "string",
+                                  "enum": [
+                                    "person",
+                                    "screen",
+                                    "auto"
+                                  ]
+                                },
+                                "automaticCropTrack": {
+                                  "default": {
+                                    "frames": [],
+                                    "provenance": null,
+                                    "fallback": {
+                                      "mode": "fit",
+                                      "reason": "missing_samples"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "properties": {
+                                    "frames": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "atMs": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "x": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "width": {
+                                            "type": "number",
+                                            "exclusiveMinimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "height": {
+                                            "type": "number",
+                                            "exclusiveMinimum": 0,
+                                            "maximum": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "atMs",
+                                          "x",
+                                          "y",
+                                          "width",
+                                          "height"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "provenance": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "artifactId": {
+                                              "type": "string",
+                                              "format": "uuid",
+                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                            },
+                                            "artifactContentHash": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "generatorVersion": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "smoothingVersion": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "target": {
+                                              "type": "string",
+                                              "enum": [
+                                                "person",
+                                                "screen",
+                                                "auto"
+                                              ]
+                                            },
+                                            "sourceWidth": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "integer",
+                                                  "exclusiveMinimum": 0,
+                                                  "maximum": 9007199254740991
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "sourceHeight": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "integer",
+                                                  "exclusiveMinimum": 0,
+                                                  "maximum": 9007199254740991
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "generatedAt": {
+                                              "type": "string",
+                                              "format": "date-time",
+                                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                                            }
+                                          },
+                                          "required": [
+                                            "artifactId",
+                                            "artifactContentHash",
+                                            "generatorVersion",
+                                            "smoothingVersion",
+                                            "target",
+                                            "sourceWidth",
+                                            "sourceHeight",
+                                            "generatedAt"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "fallback": {
+                                      "type": "object",
+                                      "properties": {
+                                        "mode": {
+                                          "type": "string",
+                                          "enum": [
+                                            "none",
+                                            "fit",
+                                            "fill"
+                                          ]
+                                        },
+                                        "reason": {
+                                          "type": "string",
+                                          "enum": [
+                                            "none",
+                                            "missing_samples",
+                                            "missing_detections",
+                                            "unsupported_detection",
+                                            "missing_dimensions",
+                                            "unmatched_source"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "mode",
+                                        "reason"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "frames",
+                                    "provenance",
+                                    "fallback"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "manualCropTrack": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                          },
+                                          "mode": {
+                                            "type": "string",
+                                            "const": "crop"
+                                          },
+                                          "atMs": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "x": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "width": {
+                                            "type": "number",
+                                            "exclusiveMinimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "height": {
+                                            "type": "number",
+                                            "exclusiveMinimum": 0,
+                                            "maximum": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "mode",
+                                          "atMs",
+                                          "x",
+                                          "y",
+                                          "width",
+                                          "height"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                          },
+                                          "mode": {
+                                            "type": "string",
+                                            "const": "automatic"
+                                          },
+                                          "atMs": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "mode",
+                                          "atMs"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "visible",
+                                "source",
+                                "assetId",
+                                "region",
+                                "fit",
+                                "type",
+                                "cropTarget",
+                                "automaticCropTrack",
+                                "manualCropTrack"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "visible": {
+                                  "default": true,
+                                  "type": "boolean"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "episode",
+                                    "asset",
+                                    "none"
+                                  ]
+                                },
+                                "assetId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "region": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "fit": {
+                                  "type": "string",
+                                  "enum": [
+                                    "fill",
+                                    "fit"
+                                  ]
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "image",
+                                    "captions",
+                                    "shape",
+                                    "logo"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "visible",
+                                "source",
+                                "assetId",
+                                "region",
+                                "fit",
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "visible": {
+                                  "default": true,
+                                  "type": "boolean"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "const": "asset"
+                                },
+                                "assetId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "region": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "fit": {
+                                  "type": "string",
+                                  "enum": [
+                                    "fill",
+                                    "fit"
+                                  ]
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "media"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "visible",
+                                "source",
+                                "assetId",
+                                "region",
+                                "fit",
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "visible": {
+                                  "default": true,
+                                  "type": "boolean"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "const": "none"
+                                },
+                                "assetId": {
+                                  "type": "null"
+                                },
+                                "region": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "fit": {
+                                  "type": "string",
+                                  "enum": [
+                                    "fill",
+                                    "fit"
+                                  ]
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "text"
+                                },
+                                "content": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "binding": {
+                                          "type": "string",
+                                          "const": "short_title"
+                                        }
+                                      },
+                                      "required": [
+                                        "binding"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "style": {
+                                  "type": "object",
+                                  "properties": {
+                                    "fontFamily": {
+                                      "type": "string",
+                                      "const": "Inter"
+                                    },
+                                    "fontWeight": {
+                                      "anyOf": [
+                                        {
+                                          "type": "number",
+                                          "const": 400
+                                        },
+                                        {
+                                          "type": "number",
+                                          "const": 700
+                                        }
+                                      ]
+                                    },
+                                    "fontSizePx": {
+                                      "type": "integer",
+                                      "minimum": 12,
+                                      "maximum": 200
+                                    },
+                                    "color": {
+                                      "type": "string",
+                                      "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+                                    },
+                                    "backgroundColor": {
+                                      "type": "string",
+                                      "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+                                    },
+                                    "backgroundPaddingPx": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "align": {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "center",
+                                        "right"
+                                      ]
+                                    },
+                                    "verticalAlign": {
+                                      "type": "string",
+                                      "enum": [
+                                        "top",
+                                        "center",
+                                        "bottom"
+                                      ]
+                                    },
+                                    "wrap": {
+                                      "type": "boolean"
+                                    },
+                                    "maxLines": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 20
+                                    },
+                                    "overflow": {
+                                      "type": "string",
+                                      "enum": [
+                                        "clip",
+                                        "ellipsis"
+                                      ]
+                                    },
+                                    "textTransform": {
+                                      "type": "string",
+                                      "enum": [
+                                        "none",
+                                        "uppercase"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "fontFamily",
+                                    "fontWeight",
+                                    "fontSizePx",
+                                    "color",
+                                    "backgroundColor",
+                                    "backgroundPaddingPx",
+                                    "align",
+                                    "verticalAlign",
+                                    "wrap",
+                                    "maxLines",
+                                    "overflow",
+                                    "textTransform"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "visible",
+                                "source",
+                                "assetId",
+                                "region",
+                                "fit",
+                                "type",
+                                "content",
+                                "style"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "captionStylePreset": {
+                        "type": "object",
+                        "properties": {
+                          "fontFamily": {
+                            "type": "string",
+                            "const": "Inter"
+                          },
+                          "fontWeight": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "const": 400
+                              },
+                              {
+                                "type": "number",
+                                "const": 700
+                              }
+                            ]
+                          },
+                          "fontSizePx": {
+                            "type": "integer",
+                            "minimum": 12,
+                            "maximum": 200
+                          },
+                          "position": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "y": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "maxWidth": {
+                            "type": "number",
+                            "minimum": 0.1,
+                            "maximum": 1
+                          },
+                          "textColor": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+                          },
+                          "highlightColor": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+                          },
+                          "textTransform": {
+                            "default": "none",
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "uppercase"
+                            ]
+                          },
+                          "outline": {
+                            "type": "object",
+                            "properties": {
+                              "color": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+                              },
+                              "widthPx": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 20
+                              }
+                            },
+                            "required": [
+                              "color",
+                              "widthPx"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "background": {
+                            "type": "object",
+                            "properties": {
+                              "color": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+                              },
+                              "paddingPx": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                              },
+                              "cornerRadiusPx": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                              }
+                            },
+                            "required": [
+                              "color",
+                              "paddingPx",
+                              "cornerRadiusPx"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "fontFamily",
+                          "fontWeight",
+                          "fontSizePx",
+                          "position",
+                          "maxWidth",
+                          "textColor",
+                          "highlightColor",
+                          "textTransform",
+                          "outline",
+                          "background"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "width",
+                      "height",
+                      "background",
+                      "safeArea",
+                      "layers"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "captions": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "cues": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "startMs": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "endMs": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "words": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "startMs": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "endMs": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "startMs",
+                                  "endMs",
+                                  "text"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "startMs",
+                            "endMs",
+                            "id",
+                            "text",
+                            "words"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "style": {
+                        "type": "object",
+                        "properties": {
+                          "fontFamily": {
+                            "type": "string",
+                            "const": "Inter"
+                          },
+                          "fontWeight": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "const": 400
+                              },
+                              {
+                                "type": "number",
+                                "const": 700
+                              }
+                            ]
+                          },
+                          "fontSizePx": {
+                            "type": "integer",
+                            "minimum": 12,
+                            "maximum": 200
+                          },
+                          "position": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "y": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "maxWidth": {
+                            "type": "number",
+                            "minimum": 0.1,
+                            "maximum": 1
+                          },
+                          "textColor": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+                          },
+                          "highlightColor": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+                          },
+                          "textTransform": {
+                            "default": "none",
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "uppercase"
+                            ]
+                          },
+                          "outline": {
+                            "type": "object",
+                            "properties": {
+                              "color": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+                              },
+                              "widthPx": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 20
+                              }
+                            },
+                            "required": [
+                              "color",
+                              "widthPx"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "background": {
+                            "type": "object",
+                            "properties": {
+                              "color": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+                              },
+                              "paddingPx": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                              },
+                              "cornerRadiusPx": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                              }
+                            },
+                            "required": [
+                              "color",
+                              "paddingPx",
+                              "cornerRadiusPx"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "fontFamily",
+                          "fontWeight",
+                          "fontSizePx",
+                          "position",
+                          "maxWidth",
+                          "textColor",
+                          "highlightColor",
+                          "textTransform",
+                          "outline",
+                          "background"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "warnings": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "CAPTION_OVERFLOW",
+                                "CAPTION_SAFE_AREA",
+                                "CAPTION_MISSING_GLYPH",
+                                "CAPTION_SHORT_CUE",
+                                "CAPTION_OVERLAP",
+                                "CAPTION_OUTSIDE_SOURCE_RANGE"
+                              ]
+                            },
+                            "cueId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "cueId",
+                            "message"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "sidecars": {
+                        "type": "object",
+                        "properties": {
+                          "srt": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "artifactId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "format": {
+                                    "type": "string",
+                                    "enum": [
+                                      "srt",
+                                      "webvtt"
+                                    ]
+                                  },
+                                  "relativePath": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "contentHash": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "byteLength": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "artifactId",
+                                  "format",
+                                  "relativePath",
+                                  "contentHash",
+                                  "byteLength"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "webvtt": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "artifactId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "format": {
+                                    "type": "string",
+                                    "enum": [
+                                      "srt",
+                                      "webvtt"
+                                    ]
+                                  },
+                                  "relativePath": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "contentHash": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "byteLength": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "artifactId",
+                                  "format",
+                                  "relativePath",
+                                  "contentHash",
+                                  "byteLength"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "srt",
+                          "webvtt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "enabled",
+                      "cues",
+                      "style",
+                      "warnings",
+                      "sidecars"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "audio": {
+                    "type": "object",
+                    "properties": {
+                      "sourceGainDb": {
+                        "type": "number",
+                        "minimum": -60,
+                        "maximum": 12
+                      },
+                      "sourceMuted": {
+                        "type": "boolean"
+                      },
+                      "cutFadeMs": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 500
+                      },
+                      "bedAssetId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "bedGainDb": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -60,
+                            "maximum": 0
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "warnings": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "AUDIO_SPEECH_BACKGROUND_RATIO"
+                              ]
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "message"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "sourceGainDb",
+                      "sourceMuted",
+                      "cutFadeMs",
+                      "bedAssetId",
+                      "bedGainDb",
+                      "warnings"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "copy": {
+                    "type": "object",
+                    "properties": {
+                      "cleanedTranscript": {
+                        "type": "string"
+                      },
+                      "rewrite": {
+                        "type": "string"
+                      },
+                      "hookVariants": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "titles": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "hashtags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "thumbnailText": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "cleanedTranscript",
+                      "rewrite",
+                      "hookVariants",
+                      "titles",
+                      "description",
+                      "hashtags",
+                      "thumbnailText"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "copyState": {
+                    "type": "string",
+                    "enum": [
+                      "proposed",
+                      "accepted"
+                    ]
+                  },
+                  "copySource": {
+                    "type": "string",
+                    "enum": [
+                      "candidate_proposal",
+                      "candidate_accepted",
+                      "user_accepted",
+                      "legacy_accepted"
+                    ]
+                  },
+                  "approved": {
+                    "type": "boolean"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "episodeId",
+                  "candidateId",
+                  "title",
+                  "sourceRanges",
+                  "templateId",
+                  "templateLineage",
+                  "composition",
+                  "captions",
+                  "audio",
+                  "copy",
+                  "copyState",
+                  "copySource",
+                  "approved",
+                  "revision",
+                  "createdAt",
+                  "updatedAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "nextCursor": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "nextCursor"
+          ],
+          "additionalProperties": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "NOT_FOUND",
+                "VALIDATION_ERROR",
+                "REVISION_CONFLICT",
+                "SOURCE_MISSING",
+                "SOURCE_IDENTITY_MISMATCH",
+                "DEPENDENCY_UNAVAILABLE",
+                "PROVIDER_UNAVAILABLE",
+                "PROVIDER_OUTPUT_INVALID",
+                "CLOUD_NOT_AUTHORIZED",
+                "CLOUD_CONFIRMATION_REQUIRED",
+                "INVALID_STATE",
+                "SCHEDULE_COLLISION",
+                "JOB_CANCELLED",
+                "ARTIFACT_CORRUPT",
+                "INTERNAL_ERROR"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "details": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/__schema0"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "details",
+            "retryable"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "apiVersion"
+      ],
+      "additionalProperties": false,
+      "definitions": {
+        "__schema0": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/__schema0"
+              }
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "$ref": "#/definitions/__schema0"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
     "name": "shorts.move_manual_crop",
     "description": "Move or numerically update one UUID-addressed manual crop control.",
     "annotations": {
@@ -17727,6 +19454,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -18051,6 +19782,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -18068,6 +19800,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -18140,6 +19876,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -18154,6 +19891,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -18217,6 +19958,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -18231,6 +19973,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -18400,6 +20146,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -19339,6 +21086,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
+                          },
                           "source": {
                             "type": "string",
                             "enum": [
@@ -19662,6 +21413,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -19679,6 +21431,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -19751,6 +21507,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -19765,6 +21522,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -19828,6 +21589,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -19842,6 +21604,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -20011,6 +21777,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -20953,6 +22720,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
+                          },
                           "source": {
                             "type": "string",
                             "enum": [
@@ -21276,6 +23047,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -21293,6 +23065,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -21365,6 +23141,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -21379,6 +23156,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -21442,6 +23223,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -21456,6 +23238,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -21625,6 +23411,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -22601,6 +24388,10 @@
                                 "type": "string",
                                 "minLength": 1
                               },
+                              "visible": {
+                                "default": true,
+                                "type": "boolean"
+                              },
                               "source": {
                                 "type": "string",
                                 "enum": [
@@ -22924,6 +24715,7 @@
                             },
                             "required": [
                               "id",
+                              "visible",
                               "source",
                               "assetId",
                               "region",
@@ -22941,6 +24733,10 @@
                               "id": {
                                 "type": "string",
                                 "minLength": 1
+                              },
+                              "visible": {
+                                "default": true,
+                                "type": "boolean"
                               },
                               "source": {
                                 "type": "string",
@@ -23013,6 +24809,7 @@
                             },
                             "required": [
                               "id",
+                              "visible",
                               "source",
                               "assetId",
                               "region",
@@ -23027,6 +24824,10 @@
                               "id": {
                                 "type": "string",
                                 "minLength": 1
+                              },
+                              "visible": {
+                                "default": true,
+                                "type": "boolean"
                               },
                               "source": {
                                 "type": "string",
@@ -23090,6 +24891,7 @@
                             },
                             "required": [
                               "id",
+                              "visible",
                               "source",
                               "assetId",
                               "region",
@@ -23104,6 +24906,10 @@
                               "id": {
                                 "type": "string",
                                 "minLength": 1
+                              },
+                              "visible": {
+                                "default": true,
+                                "type": "boolean"
                               },
                               "source": {
                                 "type": "string",
@@ -23273,6 +25079,7 @@
                             },
                             "required": [
                               "id",
+                              "visible",
                               "source",
                               "assetId",
                               "region",
@@ -24427,6 +26234,10 @@
                                 "type": "string",
                                 "minLength": 1
                               },
+                              "visible": {
+                                "default": true,
+                                "type": "boolean"
+                              },
                               "source": {
                                 "type": "string",
                                 "enum": [
@@ -24750,6 +26561,7 @@
                             },
                             "required": [
                               "id",
+                              "visible",
                               "source",
                               "assetId",
                               "region",
@@ -24767,6 +26579,10 @@
                               "id": {
                                 "type": "string",
                                 "minLength": 1
+                              },
+                              "visible": {
+                                "default": true,
+                                "type": "boolean"
                               },
                               "source": {
                                 "type": "string",
@@ -24839,6 +26655,7 @@
                             },
                             "required": [
                               "id",
+                              "visible",
                               "source",
                               "assetId",
                               "region",
@@ -24853,6 +26670,10 @@
                               "id": {
                                 "type": "string",
                                 "minLength": 1
+                              },
+                              "visible": {
+                                "default": true,
+                                "type": "boolean"
                               },
                               "source": {
                                 "type": "string",
@@ -24916,6 +26737,7 @@
                             },
                             "required": [
                               "id",
+                              "visible",
                               "source",
                               "assetId",
                               "region",
@@ -24930,6 +26752,10 @@
                               "id": {
                                 "type": "string",
                                 "minLength": 1
+                              },
+                              "visible": {
+                                "default": true,
+                                "type": "boolean"
                               },
                               "source": {
                                 "type": "string",
@@ -25099,6 +26925,7 @@
                             },
                             "required": [
                               "id",
+                              "visible",
                               "source",
                               "assetId",
                               "region",
@@ -26069,6 +27896,10 @@
                         "type": "string",
                         "minLength": 1
                       },
+                      "visible": {
+                        "default": true,
+                        "type": "boolean"
+                      },
                       "source": {
                         "type": "string",
                         "enum": [
@@ -26407,6 +28238,10 @@
                         "type": "string",
                         "minLength": 1
                       },
+                      "visible": {
+                        "default": true,
+                        "type": "boolean"
+                      },
                       "source": {
                         "type": "string",
                         "enum": [
@@ -26493,6 +28328,10 @@
                         "type": "string",
                         "minLength": 1
                       },
+                      "visible": {
+                        "default": true,
+                        "type": "boolean"
+                      },
                       "source": {
                         "type": "string",
                         "const": "asset"
@@ -26569,6 +28408,10 @@
                       "id": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "visible": {
+                        "default": true,
+                        "type": "boolean"
                       },
                       "source": {
                         "type": "string",
@@ -27042,6 +28885,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
+                          },
                           "source": {
                             "type": "string",
                             "enum": [
@@ -27365,6 +29212,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -27382,6 +29230,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -27454,6 +29306,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -27468,6 +29321,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -27531,6 +29388,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -27545,6 +29403,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -27714,6 +29576,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -28691,6 +30554,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
+                          },
                           "source": {
                             "type": "string",
                             "enum": [
@@ -29014,6 +30881,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -29031,6 +30899,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -29103,6 +30975,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -29117,6 +30990,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -29180,6 +31057,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -29194,6 +31072,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -29363,6 +31245,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -30319,6 +32202,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
+                          },
                           "source": {
                             "type": "string",
                             "enum": [
@@ -30642,6 +32529,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -30659,6 +32547,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -30731,6 +32623,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -30745,6 +32638,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -30808,6 +32705,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -30822,6 +32720,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -30991,6 +32893,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -31873,6 +33776,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
+                          },
                           "source": {
                             "type": "string",
                             "enum": [
@@ -32196,6 +34103,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -32213,6 +34121,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -32285,6 +34197,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -32299,6 +34212,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -32362,6 +34279,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -32376,6 +34294,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -32545,6 +34467,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -32941,6 +34864,10 @@
                                   "type": "string",
                                   "minLength": 1
                                 },
+                                "visible": {
+                                  "default": true,
+                                  "type": "boolean"
+                                },
                                 "source": {
                                   "type": "string",
                                   "enum": [
@@ -33264,6 +35191,7 @@
                               },
                               "required": [
                                 "id",
+                                "visible",
                                 "source",
                                 "assetId",
                                 "region",
@@ -33281,6 +35209,10 @@
                                 "id": {
                                   "type": "string",
                                   "minLength": 1
+                                },
+                                "visible": {
+                                  "default": true,
+                                  "type": "boolean"
                                 },
                                 "source": {
                                   "type": "string",
@@ -33353,6 +35285,7 @@
                               },
                               "required": [
                                 "id",
+                                "visible",
                                 "source",
                                 "assetId",
                                 "region",
@@ -33367,6 +35300,10 @@
                                 "id": {
                                   "type": "string",
                                   "minLength": 1
+                                },
+                                "visible": {
+                                  "default": true,
+                                  "type": "boolean"
                                 },
                                 "source": {
                                   "type": "string",
@@ -33430,6 +35367,7 @@
                               },
                               "required": [
                                 "id",
+                                "visible",
                                 "source",
                                 "assetId",
                                 "region",
@@ -33444,6 +35382,10 @@
                                 "id": {
                                   "type": "string",
                                   "minLength": 1
+                                },
+                                "visible": {
+                                  "default": true,
+                                  "type": "boolean"
                                 },
                                 "source": {
                                   "type": "string",
@@ -33613,6 +35555,7 @@
                               },
                               "required": [
                                 "id",
+                                "visible",
                                 "source",
                                 "assetId",
                                 "region",
@@ -33981,6 +35924,10 @@
                         "type": "string",
                         "minLength": 1
                       },
+                      "visible": {
+                        "default": true,
+                        "type": "boolean"
+                      },
                       "source": {
                         "type": "string",
                         "enum": [
@@ -34319,6 +36266,10 @@
                         "type": "string",
                         "minLength": 1
                       },
+                      "visible": {
+                        "default": true,
+                        "type": "boolean"
+                      },
                       "source": {
                         "type": "string",
                         "enum": [
@@ -34405,6 +36356,10 @@
                         "type": "string",
                         "minLength": 1
                       },
+                      "visible": {
+                        "default": true,
+                        "type": "boolean"
+                      },
                       "source": {
                         "type": "string",
                         "const": "asset"
@@ -34481,6 +36436,10 @@
                       "id": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "visible": {
+                        "default": true,
+                        "type": "boolean"
                       },
                       "source": {
                         "type": "string",
@@ -34903,6 +36862,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
+                          },
                           "source": {
                             "type": "string",
                             "enum": [
@@ -35226,6 +37189,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -35243,6 +37207,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -35315,6 +37283,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -35329,6 +37298,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -35392,6 +37365,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",
@@ -35406,6 +37380,10 @@
                           "id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "visible": {
+                            "default": true,
+                            "type": "boolean"
                           },
                           "source": {
                             "type": "string",
@@ -35575,6 +37553,7 @@
                         },
                         "required": [
                           "id",
+                          "visible",
                           "source",
                           "assetId",
                           "region",

@@ -64,6 +64,7 @@ const pagingQuery = z.strictObject(pagingFields);
 const episodeListQuery = z.strictObject({ ...pagingFields, search: z.string().optional() });
 const artifactListQuery = z.strictObject(pagingFields);
 const candidateListQuery = z.strictObject({ ...pagingFields, episodeId: uuid });
+const shortListQuery = z.strictObject({ ...pagingFields, episodeId: uuid.optional() });
 const renderListQuery = z.strictObject({ ...pagingFields, shortId: uuid.optional() });
 const authorizationListQuery = z.strictObject({ ...pagingFields, scopeId: uuid.optional() });
 const providerStatusQuery = z.strictObject({
@@ -276,6 +277,12 @@ const routes: readonly RouteDefinition[] = [
   route("shorts.create", "POST", "/v1/shorts", {}, (service, req) => {
     const input = body(shortCreateInput, req);
     return service.createShort(input.candidateId, input.templateId);
+  }),
+  route("shorts.list", "GET", "/v1/shorts", {}, (service, req) => {
+    const input = query(shortListQuery, req);
+    return paginate(service.listShorts(input.episodeId), input, "shorts.list", {
+      episodeId: input.episodeId ?? null
+    });
   }),
   route("shorts.get", "GET", "/v1/shorts/:id", {}, (service, req) => {
     query(z.strictObject({}), req);

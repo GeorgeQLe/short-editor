@@ -33,11 +33,11 @@ afterEach(async () => {
 });
 
 describe("v1 HTTP contract inventory", () => {
-  it("freezes all 60 classified routes and matches the generated JSON", async () => {
-    expect(API_ROUTE_INVENTORY).toHaveLength(60);
-    expect(new Set(API_ROUTE_INVENTORY.map((entry) => entry.operationId)).size).toBe(60);
-    expect(new Set(API_ROUTE_INVENTORY.map((entry) => `${entry.method} ${entry.path}`)).size).toBe(60);
-    expect(API_ROUTE_INVENTORY.filter((entry) => entry.access === "public")).toHaveLength(54);
+  it("freezes all 61 classified routes and matches the generated JSON", async () => {
+    expect(API_ROUTE_INVENTORY).toHaveLength(61);
+    expect(new Set(API_ROUTE_INVENTORY.map((entry) => entry.operationId)).size).toBe(61);
+    expect(new Set(API_ROUTE_INVENTORY.map((entry) => `${entry.method} ${entry.path}`)).size).toBe(61);
+    expect(API_ROUTE_INVENTORY.filter((entry) => entry.access === "public")).toHaveLength(55);
     expect(API_ROUTE_INVENTORY.filter((entry) => entry.access === "desktop-token")).toHaveLength(6);
     expect(API_ROUTE_INVENTORY.every((entry) =>
       entry.operationId.length > 0
@@ -145,6 +145,25 @@ describe("v1 pagination", () => {
         error: { code: "VALIDATION_ERROR" }
       });
     }
+  });
+
+  it("lists Shorts with stable pagination and an optional Episode filter", async () => {
+    const firstEpisode = "00000000-0000-4000-8000-000000000090";
+    const base = await start({
+      listShorts: (episodeId?: string) => ids
+        .map((item, index) => ({ ...item, episodeId: index < 3 ? firstEpisode : "other" }))
+        .filter((item) => !episodeId || item.episodeId === episodeId) as never
+    });
+    const response = await fetch(
+      `${base}/v1/shorts?episodeId=${firstEpisode}&limit=2`
+    );
+    const payload = await json(response) as {
+      data: { items: Array<{ episodeId: string }>; nextCursor: string | null };
+    };
+    expect(response.status).toBe(200);
+    expect(payload.data.items).toHaveLength(2);
+    expect(payload.data.items.every((item) => item.episodeId === firstEpisode)).toBe(true);
+    expect(payload.data.nextCursor).toEqual(expect.any(String));
   });
 
   it("rejects unknown query fields on queryless reads", async () => {

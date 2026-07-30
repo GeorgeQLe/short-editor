@@ -256,6 +256,17 @@ describe("explicit FFmpeg render contracts and graph", () => {
     expect(first.outputArgs).toContain("pipe:1");
   });
 
+  it("omits hidden visual layers from the final render graph", () => {
+    const snapshot = graphSnapshot(1);
+    snapshot.short.composition.layers = snapshot.short.composition.layers.map((layer) => ({
+      ...layer, visible: false
+    }));
+    const graph = buildRenderGraph(snapshot, "/tmp/filter", "/tmp/output.mp4", "/tmp/fonts");
+    expect(graph.script).not.toContain("episode_segment_");
+    expect(graph.script).not.toContain("drawtext=");
+    expect(graph.script).toContain("color=c=#000000:s=1080x1920");
+  });
+
   it("bounds and redacts normalization subprocess failures", async () => {
     await expect(normalizeRender(
       "/private/secret/render.mp4",
