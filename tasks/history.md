@@ -2,6 +2,61 @@
 
 ## 2026-07-29
 
+- Closed UI-01.1 after a clean rerun of fixture
+  `UI-01.1-macos-2026-07-29` on commit `af8ab23`, macOS 26.5.2 (25F84).
+  The Electron bridge now unwraps the core's paginated cloud-authorization
+  response before returning it to the renderer, with a regression using the
+  exact live `{ items, nextCursor }` shape.
+- The named-fixture walkthrough visibly passed the three-result mixed import;
+  watched-folder create, discovery, edit/disable, queued manual rescan, and
+  recovery; wrong-candidate relink rejection followed by memory-only
+  confirmation and successful relink; passive Episode-scoped provider status;
+  private-LAN per-operation disclosure and endpoint-change reset; and routing
+  an unauthorized OpenAI action to Cloud Access. A clearly fake fixture
+  credential was saved, used to grant and revoke the scoped authorization, and
+  removed without starting a provider job. The initial direct-launch ABI
+  failure was recovered by supplying npm's host Node and the complete rerun
+  passed.
+- The readable, credential-free, full-window Providers evidence is attached as
+  `UI-01.1-macos-2026-07-29.png` and remains outside git. Final verification
+  passes all 46 test files and 325 tests, the production build/typecheck, the
+  nine-function preload smoke, and diff hygiene.
+- Fixed the sandboxed Electron preload boundary by compiling the preload as
+  CommonJS `dist/electron/preload.cjs`, resolving it through shared
+  side-effect-free BrowserWindow options, and adding a hidden-window Electron
+  smoke harness. Focused options coverage, all 45 test files and 323 tests, the
+  production build/typecheck, the nine-function preload smoke, and diff hygiene
+  pass.
+- Resumed the isolated `UI-01.1-macos-2026-07-29` Computer Use walkthrough.
+  DevTools showed no preload error, the native import picker opened, and the
+  named batch visibly produced one imported Episode, one identity duplicate,
+  and one FFprobe rejection. Watched-folder discovery succeeded; the relink
+  workflow visibly rejected the wrong candidate, required the in-memory
+  confirmation for the valid no-hash candidate, and recovered successfully.
+  Provider readiness and public Ollama endpoint classification also passed.
+  Cloud Access then crashed to a blank renderer with
+  `TypeError: authorizations.filter is not a function` in
+  `CloudAccess.tsx:166`. Fake credential authorization/revocation could not run,
+  no final Providers screenshot was captured, and UI-01.1 remains open on this
+  exact blocker.
+
+- Prepared the isolated `UI-01.1-macos-2026-07-29` acceptance fixture for
+  commit `af8ab23` on macOS 26.5.2 (25F84). Its deterministic H.264/AAC inputs
+  include a byte-identical mixed-import duplicate, malformed rejection input,
+  watched-folder media, a wrong relink candidate, and a moved valid candidate;
+  the seeded relink Episode is `source_missing` with no stored content hash.
+- Enabled the project-local `guided-walkthrough` pack, reset the Node kernel,
+  and reinitialized the plugin-owned Computer Use runtime. The mandatory
+  `sky.list_apps()` gate recovered and the app/core opened against the isolated
+  fixture. Mouse click, coordinate click, and focused-keyboard activation of
+  Import episodes all failed to open the native picker. Electron DevTools
+  exposed the current blocker: `dist/electron/preload.js` is rejected with
+  `SyntaxError: Cannot use import statement outside a module`, leaving
+  `window.desktop` unavailable. Native import, watched-folder, relink, and
+  protected-credential checkpoints could not run; no final screenshot was
+  captured and UI-01.1 remains open. The post-walkthrough gates still pass all
+  44 test files and 321 tests, the production build/typecheck, and diff hygiene.
+
 - Added the UI-01.1 inventory/provider implementation: complete paginated
   Episode and watched-folder reads, per-input import outcomes, missing-source
   prioritization and relink confirmation, watched-folder configuration/rescan,

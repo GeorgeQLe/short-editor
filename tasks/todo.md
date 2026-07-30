@@ -1,12 +1,13 @@
 # Current work
 
-- [ ] UI-01.1 — Complete the library, watched-folder, relink, provider-status,
+- [x] UI-01.1 — Complete the library, watched-folder, relink, provider-status,
   and cloud-authorization workflow.
-  - Implementation and automated transition coverage are complete. Acceptance
-    remains blocked on the named-fixture macOS Computer Use walkthrough and
-    screenshot: the app/core smoke test passes after the development ABI fix,
-    but the Computer Use runtime failed to start on two attempts with
-    `Sky Computer Use native pipe startup failed`.
+  - Named-fixture macOS acceptance passed on commit `af8ab23` with isolated
+    fixture `UI-01.1-macos-2026-07-29`. Mixed import, watched-folder
+    configuration and rescans, relink rejection and confirmed recovery, passive
+    provider readiness, private-network acknowledgement reset, and protected
+    credential authorization/revocation/removal all passed. The attach-only
+    evidence is `UI-01.1-macos-2026-07-29.png`.
 - [ ] UI-01.2 — Complete transcript editing, Candidate review, and accepted-copy
   workflow.
 - [ ] UI-01.3 — Complete timeline, composition, crop, caption, and audio editing

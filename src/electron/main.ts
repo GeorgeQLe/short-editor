@@ -11,7 +11,9 @@ import {
 } from "../shared/domain.js";
 import { normalizeError } from "../shared/errors.js";
 import { resolveCoreExecutable } from "./core-launch.js";
+import { desktopListItems } from "./desktop-list.js";
 import { OpenAiHttpAdapter } from "./openai-adapter.js";
+import { createBrowserWindowOptions } from "./window-options.js";
 
 const directory = fileURLToPath(new URL(".", import.meta.url));
 let core: ChildProcess | undefined;
@@ -22,11 +24,7 @@ const openAiAdapter = new OpenAiHttpAdapter();
 const openAiOperations = new Map<string, AbortController>();
 
 function createWindow() {
-  const window = new BrowserWindow({
-    width: 1440, height: 900, minWidth: 900, minHeight: 650,
-    backgroundColor: "#0b0e14",
-    webPreferences: { preload: join(directory, "preload.js"), contextIsolation: true, nodeIntegration: false }
-  });
+  const window = new BrowserWindow(createBrowserWindowOptions(directory));
   if (app.isPackaged) void window.loadFile(join(directory, "../ui/index.html"));
   else void window.loadURL("http://localhost:5173");
 }
@@ -54,10 +52,10 @@ app.whenReady().then(() => {
     credentialVault.remove(handle);
     return { removed: true };
   });
-  ipcMain.handle("cloud-authorizations:list", (_event, scopeId?: string) =>
-    desktopRequest(`/desktop/cloud-authorizations${
+  ipcMain.handle("cloud-authorizations:list", async (_event, scopeId?: string) =>
+    desktopListItems(await desktopRequest(`/desktop/cloud-authorizations${
       scopeId ? `?scopeId=${encodeURIComponent(scopeId)}` : ""
-    }`)
+    }`), "Cloud authorization list")
   );
   ipcMain.handle("cloud-authorizations:grant", (_event, input) =>
     desktopRequest("/desktop/cloud-authorizations", "POST", input)

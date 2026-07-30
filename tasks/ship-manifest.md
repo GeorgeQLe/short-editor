@@ -1,142 +1,138 @@
 # Ship manifest
 
-## UI-01.1 implementation boundary — 2026-07-29
+## UI-01.1 acceptance-fix boundary — 2026-07-29
 
 ### User goal
 
-Wrap up and ship the current session's UI-01.1 implementation while preserving
-the project's explicit interactive acceptance gate.
+Wrap up and ship the fixes discovered during UI-01.1 interactive acceptance,
+close that gate after the clean named-fixture rerun, and preserve a concrete
+route into UI-01.2.
 
 ### Changed files
 
-`package-lock.json`, `package.json`, `src/electron/core-launch.ts`,
-`src/electron/main.ts`, `src/electron/preload.ts`,
-`src/shared/contracts.ts`, `src/ui/App.tsx`, `src/ui/api.ts`,
-`src/ui/CloudAccess.tsx`, `src/ui/desktop.ts`,
-`src/ui/LibraryWorkspace.tsx`, `src/ui/styles.css`, `src/ui/utils.ts`,
+`.agents/project.json`, `package.json`, `src/electron/desktop-list.ts`,
+`src/electron/main.ts`, `src/electron/preload.cts`,
+`src/electron/preload-smoke.ts`, `src/electron/window-options.ts`,
 `tasks/history.md`, `tasks/ship-manifest.md`, `tasks/todo.md`,
-`tests/electron-core-launch.test.ts`, `tests/ui-api.test.ts`,
-`tests/ui-workflows.test.tsx`, and `vitest.config.ts`.
+`tests/electron-desktop-list.test.ts`,
+`tests/electron-window-options.test.ts`, and `tsconfig.node.json`.
+
+The obsolete `src/electron/preload.ts` is deleted in the same boundary.
 
 Generated local pack material under `.agents/skillpacks/`, `.claude/`, and
 `.codex/` is excluded from the shipping boundary and remains untracked.
 
 ### Per-file purpose
 
-- `src/ui/App.tsx`, `src/ui/LibraryWorkspace.tsx`, and
-  `src/ui/CloudAccess.tsx` replace the inventory/provider placeholder with the
-  library tabs, complete import outcomes, relink confirmation, watched-folder
-  controls, provider selection/status, disclosures, protected credential
-  management, persisted authorizations, and job cancellation/recovery status.
-- `src/ui/api.ts`, `src/ui/desktop.ts`, and `src/ui/utils.ts` provide the typed
-  paginated API client, structured failure preservation, Electron bridge
-  declarations, and shared safe display helpers.
-- `src/electron/main.ts` and `src/electron/preload.ts` add native watched-folder
-  and relink file selection. `src/electron/core-launch.ts` fixes the
-  failure-oriented review finding by selecting npm's host Node for the
-  development core while retaining Electron for packaged execution.
-- `src/shared/contracts.ts` adds the strict Ollama endpoint-status response used
-  by provider disclosure UI.
-- `src/ui/styles.css` styles the new tabs, workflows, dialogs, status cards,
-  disclosure controls, and responsive layouts.
-- `package.json`, `package-lock.json`, and `vitest.config.ts` add the jsdom and
-  Testing Library component-test environment.
-- `tests/ui-api.test.ts` covers complete pagination, structured errors, and
-  exact non-forged provider request bodies; `tests/ui-workflows.test.tsx`
-  covers visible import outcomes, memory-only relink confirmation,
-  watched-folder configuration, passive provider behavior, and private-network
-  disclosure; `tests/electron-core-launch.test.ts` freezes the native ABI
-  launcher choice.
-- `tasks/todo.md` retains the blocked interactive acceptance step;
+- `.agents/project.json` records the installed `guided-walkthrough` pack used
+  for interactive acceptance and for the next manual UI route.
+- `src/electron/preload.cts` replaces the obsolete TypeScript preload so Node
+  compilation emits the CommonJS artifact required by Electron's sandboxed
+  preload runtime.
+- `src/electron/window-options.ts` centralizes the secure BrowserWindow settings
+  and resolves `preload.cjs`; `src/electron/main.ts` consumes those options.
+- `src/electron/preload-smoke.ts` opens a hidden sandboxed window and verifies
+  that all nine desktop bridge functions are exposed.
+- `src/electron/desktop-list.ts` validates and unwraps the core's paginated
+  cloud-authorization response; `src/electron/main.ts` applies it before the
+  response crosses the renderer bridge.
+- `package.json` exposes the preload smoke command, while
+  `tsconfig.node.json` compiles the `.cts` preload source.
+- `tests/electron-window-options.test.ts` freezes the CommonJS preload path and
+  renderer security settings. `tests/electron-desktop-list.test.ts` freezes
+  the exact live response normalization and rejects malformed responses.
+- `tasks/todo.md` closes the interactive acceptance step;
   `tasks/history.md` and this manifest record the implementation, evidence,
-  review finding, and next route.
+  recovered failures, and next route.
 
 ### User-goal mapping
 
-The library and cloud-access modules make every UI-01.1 persisted action
-available through the frozen typed API or the desktop-only credential and
-authorization bridge. The status/disclosure logic keeps passive inspection
-local, requires explicit acknowledgement before private-network data transfer,
-and routes missing public-provider grants to the user-only Cloud Access page.
-The launcher fix makes the development Electron shell reach the local core so
-the required interactive workflow can run. Task routing does not claim
-UI-01.1 complete until its named-fixture walkthrough and screenshot exist.
+The CommonJS preload fix restores the native picker and protected credential
+bridge without weakening sandboxing. The list normalization aligns the live
+paginated core response with the renderer's array contract. Together these
+fixes allowed the named-fixture walkthrough and attach-only screenshot to close
+UI-01.1, while the task documents route the next executable work to UI-01.2.
 
 ### Tests run
 
-- Executable verification: `npm test` passed all 44 files and 321 tests,
-  including five jsdom UI workflow transitions, three API client regressions,
-  two launcher regressions, the full persistence/security suites, and real
-  FFmpeg coverage. The
-  intentional `Unexpected internal error` stderr line is the redacted-500
-  regression fixture, not a product warning.
-- Executable verification after the launcher fix:
-  `npx vitest run --config vitest.config.ts
-  tests/electron-core-launch.test.ts` passed 1 file and 2 tests.
-- Executable verification: `npm run build` passed TypeScript typecheck, the
-  Vite production build, and Node TypeScript compilation before and after the
-  launcher fix without warnings.
-- Runtime verification: `npm run dev` built the application and reached
-  `Short Editor core listening on http://127.0.0.1:43120` after the launcher
-  fix. The `NO_COLOR`/`FORCE_COLOR` messages are accepted PTY/concurrently
-  harness warnings; they do not occur in the non-interactive production build
-  and do not describe product behavior.
+- Fresh executable verification: `npm test` passed all 46 files and 325 tests,
+  including the two desktop-list and two BrowserWindow-options regressions.
+  The intentional `Unexpected internal error` stderr line is the existing
+  redacted-500 fixture, not a warning or regression.
+- Fresh executable verification: `npm run build` passed TypeScript typecheck,
+  Vite production compilation, and Node TypeScript compilation without
+  warnings; it emitted `dist/electron/preload.cjs`.
+- Fresh executable verification: `npm run smoke:preload` passed in a hidden,
+  sandboxed Electron window with all nine picker, credential, and authorization
+  bridge functions present.
+- Interactive verification: the isolated `UI-01.1-macos-2026-07-29` fixture
+  completed the full import, watched-folder, relink, provider disclosure, and
+  credential authorization/revocation/removal walkthrough.
 - Repository verification: `git diff --check` passed. A focused credential
-  signature scan found only deliberate fake values in the diagnostic-redaction
-  and credential-vault tests, with no credential material in application or
-  configuration changes.
+  signature scan found one deliberate fake GitHub token in
+  `tests/api-release-contract.test.ts` and no credential material in the
+  shipping boundary.
+
+### Interactive acceptance closure
+
+- Computer Use's mandatory `sky.list_apps()` gate passed. The clean,
+  isolated rerun used fixture `UI-01.1-macos-2026-07-29`, commit `af8ab23`,
+  and macOS 26.5.2 (25F84), with both application and Electron credential data
+  rooted under `/tmp/short-editor-ui-01.1-macos-20260729/`.
+- Mixed import, watched-folder discovery/edit/disable/manual-rescan, wrong and
+  confirmed relink candidates, passive provider readiness, private-network
+  disclosure reset, and unauthorized OpenAI routing all passed visibly. The
+  fake fixture credential was saved, authorized, revoked, and removed without
+  queueing an external provider job.
+- The rerun first reproduced the development ABI failure when Electron was
+  launched without npm context, then recovered by supplying npm's host Node and
+  completed every checkpoint. The full-window, attach-only Providers evidence
+  is `UI-01.1-macos-2026-07-29.png`; it contains the named Episode, all three
+  provider cards, and the private-network disclosure with no credential,
+  token, private hostname, dialog, or unrelated desktop content.
 
 ### Skipped tests
 
-- The required named-fixture macOS Computer Use walkthrough and screenshot were
-  attempted twice but the Computer Use runtime could not start
-  (`Sky Computer Use native pipe startup failed`). This blocks closing
-  UI-01.1, so the task remains unchecked and is the next verification step.
-- Native Windows packaged acceptance is not available on this macOS host and
-  remains owned by the mapped WIN-03 gates. The packaged launcher path is
-  frozen by unit coverage, but its native ABI is not proved here.
+- Native Windows packaged acceptance is unavailable on this macOS host and is
+  outside UI-01.1's named macOS fixture. The CommonJS preload behavior is
+  covered by build output, unit tests, the Electron smoke, and the interactive
+  macOS walkthrough, but Windows packaging remains a release-gate risk.
 - No lint script or task-document audit script exists. The full typecheck/build,
-  full and focused suites, live development startup, diff hygiene, and focused
-  credential scan are the available automated gates.
+  full suite, preload smoke, diff hygiene, and focused credential scan are the
+  available automated gates.
 
 ### Adversarial review
 
 A failure-oriented changed-file review served as the equivalent review lane
 because no repository-local `quality-sweep` or `expert-review` command is
-installed. It checked cursor traversal and encoding, structured error
-preservation, forged authorization fields, per-input result visibility,
-missing-source ordering, confirmation-token disclosure, focus recovery,
-root-relative folder patterns, passive provider reads, endpoint
-reclassification and acknowledgement reset, exact provider/model request
-bodies, credential isolation, authorization revocation, and job cancellation.
+installed. It checked preload emission and runtime format, path resolution,
+sandbox/isolation settings, smoke-list completeness, malformed response
+handling, renderer contract shape, stale-source deletion, generated-pack
+exclusion, and exact task/manifest scope.
 
-The review's live Electron pass found a blocking native ABI mismatch:
-development spawned the core with Electron instead of npm's host Node. The new
-launcher selector and regressions fix that failure, and the app/core startup
-then passed. No other automated or static finding remains; interactive
-acceptance remains explicitly open.
+Earlier interactive passes found the CommonJS preload mismatch and paginated
+cloud-authorization bridge mismatch. Both are fixed with direct regressions.
+The final review found no additional issue: the obsolete preload is deleted,
+the build emits the referenced artifact, the smoke observes the bridge in an
+actual Electron renderer, and the clean interactive rerun passed every UI-01.1
+checkpoint.
 
 ### Residual risk
 
-The uncompleted Computer Use pass leaves responsive layout, native picker
-round-trips, focus trapping beyond the covered relink focus restoration, and a
-complete fixture-backed import/watch/relink/provider recovery sequence visually
-unproved. A user would notice these as inaccessible controls, clipped content,
-or a workflow that cannot recover after a native/core failure. Native Windows
-packaging also remains unproved until WIN-03.
+The desktop bridge, native picker round-trips, authorization lifecycle, and
+required desktop framing work in the macOS development Electron shell. A
+Windows user would be the first to notice a platform-specific packaged-preload
+failure; that remains unproved until the Windows release-acceptance gate.
 
 ### Rollback note
 
-Revert the UI feature commit to restore the previous placeholder workflows and
-dependency set. Revert the separate launcher fix to restore Electron-based
-development core startup; no database migration or durable-state rollback is
-required for either commit.
+Revert the acceptance-fix commit to restore the prior preload and raw paginated
+bridge behavior. No database migration or durable-state rollback is required.
 
 ### Next command
 
-Run `npx skillpacks install guided-walkthrough` from the project shell, then use
-`$guide` for the UI-01.1 named-fixture macOS walkthrough, attach the required
-screenshot, and close the task if every recovery state passes.
+Run `$guide` for the UI-01.2 named-fixture walkthrough covering transcript
+editing, Candidate review, and accepted-copy recovery.
 
 ## News Brief + Speaker shipping boundary — 2026-07-29
 
