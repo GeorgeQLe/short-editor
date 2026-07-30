@@ -40,6 +40,8 @@ app.whenReady().then(() => {
     }
   );
   ipcMain.handle("dialog:select-media", selectMediaFiles);
+  ipcMain.handle("dialog:select-watched-directory", selectWatchedDirectory);
+  ipcMain.handle("dialog:select-relink-candidate", selectRelinkCandidate);
   ipcMain.handle("credentials:list", () => credentialVault.list());
   ipcMain.handle("credentials:save", async (_event, input) => {
     const credential = credentialVault.save(input);
@@ -85,6 +87,26 @@ export async function selectMediaFiles(): Promise<string[]> {
     ]
   });
   return result.canceled ? [] : result.filePaths;
+}
+
+export async function selectWatchedDirectory(): Promise<string | null> {
+  const result = await dialog.showOpenDialog({
+    title: "Choose watched folder",
+    properties: ["openDirectory", "createDirectory"]
+  });
+  return result.canceled ? null : result.filePaths[0] ?? null;
+}
+
+export async function selectRelinkCandidate(): Promise<string | null> {
+  const result = await dialog.showOpenDialog({
+    title: "Choose replacement source",
+    properties: ["openFile"],
+    filters: [
+      { name: "Video media", extensions: ["mp4", "mov", "mkv", "webm", "avi", "m4v", "mpeg", "mpg"] },
+      { name: "All files", extensions: ["*"] }
+    ]
+  });
+  return result.canceled ? null : result.filePaths[0] ?? null;
 }
 
 async function synchronizeCredentialHandles(): Promise<void> {

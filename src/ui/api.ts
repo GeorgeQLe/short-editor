@@ -1,14 +1,60 @@
-import type { ApiResult, Episode, ImportRejectedResult, Job, Page } from "../shared/domain";
+import type {
+  ApiErrorCode,
+  ApiResult,
+  Episode,
+  ImportRejectedResult,
+  Job,
+  OllamaEndpointStatus,
+  Page,
+  ProviderCapability,
+  ProviderStatus,
+  RelinkSourceResult,
+  TranscriptRevision,
+  WatchedFolder,
+  WatchedFolderConfigurationInput
+} from "../shared/domain";
 
 const coreUrl = "http://127.0.0.1:43120/v1";
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+interface ErrorEnvelope {
+  apiVersion: "v1";
+  error: {
+    code: ApiErrorCode;
+    message: string;
+    details: unknown;
+    retryable: boolean;
+  };
+}
+
+export class ApiClientError extends Error {
+  constructor(
+    public readonly code: ApiErrorCode,
+    message: string,
+    public readonly details: unknown,
+    public readonly retryable: boolean,
+    public readonly status: number
+  ) {
+    super(message);
+    this.name = "ApiClientError";
+  }
+}
+
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${coreUrl}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers }
   });
-  const body = await response.json() as ApiResult<T> | { code: string; message: string };
-  if (!response.ok) throw new Error("message" in body ? body.message : `Request failed (${response.status})`);
+  const body = await response.json() as ApiResult<T> | ErrorEnvelope;
+  if (!response.ok) {
+    const failure = (body as ErrorEnvelope).error;
+    throw new ApiClientError(
+      failure?.code ?? "INTERNAL_ERROR",
+      failure?.message ?? `Request failed (${response.status})`,
+      failure?.details ?? null,
+      failure?.retryable ?? false,
+      response.status
+    );
+  }
   return (body as ApiResult<T>).data;
 }
 
@@ -26,16 +72,77 @@ async function requestAll<T>(path: string): Promise<T[]> {
   return items;
 }
 
+export interface ImportBatchResult {
+  imported: Episode[];
+  duplicates: Episode[];
+  relinked: Episode[];
+  rejected: ImportRejectedResult[];
+}
+
+export interface TranscriptionOptions {
+  episodeId: string;
+  provider: "local" | "openai";
+  modelId: string;
+  wordTimestamps: boolean;
+  speechMode?: "transcription" | "diarization";
+}
+
 export const api = {
   episodes: (search = "") =>
     requestAll<Episode>(`/library/episodes?search=${encodeURIComponent(search)}`),
+  watchedFolders: () => requestAll<WatchedFolder>("/library/watched-folders"),
   jobs: () => requestAll<Job>("/jobs"),
-  importPaths: (paths: string[]) => request<{
-    imported: Episode[];
-    duplicates: Episode[];
-    rejected: ImportRejectedResult[];
-  }>("/library/import", { method: "POST", body: JSON.stringify({ paths }) }),
-  startAnalysis: (episodeId: string) => request<Job>("/analysis/start", {
-    method: "POST", body: JSON.stringify({ episodeId, provider: "local" })
+  importPaths: (paths: string[]) => request<ImportBatchResult>("/library/import", {
+    method: "POST", body: JSON.stringify({ paths })
+  }),
+  configureWatchedFolder: (input: WatchedFolderConfigurationInput) =>
+    request<WatchedFolder | Job>("/library/watched-folders/configure", {
+      method: "POST", body: JSON.stringify(input)
+    }),
+  rescanWatchedFolder: (folderId: string) =>
+    request<Job>(`/library/watched-folders/${encodeURIComponent(folderId)}/rescan`, {
+      method: "POST", body: "{}"
+    }),
+  relinkSource: (episodeId: string, candidatePath: string) =>
+    request<RelinkSourceResult>(`/library/episodes/${encodeURIComponent(episodeId)}/relink`, {
+      method: "POST", body: JSON.stringify({ candidatePath })
+    }),
+  confirmRelink: (episodeId: string, confirmationToken: string) =>
+    request<Episode>(`/library/episodes/${encodeURIComponent(episodeId)}/relink/confirm`, {
+      method: "POST", body: JSON.stringify({ confirmationToken })
+    }),
+  providerCapabilities: () => request<ProviderCapability[]>("/providers/capabilities"),
+  providerStatus: (episodeId: string) =>
+    request<ProviderStatus[]>(`/providers/status?episodeId=${encodeURIComponent(episodeId)}`),
+  ollamaStatus: (baseUrl: string) =>
+    request<OllamaEndpointStatus>(
+      `/analysis/ollama/status?baseUrl=${encodeURIComponent(baseUrl)}`
+    ),
+  transcript: (episodeId: string) =>
+    request<TranscriptRevision>(`/analysis/${encodeURIComponent(episodeId)}/transcript`),
+  startTranscription: (options: TranscriptionOptions) => request<Job>("/analysis/start", {
+    method: "POST",
+    body: JSON.stringify({
+      episodeId: options.episodeId,
+      provider: options.provider,
+      modelId: options.modelId,
+      wordTimestamps: options.wordTimestamps,
+      ...(options.provider === "openai" ? { speechMode: options.speechMode } : {})
+    })
+  }),
+  startOllamaAnalysis: (input: {
+    episodeId: string;
+    baseUrl: string;
+    modelId: string;
+    networkDisclosed?: boolean;
+  }) => request<Job>("/analysis/ollama/start", {
+    method: "POST", body: JSON.stringify(input)
+  }),
+  startOpenAiAnalysis: (episodeId: string, modelId: string) =>
+    request<Job>("/analysis/openai/start", {
+      method: "POST", body: JSON.stringify({ episodeId, modelId })
+    }),
+  cancelJob: (jobId: string) => request<Job>(`/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: "POST", body: "{}"
   })
 };

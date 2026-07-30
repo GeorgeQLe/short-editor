@@ -2,6 +2,10 @@ import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("desktop", {
   selectMedia: (): Promise<string[]> => ipcRenderer.invoke("dialog:select-media"),
+  selectWatchedDirectory: (): Promise<string | null> =>
+    ipcRenderer.invoke("dialog:select-watched-directory"),
+  selectRelinkCandidate: (): Promise<string | null> =>
+    ipcRenderer.invoke("dialog:select-relink-candidate"),
   credentials: {
     list: () => ipcRenderer.invoke("credentials:list"),
     save: (input: unknown) => ipcRenderer.invoke("credentials:save", input),

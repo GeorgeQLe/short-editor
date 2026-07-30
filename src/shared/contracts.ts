@@ -131,6 +131,14 @@ export type RelinkSourceResult = z.infer<typeof relinkSourceResultSchema>;
 
 export const providerClasses = ["local", "network", "cloud"] as const;
 export const providerClassSchema = z.enum(providerClasses);
+export const ollamaEndpointStatusSchema = z.strictObject({
+  provider: z.literal("ollama"),
+  providerClass: providerClassSchema,
+  baseUrl: z.string().url(),
+  requiresNetworkDisclosure: z.boolean(),
+  requiresCloudAuthorization: z.boolean()
+});
+export type OllamaEndpointStatus = z.infer<typeof ollamaEndpointStatusSchema>;
 export const providerProvenanceSchema = z.strictObject({
   provider: z.string().min(1),
   providerClass: providerClassSchema,
