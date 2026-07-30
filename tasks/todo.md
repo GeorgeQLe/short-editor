@@ -33,6 +33,15 @@
     gate.
 - [ ] UI-01.4 — Complete approval, preflight, render progress, cancellation,
   recovery, and retry workflow.
+  - The implementation checkpoint adds exact-revision approval and preflight,
+    immutable-snapshot render start with SRT/WebVTT selection, persisted attempt
+    progress/provenance, idempotent cancellation, bounded lineage retry, and
+    restart recovery in the Editor's Render tab.
+  - Isolated macOS UAT passed approval, blocking preflight and relink recovery,
+    exact-snapshot start, failed-attempt retry, and restart persistence. It
+    remains open because the synthetic fixture's FFmpeg process exited with
+    code 8 before cancellation and a successful render could be demonstrated.
+    Continue from `docs/ui-01.4-macos-uat.md`.
 - [ ] UI-01.5 — Complete schedule rules, list/calendar, move, collision, and
   publication-recording workflow.
 

@@ -12,6 +12,10 @@ import type {
   Candidate,
   Composition,
   Episode,
+  Job,
+  Render,
+  RenderPreflightResult,
+  RenderStartRequest,
   ShortProject,
   Template
 } from "../shared/domain";
@@ -39,11 +43,12 @@ interface Props {
   episodes: Episode[];
   announce(message: string): void;
   onChanged(): Promise<void>;
+  onOpenLibrary?(): void;
 }
 
-type EditorTab = "Timeline" | "Composition & Crops" | "Captions" | "Audio";
+type EditorTab = "Timeline" | "Composition & Crops" | "Captions" | "Audio" | "Render";
 
-export function EditorWorkspace({ episodes, announce, onChanged }: Props) {
+export function EditorWorkspace({ episodes, announce, onChanged, onOpenLibrary }: Props) {
   const [shorts, setShorts] = useState<ShortProject[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -183,6 +188,7 @@ export function EditorWorkspace({ episodes, announce, onChanged }: Props) {
     assets={assets}
     setAssets={setAssets}
     announce={announce}
+    onOpenLibrary={onOpenLibrary}
     close={() => {
       if (dirtySections(baseline, draft).size &&
         !window.confirm("Discard unsaved editor changes and return to projects?")) return;
@@ -311,6 +317,7 @@ function ProjectEditor(props: {
   assets: Asset[];
   setAssets: Dispatch<SetStateAction<Asset[]>>;
   announce(message: string): void;
+  onOpenLibrary?(): void;
   close(): void;
 }) {
   const [tab, setTab] = useState<EditorTab>("Timeline");
@@ -558,9 +565,11 @@ function ProjectEditor(props: {
       />
       <div className="editor-inspector">
         <div className="tabs editor-tabs" role="tablist">
-          {(["Timeline", "Composition & Crops", "Captions", "Audio"] as EditorTab[])
+          {(["Timeline", "Composition & Crops", "Captions", "Audio", "Render"] as EditorTab[])
             .map((item) => <button key={item} role="tab" aria-selected={tab === item}
-              onClick={() => setTab(item)}>{item}{dirty.has(sectionForTab(item)) ? " •" : ""}</button>)}
+              onClick={() => setTab(item)}>{item}{
+                item !== "Render" && dirty.has(sectionForTab(item)) ? " •" : ""
+              }</button>)}
         </div>
         {tab === "Timeline" && <TimelineEditor
           ranges={props.draft.sourceRanges}
@@ -599,6 +608,15 @@ function ProjectEditor(props: {
           save={() => void save("audio")}
           disabled={saving !== null || props.conflict}
         />}
+        {tab === "Render" && <RenderWorkflow
+          project={props.project}
+          dirty={dirty.size > 0}
+          conflict={props.conflict}
+          setConflict={props.setConflict}
+          setProject={props.setProject}
+          announce={props.announce}
+          onOpenLibrary={props.onOpenLibrary}
+        />}
       </div>
     </div>
     <div className="published-note">
@@ -606,6 +624,448 @@ function ProjectEditor(props: {
       draft schedule entries and successful renders are marked for refresh.
     </div>
   </section>;
+}
+
+const ACTIVE_JOB_STATES = new Set<Job["state"]>(["queued", "running"]);
+const ACTIVE_RENDER_STATES = new Set<Render["state"]>(["queued", "running"]);
+
+function RenderWorkflow(props: {
+  project: ShortProject;
+  dirty: boolean;
+  conflict: boolean;
+  setConflict(value: boolean): void;
+  setProject: Dispatch<SetStateAction<ShortProject | null>>;
+  announce(message: string): void;
+  onOpenLibrary?(): void;
+}) {
+  const [renders, setRenders] = useState<Render[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [preflight, setPreflight] = useState<RenderPreflightResult | null>(null);
+  const [sidecar, setSidecar] =
+    useState<RenderStartRequest["sidecarFormat"]>("srt");
+  const [loading, setLoading] = useState(true);
+  const [actionError, setActionError] = useState("");
+  const [operation, setOperation] =
+    useState<"approve" | "preflight" | "start" | null>(null);
+  const [cancelling, setCancelling] = useState<Set<string>>(new Set());
+  const [retrying, setRetrying] = useState<Set<string>>(new Set());
+  const submission = useRef({ approve: false, preflight: false, start: false });
+  const cancelSubmissions = useRef(new Set<string>());
+  const retrySubmissions = useRef(new Set<string>());
+  const progressSeen = useRef<Map<string, string> | null>(null);
+  const revisionRef = useRef(props.project.revision);
+  revisionRef.current = props.project.revision;
+
+  const refreshAttempts = useCallback(async (announceChanges = true) => {
+    try {
+      const [renderRows, jobRows] = await Promise.all([
+        api.renders(props.project.id),
+        api.jobs()
+      ]);
+      const renderIds = new Set(renderRows.map((render) => `render:${render.id}`));
+      const pairedJobs = jobRows.filter((job) =>
+        job.type === "render" && job.payloadReference !== null &&
+        renderIds.has(job.payloadReference)
+      );
+      setRenders(renderRows);
+      setJobs(pairedJobs);
+      const nextSeen = new Map<string, string>();
+      for (const job of pairedJobs) {
+        const marker = `${job.state}:${job.stage}:${Math.round(job.progress * 100)}`;
+        nextSeen.set(job.id, marker);
+        if (announceChanges && progressSeen.current?.get(job.id) !== marker) {
+          props.announce(
+            `Render ${job.stage}: ${Math.round(job.progress * 100)}% (${job.state}).`
+          );
+        }
+      }
+      progressSeen.current = nextSeen;
+    } catch (error) {
+      setActionError(errorMessage(error, "Render history unavailable"));
+    } finally {
+      setLoading(false);
+    }
+  }, [props.announce, props.project.id]);
+
+  useEffect(() => {
+    progressSeen.current = null;
+    setLoading(true);
+    void refreshAttempts(false);
+  }, [refreshAttempts]);
+
+  const active = renders.some((render) => ACTIVE_RENDER_STATES.has(render.state)) ||
+    jobs.some((job) => ACTIVE_JOB_STATES.has(job.state));
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setInterval(() => void refreshAttempts(), 1500);
+    return () => clearInterval(timer);
+  }, [active, refreshAttempts]);
+
+  useEffect(() => {
+    setPreflight(null);
+    setActionError("");
+  }, [props.project.revision]);
+
+  const markConflict = (error: unknown) => {
+    if (error instanceof ApiClientError && error.code === "REVISION_CONFLICT") {
+      props.setConflict(true);
+    }
+  };
+
+  const approve = async () => {
+    if (submission.current.approve || props.dirty || props.conflict) return;
+    submission.current.approve = true;
+    setOperation("approve");
+    setActionError("");
+    try {
+      const approved = await api.approveShort(props.project.id, props.project.revision);
+      props.setProject(approved);
+      props.announce(`Approved exact Short revision ${approved.revision}.`);
+    } catch (error) {
+      markConflict(error);
+      setActionError(errorMessage(error, "Approval failed"));
+    } finally {
+      submission.current.approve = false;
+      setOperation(null);
+    }
+  };
+
+  const runPreflight = async () => {
+    if (submission.current.preflight || props.dirty || props.conflict) return;
+    submission.current.preflight = true;
+    setOperation("preflight");
+    setActionError("");
+    const requestedRevision = props.project.revision;
+    try {
+      const result = await api.preflightRender(props.project.id, requestedRevision);
+      if (revisionRef.current !== requestedRevision) return;
+      setPreflight(result);
+      const errors = result.findings.filter((finding) => finding.severity === "error").length;
+      const warnings = result.findings.length - errors;
+      props.announce(
+        `Preflight ${result.status}: ${errors} error(s), ${warnings} warning(s).`
+      );
+    } catch (error) {
+      markConflict(error);
+      setActionError(errorMessage(error, "Preflight failed"));
+    } finally {
+      submission.current.preflight = false;
+      setOperation(null);
+    }
+  };
+
+  const startRender = async () => {
+    const passing = preflight?.status === "passed" &&
+      preflight.revision === props.project.revision &&
+      preflight.shortId === props.project.id;
+    if (
+      submission.current.start || props.dirty || props.conflict ||
+      !props.project.approved || !passing
+    ) return;
+    submission.current.start = true;
+    setOperation("start");
+    setActionError("");
+    try {
+      const result = await api.startRender(
+        props.project.id,
+        props.project.revision,
+        preflight.id,
+        sidecar
+      );
+      setRenders((current) => appendById(current, result.render));
+      setJobs((current) => appendById(current, result.job));
+      setPreflight(null);
+      props.announce(`Render attempt ${result.render.attempt} queued.`);
+    } catch (error) {
+      markConflict(error);
+      setActionError(errorMessage(error, "Render start failed"));
+    } finally {
+      submission.current.start = false;
+      setOperation(null);
+    }
+  };
+
+  const cancel = async (render: Render, job: Job) => {
+    if (
+      cancelSubmissions.current.has(job.id) || job.cancelRequested ||
+      !ACTIVE_JOB_STATES.has(job.state)
+    ) return;
+    cancelSubmissions.current.add(job.id);
+    setCancelling((current) => new Set(current).add(job.id));
+    setActionError("");
+    try {
+      const updated = await api.cancelJob(job.id);
+      setJobs((current) => current.map((row) => row.id === updated.id ? updated : row));
+      props.announce(`Cancellation requested for render attempt ${render.attempt}.`);
+    } catch (error) {
+      setActionError(errorMessage(error, "Cancellation failed"));
+      cancelSubmissions.current.delete(job.id);
+      setCancelling((current) => without(current, job.id));
+    }
+  };
+
+  const retry = async (render: Render) => {
+    if (retrySubmissions.current.has(render.id)) return;
+    retrySubmissions.current.add(render.id);
+    setRetrying((current) => new Set(current).add(render.id));
+    setActionError("");
+    try {
+      const result = await api.retryRender(render.id);
+      setRenders((current) => appendById(current, result.render));
+      setJobs((current) => appendById(current, result.job));
+      props.announce(
+        `Render retry created attempt ${result.render.attempt} from revision ` +
+        `${result.render.projectRevision}.`
+      );
+    } catch (error) {
+      markConflict(error);
+      setActionError(errorMessage(error, "Render retry failed"));
+    } finally {
+      retrySubmissions.current.delete(render.id);
+      setRetrying((current) => without(current, render.id));
+    }
+  };
+
+  const guarded = props.dirty || props.conflict;
+  const grouped = groupLineages(renders);
+  const preflightCurrent = preflight?.revision === props.project.revision;
+  const hasSourceFinding = preflight?.findings.some((finding) =>
+    finding.category === "source" || finding.code === "ASSET_MISSING"
+  );
+
+  return <div className="editor-section render-workflow">
+    <div className="render-heading">
+      <div><h2>Approval & Render</h2>
+        <p>Rendering uses an immutable snapshot of one approved Short revision.</p></div>
+      <span className={`pill ${props.project.approved ? "ready" : ""}`}>
+        {props.project.approved ? `revision ${props.project.revision} approved` : "not approved"}
+      </span>
+    </div>
+
+    {guarded && <div className="validation-box" role="note">
+      {props.conflict
+        ? "Resolve the revision conflict before approval, preflight, or rendering."
+        : "Save every editor section before approval, preflight, or rendering."}
+    </div>}
+    {actionError && <div className="error-box" role="alert">{actionError}</div>}
+
+    <div className="render-actions">
+      <button className="primary" disabled={
+        guarded || props.project.approved || operation !== null
+      } onClick={() => void approve()}>
+        {operation === "approve" ? "Approving…" : "Approve revision"}
+      </button>
+      <button className="secondary" disabled={
+        guarded || !props.project.approved || operation !== null
+      } onClick={() => void runPreflight()}>
+        {operation === "preflight" ? "Checking…" :
+          preflightCurrent ? "Rerun preflight" : "Run preflight"}
+      </button>
+    </div>
+
+    {preflightCurrent && preflight && <section className="preflight-result"
+      aria-label="Render preflight result">
+      <div className="preflight-summary">
+        <div><strong>Preflight {preflight.status}</strong>
+          <small>Revision {preflight.revision} · {formatDate(preflight.createdAt)}</small></div>
+        <span className={`pill ${preflight.status === "passed" ? "ready" : "error"}`}>
+          {preflight.status}
+        </span>
+      </div>
+      <dl className="snapshot-metadata">
+        <dt>Snapshot</dt><dd>{preflight.snapshotHash}</dd>
+        <dt>FFmpeg</dt><dd>{preflight.dependencyVersions.ffmpeg ?? "Unavailable"}</dd>
+        <dt>FFprobe</dt><dd>{preflight.dependencyVersions.ffprobe ?? "Unavailable"}</dd>
+      </dl>
+      <PreflightFindings findings={preflight.findings} />
+      {hasSourceFinding && <button className="secondary" onClick={() => {
+        if (props.onOpenLibrary) props.onOpenLibrary();
+        else props.announce("Open Library to relink or restore the missing source.");
+      }}>Open Library for relinking</button>}
+      <div className="render-start">
+        <label>Caption sidecar
+          <select value={sidecar ?? "none"} onChange={(event) =>
+            setSidecar(event.target.value === "none"
+              ? null : event.target.value as "srt" | "webvtt")}>
+            <option value="srt">SRT (default)</option>
+            <option value="webvtt">WebVTT</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+        <button className="primary" disabled={
+          guarded || preflight.status !== "passed" || operation !== null
+        } onClick={() => void startRender()}>
+          {operation === "start" ? "Starting…" : "Start render"}
+        </button>
+      </div>
+    </section>}
+
+    <section className="attempt-history" aria-label="Render attempt history">
+      <h3>Attempt history</h3>
+      {loading && !renders.length && <p>Loading persisted attempts…</p>}
+      {!loading && !renders.length && <div className="compact-empty">
+        No render attempts for this Short.
+      </div>}
+      {grouped.map((lineage) => <RenderLineage key={lineage.id}
+        renders={lineage.renders}
+        jobs={jobs}
+        project={props.project}
+        cancelling={cancelling}
+        retrying={retrying}
+        onCancel={cancel}
+        onRetry={retry}
+      />)}
+    </section>
+  </div>;
+}
+
+function PreflightFindings({ findings }: {
+  findings: RenderPreflightResult["findings"];
+}) {
+  if (!findings.length) return <p className="preflight-clear">No findings.</p>;
+  const categories = [...new Set(findings.map((finding) => finding.category))];
+  return <div className="preflight-findings">
+    {categories.map((category) => <section key={category}>
+      <h3>{category.replace("_", " ")}</h3>
+      {findings.filter((finding) => finding.category === category).map((finding) =>
+        <article className={`finding ${finding.severity}`} key={finding.code}>
+          <div><strong>{finding.severity}: {finding.code}</strong>
+            <p>{finding.message}</p>
+            <small>Remediation: {finding.remediation}</small>
+            {finding.details && <dl>{Object.entries(finding.details).map(([key, value]) =>
+              <div key={key}><dt>{key}</dt><dd>{String(value)}</dd></div>)}</dl>}
+          </div>
+          {finding.helpUrl && <a href={finding.helpUrl} target="_blank"
+            rel="noreferrer">Help</a>}
+        </article>)}
+    </section>)}
+  </div>;
+}
+
+function RenderLineage(props: {
+  renders: Render[];
+  jobs: Job[];
+  project: ShortProject;
+  cancelling: Set<string>;
+  retrying: Set<string>;
+  onCancel(render: Render, job: Job): void;
+  onRetry(render: Render): void;
+}) {
+  const newest = props.renders.reduce((latest, row) =>
+    row.attempt > latest.attempt ? row : latest);
+  const retryReason = (render: Render): string | null => {
+    if (render.id !== newest.id) return "Superseded by a newer attempt";
+    if (render.state === "stale" || render.projectRevision !== props.project.revision) {
+      return "Attempt is stale for the current Short revision";
+    }
+    if (render.state !== "failed" && render.state !== "cancelled") {
+      return "Only failed or cancelled attempts can be retried";
+    }
+    if (!props.project.approved) return "The persisted Short revision is no longer approved";
+    if (props.renders.length >= 3 || render.attempt >= 3) {
+      return "Three-attempt lineage limit reached";
+    }
+    if (render.preflightId === null) return "Legacy attempt has no immutable preflight";
+    return null;
+  };
+  return <section className="render-lineage">
+    <div className="lineage-heading"><strong>Lineage {shortId(newest.lineageId)}</strong>
+      <small>{props.renders.length} of 3 attempts</small></div>
+    {[...props.renders].sort((a, b) => b.attempt - a.attempt).map((render) => {
+      const job = props.jobs.find((row) => row.payloadReference === `render:${render.id}`);
+      const progress = job?.progress ?? (render.state === "succeeded" ? 1 : 0);
+      const reason = retryReason(render);
+      const canCancel = job && ACTIVE_JOB_STATES.has(job.state) &&
+        !job.cancelRequested && !props.cancelling.has(job.id);
+      return <article className="render-attempt" key={render.id}>
+        <div className="attempt-heading">
+          <div><strong>Attempt {render.attempt} · revision {render.projectRevision}</strong>
+            <small>{formatDate(render.createdAt)}</small></div>
+          <span className={`pill ${render.state === "succeeded" ? "ready" :
+            render.state === "failed" || render.state === "cancelled" ? "error" : ""}`}>
+            {job?.cancelRequested && ACTIVE_JOB_STATES.has(job.state)
+              ? "cancelling" : render.state}
+          </span>
+        </div>
+        <div className="attempt-progress">
+          <progress max={1} value={progress}
+            aria-label={`Render attempt ${render.attempt} progress`} />
+          <span>{Math.round(progress * 100)}% · {job?.stage ?? render.state}</span>
+        </div>
+        <dl className="attempt-details">
+          <dt>Output</dt><dd>{render.outputPath ?? "Not produced"}</dd>
+          <dt>Sidecar</dt><dd>{render.sidecarPath ?? "None"}</dd>
+          <dt>Encoder</dt><dd>{render.encoder.ffmpegVersion} · {render.encoder.videoCodec} / {
+            render.encoder.audioCodec}</dd>
+          <dt>Settings</dt><dd>{JSON.stringify(render.encoder.settings)}</dd>
+          <dt>Validation</dt><dd>{render.validation
+            ? `${render.validation.valid ? "passed" : "failed"} · ${
+              render.validation.width ?? "?"}×${render.validation.height ?? "?"} · ${
+              render.validation.videoCodec ?? "?"}/${render.validation.audioCodec ?? "?"}`
+            : "Pending"}</dd>
+          <dt>Determinism</dt><dd>{render.determinism
+            ? `${render.determinism.comparison} · ${render.determinism.identityHash}`
+            : "Pending"}</dd>
+        </dl>
+        {render.validation?.findings.length ? <ul className="attempt-findings">
+          {render.validation.findings.map((finding, index) =>
+            <li key={`${finding.code}-${index}`}>{finding.severity}: {finding.message}</li>)}
+        </ul> : null}
+        {(render.error || job?.errorMessage) && <div className="error-box">
+          <strong>{render.error?.code ?? job?.errorCode ?? "RENDER_ERROR"}</strong>: {
+            render.error?.message ?? job?.errorMessage}
+        </div>}
+        <div className="attempt-actions">
+          {job && ACTIVE_JOB_STATES.has(job.state) && <button className="secondary"
+            disabled={!canCancel} onClick={() => props.onCancel(render, job)}>
+            {job.cancelRequested || props.cancelling.has(job.id)
+              ? "Cancellation requested" : "Cancel render"}
+          </button>}
+          {(render.state === "failed" || render.state === "cancelled" ||
+            render.state === "stale") && <button className="secondary"
+            title={reason ?? "Retry from the persisted immutable snapshot"}
+            disabled={reason !== null || props.retrying.has(render.id)}
+            onClick={() => props.onRetry(render)}>
+            {props.retrying.has(render.id) ? "Retrying…" : "Retry attempt"}
+          </button>}
+          {reason && (render.state === "failed" || render.state === "cancelled" ||
+            render.state === "stale") && <small>{reason}</small>}
+        </div>
+      </article>;
+    })}
+  </section>;
+}
+
+function groupLineages(renders: Render[]) {
+  const groups = new Map<string, Render[]>();
+  for (const render of renders) {
+    groups.set(render.lineageId, [...(groups.get(render.lineageId) ?? []), render]);
+  }
+  return [...groups.entries()]
+    .map(([id, rows]) => ({ id, renders: rows }))
+    .sort((left, right) =>
+      Date.parse(right.renders.at(-1)?.createdAt ?? "") -
+      Date.parse(left.renders.at(-1)?.createdAt ?? ""));
+}
+
+function appendById<T extends { id: string }>(rows: T[], next: T) {
+  return rows.some((row) => row.id === next.id)
+    ? rows.map((row) => row.id === next.id ? next : row)
+    : [...rows, next];
+}
+
+function without(values: Set<string>, value: string) {
+  const next = new Set(values);
+  next.delete(value);
+  return next;
+}
+
+function shortId(value: string) {
+  return value.slice(0, 8);
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString();
 }
 
 function Preview(props: {

@@ -18,6 +18,10 @@ import type {
   Page,
   ProviderCapability,
   ProviderStatus,
+  Render,
+  RenderPreflightResult,
+  RenderStartRequest,
+  RenderStartResult,
   ShortProject,
   Template,
   RelinkSourceResult,
@@ -146,6 +150,10 @@ export const api = {
   ),
   short: (shortId: string) =>
     request<ShortProject>(`/shorts/${encodeURIComponent(shortId)}`),
+  approveShort: (shortId: string, expectedRevision: number) =>
+    request<ShortProject>(`/shorts/${encodeURIComponent(shortId)}/approve`, {
+      method: "POST", body: JSON.stringify({ expectedRevision })
+    }),
   createShort: (candidateId: string, templateId: string) =>
     request<ShortProject>("/shorts", {
       method: "POST", body: JSON.stringify({ candidateId, templateId })
@@ -163,6 +171,26 @@ export const api = {
     method: "PUT", body: JSON.stringify({ expectedRevision, ...patch })
   }),
   assets: () => requestAll<Asset>("/assets"),
+  renders: (shortId?: string) => requestAll<Render>(
+    `/renders${shortId ? `?shortId=${encodeURIComponent(shortId)}` : ""}`
+  ),
+  preflightRender: (shortId: string, expectedRevision: number) =>
+    request<RenderPreflightResult>("/renders/preflight", {
+      method: "POST", body: JSON.stringify({ shortId, expectedRevision })
+    }),
+  startRender: (
+    shortId: string,
+    expectedRevision: number,
+    preflightId: string,
+    sidecarFormat: RenderStartRequest["sidecarFormat"]
+  ) => request<RenderStartResult>("/renders/start", {
+    method: "POST",
+    body: JSON.stringify({ shortId, expectedRevision, preflightId, sidecarFormat })
+  }),
+  retryRender: (renderId: string) =>
+    request<RenderStartResult>(`/renders/${encodeURIComponent(renderId)}/retry`, {
+      method: "POST", body: "{}"
+    }),
   importAsset: (path: string, provenance: string, reusable: boolean) =>
     request<Asset>("/assets/import", {
       method: "POST", body: JSON.stringify({ path, provenance, reusable })

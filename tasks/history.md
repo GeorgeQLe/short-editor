@@ -2,6 +2,28 @@
 
 ## 2026-07-30
 
+- Added the UI-01.4 implementation checkpoint: the Editor now approves exact
+  Short revisions, runs typed preflight with actionable findings and Library
+  relink routing, starts the exact passing immutable snapshot with selectable
+  caption sidecars, and restores render lineages with live progress, encoder,
+  validation, determinism, failure, cancellation, and bounded retry state.
+- Added exact renderer API contracts and component/API regressions for
+  pagination, approval, preflight/start bodies, dirty-state guards, default SRT
+  output, durable successful-output history, newest-failure retry, progress,
+  and duplicate cancellation suppression. Failure-oriented review found the
+  missing cancellation interaction coverage and added it before shipping.
+- The isolated macOS walkthrough passed missing-source blocking/relink
+  recovery, exact-snapshot start, retry lineage persistence, and restart
+  recovery. UI-01.4 remains open: both attempts hit a fixture-local FFmpeg exit
+  code 8 before cancellation or success could be accepted. The continuation is
+  recorded in `docs/ui-01.4-macos-uat.md`.
+- Shipping validation exposed parallel-load flakes in multiple MCP-heavy tests
+  against Vitest's five-second default. Raising the per-test ceiling to 15
+  seconds preserved parallel execution and produced a clean full run of all 48
+  files and 346 tests; the final focused UI run passed all 11 workflow tests.
+  Production build/typecheck, the 11-function Electron preload smoke, and diff
+  hygiene also pass. The intentional `Unexpected internal error` stderr line
+  remains the existing redacted-500 fixture.
 - Added the UI-01.3 implementation checkpoint: durable Short project listing,
   reopening, creation from approved Candidates, explicit duplicate creation,
   and template clone/edit entry points now replace the Editor placeholder.

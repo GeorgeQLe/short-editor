@@ -49,6 +49,51 @@ describe("UI v1 API client", () => {
     });
   });
 
+  it("uses exact approval and render workflow contracts, including pagination", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(ok({ revision: 8, approved: true }))
+      .mockResolvedValueOnce(ok({
+        items: [{ id: "render-1" }],
+        nextCursor: "render cursor/2"
+      }))
+      .mockResolvedValueOnce(ok({ items: [{ id: "render-2" }], nextCursor: null }))
+      .mockResolvedValueOnce(ok({ id: "preflight-1", status: "passed" }))
+      .mockResolvedValueOnce(ok({ render: { id: "render-3" }, job: { id: "job-3" } }))
+      .mockResolvedValueOnce(ok({ render: { id: "render-4" }, job: { id: "job-4" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.approveShort("short/id", 7);
+    await expect(api.renders("short/id")).resolves.toEqual([
+      { id: "render-1" }, { id: "render-2" }
+    ]);
+    await api.preflightRender("short/id", 8);
+    await api.startRender("short/id", 8, "preflight/id", "webvtt");
+    await api.retryRender("render/id");
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "http://127.0.0.1:43120/v1/shorts/short%2Fid/approve",
+      "http://127.0.0.1:43120/v1/renders?shortId=short%2Fid",
+      "http://127.0.0.1:43120/v1/renders?shortId=short%2Fid&cursor=render%20cursor%2F2",
+      "http://127.0.0.1:43120/v1/renders/preflight",
+      "http://127.0.0.1:43120/v1/renders/start",
+      "http://127.0.0.1:43120/v1/renders/render%2Fid/retry"
+    ]);
+    expect(fetchMock.mock.calls.map((call) => (call[1] as RequestInit | undefined)?.body))
+      .toEqual([
+        JSON.stringify({ expectedRevision: 7 }),
+        undefined,
+        undefined,
+        JSON.stringify({ shortId: "short/id", expectedRevision: 8 }),
+        JSON.stringify({
+          shortId: "short/id",
+          expectedRevision: 8,
+          preflightId: "preflight/id",
+          sidecarFormat: "webvtt"
+        }),
+        "{}"
+      ]);
+  });
+
   it("sends exact provider operation bodies without forged authorization", async () => {
     const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(ok({ id: "job" })));
     vi.stubGlobal("fetch", fetchMock);

@@ -132,7 +132,11 @@ export function App() {
         ) : view === "Candidates" ? (
           <CandidatesWorkspace episodes={episodes} announce={setMessage} onChanged={refresh} />
         ) : view === "Editor" ? (
-          <EditorWorkspace episodes={episodes} announce={setMessage} onChanged={refresh} />
+          <EditorWorkspace episodes={episodes} announce={setMessage} onChanged={refresh}
+            onOpenLibrary={() => {
+              setLibraryTab("episodes");
+              setView("Library");
+            }} />
         ) : view === "Cloud Access" ? (
           <CloudAccess
             episodes={episodes}
