@@ -1,0 +1,6 @@
+The frozen local worker uses Python 3.12, faster-whisper 1.2.1 (MIT),
+CTranslate2 4.8.1 (MIT), PyInstaller 6.21.0 (GPL-2.0-or-later with the
+PyInstaller bootloader exception), and their fully hash-pinned dependencies.
+
+Exact package versions and artifact hashes are recorded in
+resources/worker/requirements.lock and resources/runtime-manifest.json.

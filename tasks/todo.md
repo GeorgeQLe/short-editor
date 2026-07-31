@@ -60,6 +60,12 @@
 
 ## Completed
 
+- [x] Produce reproducible macOS release inputs, secure model installation,
+  concrete runtime manifests, GPL corresponding source, unsigned arm64 test
+  artifacts, and automated release validation.
+- [x] Prepare Short Editor for public OSS operation with an MIT project
+  license, explicit third-party notices, contribution and conduct policies,
+  private vulnerability reporting guidance, issue/PR templates, and Dependabot.
 - [x] Add the News Brief + Speaker starter template with bound topic text,
   image-or-video related media, split composition, uppercase caption preset,
   migration compatibility, and executable render coverage.

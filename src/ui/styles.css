@@ -10,7 +10,7 @@ button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #8b7cff; outline-offset: 2px; }
 .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
-aside { border-right: 1px solid #232834; padding: 28px 18px; display: flex; flex-direction: column; background: #0d1017; }
+aside { border-right: 1px solid #232834; padding: 28px 18px; display: flex; flex-direction: column; background: #0d1017; overflow-y: auto; }
 .brand { display: flex; gap: 11px; align-items: center; padding: 0 10px 30px; }
 .brand > span { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; font-weight: 900; background: linear-gradient(135deg,#856cff,#49c7f2); }
 nav { display: grid; gap: 7px; }
@@ -18,6 +18,7 @@ nav button { border: 0; color: #929aaa; background: transparent; padding: 11px 1
 nav button:hover { color: #fff; background: #151a24; }
 nav button[aria-current="page"] { color: #fff; background: #1b2030; }
 nav button[aria-current="page"] span { color: #917fff; }
+nav button:nth-last-child(3) { margin-top: 12px; border-top: 1px solid #242935; border-radius: 0 0 9px 9px; padding-top: 18px; }
 .privacy { margin-top: auto; border-top: 1px solid #242935; padding: 20px 10px 0; color: #a6adba; font-size: 13px; line-height: 1.5; }
 .privacy small { color: #656d7b; margin-left: 13px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: #53d39d; display: inline-block; margin-right: 7px; box-shadow: 0 0 10px #53d39d88; }
@@ -97,6 +98,42 @@ td small { color: #687181; margin-top: 4px; max-width: 400px; overflow: hidden; 
 .dialog-backdrop { position: fixed; z-index: 20; inset: 0; background: #03050acc; display: grid; place-items: center; padding: 24px; }
 .dialog { width: min(540px, 100%); border: 1px solid #343b4b; border-radius: 14px; background: #141924; padding: 25px; box-shadow: 0 24px 80px #000b; }
 .dialog p { line-height: 1.55; }
+.support-panel { padding: 24px; min-height: 520px; overflow: visible; }
+.support-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px;
+  padding-bottom: 18px; border-bottom: 1px solid #292f3c; }
+.support-heading p, .support-empty p, .disclosure-card p, .diagnostic-card p { margin: 6px 0; line-height: 1.5; }
+.support-loading { padding: 30px 0; }
+.readiness-list, .recovery-list { list-style: none; padding: 0; margin: 0; }
+.readiness-list li, .recovery-list li { display: grid; grid-template-columns: auto minmax(0,1fr) auto auto;
+  gap: 13px; align-items: center; padding: 16px 4px; border-bottom: 1px solid #252b38; }
+.readiness-list p, .recovery-list p { margin: 4px 0; font-size: 12px; }
+.readiness-list small, .recovery-list small { color: #737c8c; }
+.state-marker { width: 12px; height: 12px; border: 2px solid currentColor; border-radius: 50%; color: #e36f79; }
+.state-marker.ready { color: #53d39d; background: currentColor; }
+.state-marker.optional { color: #d2a450; border-radius: 2px; }
+.pill.needs_attention { color: #ffb0b0; background: #3c2025; }
+.pill.optional { color: #f1c47f; background: #352b1d; }
+.disclosure-card, .diagnostic-card { margin-top: 20px; padding: 17px; border: 1px solid #373354;
+  background: #171725; border-radius: 10px; }
+.disclosure-card small { color: #aaa4d3; line-height: 1.5; }
+.model-install-status { display: grid; gap: 6px; margin: 14px 0; }
+.model-install-status > div { display: flex; justify-content: space-between; gap: 12px; }
+.model-install-status progress { width: 100%; }
+.support-empty { min-height: 180px; display: grid; place-content: center; text-align: center; }
+.diagnostic-card h3 { margin: 0 0 5px; }
+.diagnostic-preview { width: min(760px, 100%); }
+.diagnostic-preview pre { max-height: 420px; overflow: auto; padding: 12px; border-radius: 8px;
+  background: #090c12; color: #c7cdd8; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.about-card { text-align: center; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; max-width: 700px; margin: 0 auto; }
+.about-card p { max-width: 530px; line-height: 1.6; }
+.brand-mark { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 17px;
+  font-size: 28px; font-weight: 900; background: linear-gradient(135deg,#856cff,#49c7f2);
+  margin-bottom: 18px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
 .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 22px; }
 .notice, .error-box { border-radius: 8px; padding: 10px 12px; font-size: 12px; }
 .notice { background: #24233a; color: #c4bdfa; }

@@ -23,5 +23,17 @@ contextBridge.exposeInMainWorld("desktop", {
     list: (scopeId?: string) => ipcRenderer.invoke("cloud-authorizations:list", scopeId),
     grant: (input: unknown) => ipcRenderer.invoke("cloud-authorizations:grant", input),
     revoke: (id: string) => ipcRenderer.invoke("cloud-authorizations:revoke", id)
-  }
+  },
+  runtime: {
+    readiness: () => ipcRenderer.invoke("runtime:readiness"),
+    modelInstallState: () => ipcRenderer.invoke("runtime:model-install-state"),
+    installModel: () => ipcRenderer.invoke("runtime:model-install"),
+    cancelModelInstall: () => ipcRenderer.invoke("runtime:model-install-cancel"),
+    openModelsFolder: () => ipcRenderer.invoke("runtime:open-models-folder")
+  },
+  diagnostics: {
+    preview: (options: unknown) => ipcRenderer.invoke("diagnostics:preview", options),
+    export: (options: unknown) => ipcRenderer.invoke("diagnostics:export", options)
+  },
+  applicationVersion: () => ipcRenderer.invoke("application:version")
 });

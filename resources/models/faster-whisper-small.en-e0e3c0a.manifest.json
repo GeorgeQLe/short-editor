@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "small.en",
+  "version": "e0e3c0a",
+  "repository": "Systran/faster-whisper-small.en",
+  "revision": "e0e3c0a16c844a994ca4d6d1318ce35f68236052",
+  "license": "MIT",
+  "licenseUrl": "https://huggingface.co/Systran/faster-whisper-small.en/blob/e0e3c0a16c844a994ca4d6d1318ce35f68236052/README.md",
+  "privacy": {
+    "networkUse": "The archive is downloaded only after explicit confirmation.",
+    "localUse": "Transcription runs locally; source media and transcript text are not uploaded.",
+    "telemetry": false
+  },
+  "archive": {
+    "name": "faster-whisper-small.en-e0e3c0a.tar.gz",
+    "size": 445185198,
+    "sha256": "65dcc9aabf93c44a2d23931df9aaabeb2a45278df7fded9a428501ec45fe3455",
+    "url": "https://github.com/GeorgeQLe/short-editor/releases/download/model-small.en-e0e3c0a/faster-whisper-small.en-e0e3c0a.tar.gz"
+  },
+  "contents": [
+    {
+      "path": "small.en/.gitattributes",
+      "size": 1477,
+      "sha256": "db7c0371f46f0840b8f25794c1e3321c9b5820a8cb6ba9694a46fc64b8fae5a6"
+    },
+    {
+      "path": "small.en/README.md",
+      "size": 1334,
+      "sha256": "22510f7a8e3d926e662d8f682eba895468daa96b20355be4897417a78462abda"
+    },
+    {
+      "path": "small.en/config.json",
+      "size": 2657,
+      "sha256": "666a9605530ac1f61fa8177f3702b4dacec9966749e42610839fcc32661d5fae"
+    },
+    {
+      "path": "small.en/model.bin",
+      "size": 483545366,
+      "sha256": "62b2a45b05ee59acb4a5341b33ee35e041395d378d418a18acfe4c9e768ee37a"
+    },
+    {
+      "path": "small.en/tokenizer.json",
+      "size": 2128466,
+      "sha256": "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df"
+    },
+    {
+      "path": "small.en/vocabulary.txt",
+      "size": 422309,
+      "sha256": "ff77588746d3a2595d32ab5b69ffd7b95ce2441ac57533cb66fc3eb575a115cf"
+    }
+  ]
+}

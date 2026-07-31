@@ -1,5 +1,162 @@
 # Ship manifest
 
+## Reproducible macOS release inputs and OSS preparation — 2026-07-30
+
+### User goal
+
+Build and stage every redistributable macOS release input, make model
+installation safe and reproducible, and prepare the complete repository for
+public open-source operation. Developer ID credentials, notarization
+authorization, clean-macOS acceptance, and final owner approval remain owner
+gates.
+
+### Changed files
+
+- Project and community boundary: `.gitignore`, `README.md`, `SPEC.md`,
+  `package.json`, `package-lock.json`, `LICENSE`, `THIRD_PARTY_NOTICES.md`,
+  `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md`,
+  `.github/PULL_REQUEST_TEMPLATE.md`,
+  `.github/ISSUE_TEMPLATE/bug_report.yml`,
+  `.github/ISSUE_TEMPLATE/feature_request.yml`,
+  `.github/ISSUE_TEMPLATE/config.yml`, and `.github/dependabot.yml`.
+- Runtime application: `src/core/bootstrap.ts`, `src/electron/main.ts`,
+  `src/electron/preload.cts`, `src/electron/runtime-support.ts`,
+  `src/ui/App.tsx`, `src/ui/desktop.ts`, `src/ui/SupportCenter.tsx`,
+  `src/ui/styles.css`, and `tests/runtime-support.test.ts`.
+- Reproducible release tooling: `scripts/validate-runtime-resources.mjs` and
+  every file under `scripts/release/`.
+- Frozen runtime metadata: `resources/runtime-manifest.json`,
+  `resources/worker/requirements.in`, `resources/worker/requirements.txt`,
+  `resources/worker/requirements.lock`,
+  `resources/models/faster-whisper-small.en-e0e3c0a.manifest.json`,
+  `resources/models/model-upstream.json`, and every file under
+  `resources/licenses/`.
+- Release records: `docs/macos-public-beta-acceptance.md`,
+  `docs/release-evidence-2026-07-30.md`, `docs/release-sources.md`,
+  `tasks/todo.md`, `tasks/history.md`, and `tasks/ship-manifest.md`.
+
+Generated skill caches, downloaded sources, archives, frozen binaries, the
+application bundle, DMG, test databases, and local evidence remain ignored and
+are not committed. No credentials or signing material enter the repository.
+
+### Per-file purpose
+
+- The project/community files establish the MIT source license, preserve the
+  separate GPL and third-party distribution boundaries, document support and
+  private security reporting, add contribution governance and templates, and
+  prevent accidental npm publication through the retained `private` field.
+- Runtime application files add the Setup Center and typed Electron bridge for
+  resumable/cancellable model installation, complete validation, protected
+  extraction, restart recovery, atomic replacement, and actionable runtime
+  readiness.
+- Release scripts pin and verify official FFmpeg/x264/font sources, Python
+  3.12 worker dependencies, and the exact model revision; build native arm64
+  inputs; create deterministic archives; smoke-test the actual binaries; write
+  computed manifests; package macOS; and record validation evidence.
+- Runtime metadata records immutable versions, checksums, sizes, architecture,
+  licenses, upstream contents, privacy disclosure, and the anonymous GitHub
+  Release URLs consumed by Setup Center.
+- Documentation and task records provide corresponding-source instructions,
+  reproducibility evidence, clean-macOS acceptance, task closure, review
+  rationale, rollback, and the remaining owner gates.
+
+### User-goal mapping
+
+The staged FFmpeg/ffprobe pair is official FFmpeg 8.1.2 with static x264 r3222,
+AAC, the required filters, and macOS system frameworks. The worker is frozen
+from Python 3.12 with fully hash-pinned dependencies. The exact
+`Systran/faster-whisper-small.en` revision is packaged deterministically with
+an independently verifiable manifest. Setup Center installs only that
+immutable asset through a recoverable, traversal-safe, checksum-verified,
+atomic workflow. Runtime validation checks every native architecture,
+permission, dependency, capability, worker protocol, model member, and
+`better-sqlite3` binding. GPL corresponding source and notices are staged
+alongside the MIT application source. The unsigned app and DMG demonstrate the
+complete credential-free build path.
+
+### Tests run
+
+- `npm run typecheck`: passed.
+- `npm test -- --maxWorkers=4`: all 50 files and 363 tests passed.
+- `npm run build`: passed.
+- `npm run smoke:preload`: passed all 11 preload functions.
+- `npm run validate:runtime`: passed architecture, executable, dependency,
+  FFmpeg capability, worker startup, model, manifest, and native SQLite checks.
+- FFmpeg probe, libx264, captions, audio mixing, and composition smoke tests:
+  passed against the staged arm64 binary.
+- Frozen worker protocol and real offline transcription: passed with the
+  controlled environment excluding system Python and inherited `PATH`.
+- Interrupted transfer, range resume, cancellation, archive corruption,
+  member corruption, traversal, insufficient disk, restart recovery, and
+  previous-model preservation tests: passed.
+- Two clean FFmpeg builds, two worker builds, and two deterministic model and
+  corresponding-source packages produced matching hashes.
+- `npm audit --omit=dev --audit-level=high`: passed with zero runtime
+  vulnerabilities.
+- Full-history and working-tree Gitleaks reviews found no credentials. The
+  only findings were the established literal synthetic value `REDACTED` in
+  release-contract fixtures/history.
+- `git diff --check`: passed.
+
+### Skipped tests
+
+- Developer ID verification, Gatekeeper assessment, notarization, stapling,
+  and the clean-macOS acceptance checklist are intentionally pending because
+  no Developer ID Application identity or notarization authorization is
+  available.
+- The 50-file suite and production build were not repeated after the
+  documentation-only OSS metadata additions. Those additions do not change
+  executable source or dependencies; YAML parsing, package metadata, diff
+  hygiene, and security scans are repeated before commit.
+- No production deployment was run. This task publishes repository and release
+  assets, not a hosted service.
+
+### Adversarial review
+
+- Failure-oriented review checked partial downloads, malicious tar paths,
+  symlink-like entries, hash/size mismatch, individual model-member
+  corruption, cancellation races, disk exhaustion, restart persistence,
+  atomic rollback, absent binaries, wrong architecture, writable-workspace and
+  Homebrew path leakage, native dependency leakage, and a mismatched SQLite
+  ABI.
+- The public-repository boundary was reviewed across all commits, current
+  tracked and untracked files, GitHub repository metadata, Actions secrets and
+  variables, deployments, releases, and branch/tag history. No private keys,
+  credentials, customer data, private media, or transcripts were found.
+- The sole intentional personal datum is the repository owner's author name
+  and email in existing Git history; the owner explicitly approved publishing
+  it and the planning documents.
+- GPL x264 is not represented as MIT: binary notices, exact sources, configure
+  flags, corresponding-source packaging, and redistribution instructions
+  remain explicit.
+
+### Residual risk
+
+- The staged app and DMG are unsigned and must not be represented as an
+  end-user release until Developer ID signing, notarization, stapling, and
+  clean-macOS acceptance pass.
+- The complete npm audit reports 16 high-severity findings confined to the
+  electron-builder development toolchain. Runtime-only audit reports zero;
+  Dependabot is enabled and the build-tool chain should be upgraded when its
+  upstream dependency graph resolves the advisories.
+- Publishing makes all 45 existing commits and their author metadata public
+  and permits public forks. The owner has explicitly accepted that boundary.
+
+### Rollback
+
+Revert the release/OSS commit to restore the previous source state. Before the
+repository becomes public, GitHub visibility can remain private with no public
+exposure. After publication, changing visibility back does not retract forks
+or copies; do not treat it as a confidentiality rollback. A published immutable
+model release cannot be mutated, so any model correction must use a new
+versioned tag and a new signed application manifest.
+
+### Next command
+
+Commit and push the reviewed source while private, enable public visibility and
+immutable releases, publish the versioned model assets, verify anonymous
+downloads, then record the resulting GitHub evidence in a follow-up commit.
+
 ## UI-01.5 scheduling workflow and acceptance — 2026-07-30
 
 ### User goal

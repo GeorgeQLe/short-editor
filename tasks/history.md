@@ -873,3 +873,20 @@
   constraints while retaining Windows 11 as the release-acceptance platform.
 - Reconciled SPEC implementation evidence and routed the next executable work to
   FND-02 transactional persistence and migrations.
+- Prepared the complete Apple Silicon release boundary: reproducible FFmpeg
+  8.1.2/x264 r3222 and ffprobe, a hash-pinned frozen Python 3.12 worker,
+  deterministic small.en model and corresponding-source archives, concrete
+  runtime manifests, secure resumable/atomic model installation, deep native
+  validation, and unsigned app/DMG evidence.
+- Verified two identical rebuilds of FFmpeg, ffprobe, the worker, model archive,
+  and corresponding-source archive; passed real offline frozen-worker
+  transcription, `npm run validate:runtime`, preload smoke, production build,
+  and the complete 50-file/363-test suite with four workers.
+- Audited all 45 Git commits and the current shipping tree with redacted
+  Gitleaks scans. The only detections were the intentional `REDACTED` fixture;
+  no repository or Actions secrets, variables, deployments, or private source
+  artifacts were found.
+- Added the MIT project license, explicit third-party licensing boundary,
+  contribution, conduct, support, and security policies, structured issue/PR
+  templates, generated-skill exclusions, and monthly npm Dependabot metadata
+  for public OSS operation.

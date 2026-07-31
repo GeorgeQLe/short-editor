@@ -47,6 +47,58 @@ export interface DesktopBridge {
     }): Promise<CloudAuthorization>;
     revoke(id: string): Promise<void>;
   };
+  runtime?: {
+    readiness(): Promise<RuntimeReadiness>;
+    modelInstallState(): Promise<ModelInstallState>;
+    installModel(): Promise<ModelInstallState>;
+    cancelModelInstall(): Promise<ModelInstallState>;
+    openModelsFolder(): Promise<void>;
+  };
+  diagnostics?: {
+    preview(options: DiagnosticConsent): Promise<DiagnosticPreview>;
+    export(options: DiagnosticConsent): Promise<{ exported: boolean; path?: string }>;
+  };
+  applicationVersion?(): Promise<{
+    version: string;
+    platform: string;
+    arch: string;
+    supportedPlatform: boolean;
+  }>;
+}
+
+export interface RuntimeCheck {
+  id: "ffmpeg" | "ffprobe" | "python" | "worker" | "model" | "ollama" | "storage";
+  label: string;
+  state: "ready" | "optional" | "needs_attention";
+  detail: string;
+  action: "none" | "install_model" | "open_setup";
+  version?: string;
+}
+
+export interface RuntimeReadiness {
+  checkedAt: string;
+  localWorkflowReady: boolean;
+  checks: RuntimeCheck[];
+}
+
+export interface ModelInstallState {
+  phase: "not_installed" | "downloading" | "paused" | "verifying" | "installing" | "ready" | "failed";
+  receivedBytes: number;
+  totalBytes: number;
+  message: string;
+  canResume: boolean;
+  canCancel: boolean;
+}
+
+export interface DiagnosticConsent {
+  includeTranscripts: boolean;
+  includePaths: boolean;
+}
+
+export interface DiagnosticPreview {
+  policyVersion: string;
+  fileName: string;
+  payload: unknown;
 }
 
 declare global {

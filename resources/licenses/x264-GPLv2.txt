@@ -1,0 +1,6 @@
+Short Editor includes x264 r3222 at commit
+b35605ace3ddf7c1a5d67a2eb553f034aef41d55, statically linked into FFmpeg.
+x264 is distributed under GPL-2.0-or-later.
+
+The complete license and corresponding source are available from the pinned
+upstream archive documented in docs/release-sources.md.

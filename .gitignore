@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+build/
 *.db
 *.db-shm
 *.db-wal
@@ -9,3 +10,8 @@ coverage/
 .DS_Store
 resources/bin/*
 !resources/bin/.gitkeep
+resources/worker/short-editor-worker
+resources/worker/short-editor-worker.exe
+.agents/skillpacks/
+.claude/skills/
+.codex/skills/

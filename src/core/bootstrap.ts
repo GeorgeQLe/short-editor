@@ -59,7 +59,13 @@ export function createCore(
   artifacts.cleanupInterruptedRenderArtifacts();
   const watchedFolders = new WatchedFolderCoordinator(repository, media, jobs);
   const worker = new PythonWorkerSupervisor({
-    launch: developmentPythonWorkerLaunch(process.cwd()),
+    launch: process.env.SHORT_EDITOR_WORKER_EXECUTABLE
+      ? { command: process.env.SHORT_EDITOR_WORKER_EXECUTABLE, args: [] }
+      : developmentPythonWorkerLaunch(
+        process.cwd(),
+        process.env.SHORT_EDITOR_PYTHON ??
+          (process.platform === "win32" ? "python" : "python3")
+      ),
     coreVersion: "0.1.0"
   });
   const localTranscription = new LocalTranscriptionProvider(worker);

@@ -6,10 +6,12 @@ import { CandidatesWorkspace } from "./CandidatesWorkspace";
 import { LibraryWorkspace, type LibraryTab } from "./LibraryWorkspace";
 import { EditorWorkspace } from "./EditorWorkspace";
 import { CalendarWorkspace } from "./CalendarWorkspace";
+import { SupportCenter } from "./SupportCenter";
 import "./desktop";
 import { errorMessage } from "./utils";
 
-type View = "Library" | "Candidates" | "Editor" | "Calendar" | "Cloud Access";
+type View = "Library" | "Candidates" | "Editor" | "Calendar" | "Cloud Access" |
+  "Setup" | "Recovery" | "About";
 
 export function App() {
   const [view, setView] = useState<View>("Library");
@@ -88,7 +90,8 @@ export function App() {
       <aside aria-label="Primary navigation">
         <div className="brand"><span aria-hidden="true">S</span><strong>Short Editor</strong></div>
         <nav>
-          {(["Library", "Candidates", "Editor", "Calendar", "Cloud Access"] as View[]).map((item) => (
+          {(["Library", "Candidates", "Editor", "Calendar", "Cloud Access", "Setup",
+            "Recovery", "About"] as View[]).map((item) => (
             <button key={item} aria-current={view === item ? "page" : undefined}
               onClick={() => setView(item)}>
               <span aria-hidden="true">{icons[item]}</span>{item}
@@ -147,6 +150,12 @@ export function App() {
             announce={setMessage}
             onChanged={refresh}
           />
+        ) : view === "Setup" || view === "Recovery" || view === "About" ? (
+          <SupportCenter section={view} jobs={jobs} announce={setMessage}
+            onRefresh={refresh} onOpenLibrary={() => {
+              setLibraryTab("episodes");
+              setView("Library");
+            }} />
         ) : null}
       </main>
     </div>
@@ -158,5 +167,6 @@ function Metric({ label, value }: { label: string; value: number }) {
 }
 
 const icons: Record<View, string> = {
-  Library: "▦", Candidates: "✦", Editor: "◫", Calendar: "□", "Cloud Access": "⌁"
+  Library: "▦", Candidates: "✦", Editor: "◫", Calendar: "□", "Cloud Access": "⌁",
+  Setup: "✓", Recovery: "↻", About: "ⓘ"
 };

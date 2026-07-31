@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 2,
+  "generatedBy": "scripts/release/generate-runtime-manifest.mjs",
+  "releasePlatform": {
+    "os": "macos",
+    "minimumVersion": "14.0",
+    "architecture": "arm64"
+  },
+  "resources": [
+    {
+      "id": "ffmpeg",
+      "version": "8.1.2+x264-r3222",
+      "path": "bin/ffmpeg",
+      "licenseEvidence": "licenses/FFmpeg-GPLv2.txt",
+      "size": 8082200,
+      "sha256": "847026157a13b451b83fb1d8838dc87cdb47800f71bd88516627d1bde2a0853a"
+    },
+    {
+      "id": "ffprobe",
+      "version": "8.1.2",
+      "path": "bin/ffprobe",
+      "licenseEvidence": "licenses/FFmpeg-GPLv2.txt",
+      "size": 7922520,
+      "sha256": "e1b7b664daa16d66c3bb4eea9bce964d635cc9f8646bd2e6cef0e49f8b542356"
+    },
+    {
+      "id": "python-worker",
+      "version": "0.3.0+python-3.12.12+faster-whisper-1.2.1+ctranslate2-4.8.1",
+      "path": "worker/short-editor-worker",
+      "licenseEvidence": "licenses/worker-notices.txt",
+      "size": 61054592,
+      "sha256": "7722b60469a5f48087c6c9638848f9340b30c62a17c4ef0192a871117fb3a033"
+    },
+    {
+      "id": "inter-regular",
+      "version": "Inter",
+      "path": "fonts/Inter-Regular.otf",
+      "licenseEvidence": "fonts/OFL.txt",
+      "size": 609600,
+      "sha256": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799"
+    },
+    {
+      "id": "inter-bold",
+      "version": "Inter",
+      "path": "fonts/Inter-Bold.otf",
+      "licenseEvidence": "fonts/OFL.txt",
+      "size": 631880,
+      "sha256": "9fc6261e817d0b1b2bf1953d8799bb1c837d11aeebbf83ae352e7b4d6de6425d"
+    }
+  ],
+  "models": [
+    {
+      "id": "small.en",
+      "bundled": false,
+      "transfer": "explicit-resumable-only",
+      "version": "e0e3c0a",
+      "revision": "e0e3c0a16c844a994ca4d6d1318ce35f68236052",
+      "license": "MIT",
+      "archiveUrl": "https://github.com/GeorgeQLe/short-editor/releases/download/model-small.en-e0e3c0a/faster-whisper-small.en-e0e3c0a.tar.gz",
+      "archiveSize": 445185198,
+      "archiveSha256": "65dcc9aabf93c44a2d23931df9aaabeb2a45278df7fded9a428501ec45fe3455",
+      "manifestPath": "models/faster-whisper-small.en-e0e3c0a.manifest.json",
+      "manifestSha256": "7b7c1d4b1bcef38f99a0920748914538d0e82791e60b3c65025547e75cfdd1db"
+    }
+  ]
+}

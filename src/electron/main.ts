@@ -1,6 +1,6 @@
-import { app, BrowserWindow, dialog, ipcMain, protocol, safeStorage } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, protocol, safeStorage, shell } from "electron";
 import { randomBytes } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { mkdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -15,6 +15,13 @@ import { resolveCoreExecutable } from "./core-launch.js";
 import { desktopListItems } from "./desktop-list.js";
 import { OpenAiHttpAdapter } from "./openai-adapter.js";
 import { createBrowserWindowOptions } from "./window-options.js";
+import {
+  buildDiagnosticPreview,
+  inspectRuntime,
+  ModelInstallManager,
+  writeDiagnosticZip,
+  type RuntimePaths
+} from "./runtime-support.js";
 
 const directory = fileURLToPath(new URL(".", import.meta.url));
 let core: ChildProcess | undefined;
@@ -37,7 +44,12 @@ function createWindow() {
   else void window.loadURL("http://localhost:5173");
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  const runtimePaths = applicationRuntimePaths();
+  const modelInstaller = new ModelInstallManager(runtimePaths);
+  await modelInstaller.initialize().catch((error) => {
+    console.error(error instanceof Error ? error.message : "Model installer could not initialize");
+  });
   credentialVault = new ProtectedCredentialVault(
     join(app.getPath("userData"), "protected-credentials.json"),
     {
@@ -73,6 +85,35 @@ app.whenReady().then(() => {
   ipcMain.handle("cloud-authorizations:revoke", (_event, id: string) =>
     desktopRequest(`/desktop/cloud-authorizations/${encodeURIComponent(id)}/revoke`, "POST")
   );
+  ipcMain.handle("runtime:readiness", () => inspectRuntime(runtimePaths));
+  ipcMain.handle("runtime:model-install-state", () => modelInstaller.snapshot());
+  ipcMain.handle("runtime:model-install", () => modelInstaller.start());
+  ipcMain.handle("runtime:model-install-cancel", () => modelInstaller.cancel());
+  ipcMain.handle("runtime:open-models-folder", async () => {
+    await mkdir(runtimePaths.models, { recursive: true });
+    const error = await shell.openPath(runtimePaths.models);
+    if (error) throw new Error(error);
+  });
+  ipcMain.handle("application:version", () => ({
+    version: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch,
+    supportedPlatform: process.platform === "darwin" && process.arch === "arm64"
+  }));
+  ipcMain.handle("diagnostics:preview", async (_event, options) =>
+    diagnosticPreview(runtimePaths, options)
+  );
+  ipcMain.handle("diagnostics:export", async (_event, options) => {
+    const preview = await diagnosticPreview(runtimePaths, options);
+    const result = await dialog.showSaveDialog({
+      title: "Export diagnostics",
+      defaultPath: join(app.getPath("downloads"), preview.fileName),
+      filters: [{ name: "ZIP archive", extensions: ["zip"] }]
+    });
+    if (result.canceled || !result.filePath) return { exported: false };
+    await writeDiagnosticZip(result.filePath, preview);
+    return { exported: true, path: result.filePath };
+  });
   core = spawn(
     resolveCoreExecutable(app.isPackaged, process.execPath, process.env.npm_node_execpath),
     [join(directory, "../core/cli.js")],
@@ -381,7 +422,54 @@ function coreEnvironment(): NodeJS.ProcessEnv {
   ]) delete environment[name];
   environment.ELECTRON_RUN_AS_NODE = "1";
   environment.SHORT_EDITOR_DESKTOP_TOKEN = desktopToken;
+  const runtimePaths = applicationRuntimePaths();
+  environment.SHORT_EDITOR_DATA_DIR = runtimePaths.data;
+  environment.SHORT_EDITOR_FFMPEG = runtimePaths.ffmpeg;
+  environment.SHORT_EDITOR_FFMPEG_PATH = runtimePaths.ffmpeg;
+  environment.SHORT_EDITOR_FFPROBE = runtimePaths.ffprobe;
+  environment.SHORT_EDITOR_WHISPER_MODEL_DIR = runtimePaths.models;
+  environment.SHORT_EDITOR_WHISPER_MODEL_IDS = "small.en";
+  environment.SHORT_EDITOR_WHISPER_MODEL = "small.en";
+  if (app.isPackaged) environment.SHORT_EDITOR_WORKER_EXECUTABLE = runtimePaths.worker;
   return environment;
+}
+
+function applicationRuntimePaths(): RuntimePaths {
+  const resources = app.isPackaged ? process.resourcesPath : join(directory, "../../resources");
+  const executable = (name: string) => join(resources, "bin", name);
+  const packagedWorker = process.platform === "win32"
+    ? join(resources, "worker", "short-editor-worker.exe")
+    : join(resources, "worker", "short-editor-worker");
+  return {
+    ffmpeg: app.isPackaged ? executable("ffmpeg") : (process.env.SHORT_EDITOR_FFMPEG ?? "ffmpeg"),
+    ffprobe: app.isPackaged ? executable("ffprobe") :
+      (process.env.SHORT_EDITOR_FFPROBE ?? "ffprobe"),
+    python: app.isPackaged ? packagedWorker : (process.env.SHORT_EDITOR_PYTHON ?? "python3"),
+    worker: app.isPackaged ? packagedWorker : join(resources, "worker", "worker.py"),
+    modelManifest: join(resources, "models", "faster-whisper-small.en-e0e3c0a.manifest.json"),
+    models: join(app.getPath("userData"), "models"),
+    data: app.getPath("userData")
+  };
+}
+
+async function diagnosticPreview(runtimePaths: RuntimePaths, options: unknown) {
+  const consent = options && typeof options === "object"
+    ? options as { includeTranscripts?: unknown; includePaths?: unknown }
+    : {};
+  const [jobs, renders, coreHealth] = await Promise.all([
+    publicCoreRequest("/jobs?limit=1000"),
+    publicCoreRequest("/renders?limit=1000"),
+    publicCoreRequest("/health")
+  ]);
+  return buildDiagnosticPreview({
+    appVersion: app.getVersion(),
+    readiness: await inspectRuntime(runtimePaths),
+    jobs,
+    renders,
+    coreHealth,
+    includeTranscripts: consent.includeTranscripts === true,
+    includePaths: consent.includePaths === true
+  });
 }
 
 async function waitForCore(): Promise<void> {

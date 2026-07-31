@@ -1,1 +1,4 @@
-faster-whisper>=1.1,<2
+# Development convenience only. Release builds use the fully hash-pinned
+# requirements.lock generated from requirements.in.
+faster-whisper==1.2.1
+ctranslate2==4.8.1
