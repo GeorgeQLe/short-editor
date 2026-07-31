@@ -1,5 +1,177 @@
 # Ship manifest
 
+## SiftCut product identity and icon system — 2026-07-31
+
+### User goal
+
+Replace the layered app icon with a simple small-size film-cut mark, orient it
+to communicate SiftCut's top/bottom vertical-video workflow, place the logo in
+the app header, explain the initial palette, and provide an interactive HTML
+showcase of alternative color systems. Ship the complete pending SiftCut rename
+and renderer-packaging boundary safely to `master`.
+
+### Changed files
+
+- Product and community naming: `.github/ISSUE_TEMPLATE/bug_report.yml`,
+  `.github/ISSUE_TEMPLATE/feature_request.yml`, `CONTRIBUTING.md`,
+  `IMPLEMENTATION_PLAN.md`, `README.md`, `SPEC.md`,
+  `THIRD_PARTY_NOTICES.md`, `docs/release-interfaces-v1.md`,
+  `docs/release-sources.md`, `resources/licenses/FFmpeg-GPLv2.txt`,
+  `resources/licenses/x264-GPLv2.txt`, `resources/worker/worker.py`,
+  `src/core/cli.ts`, `src/core/render-composition.ts`,
+  `src/core/startup.ts`, `src/electron/preload-smoke.ts`,
+  `src/electron/runtime-support.ts`, `src/release/interface-docs.ts`,
+  `src/ui/SupportCenter.tsx`, and `src/ui/index.html`.
+- Brand and packaging implementation: `package.json`, `vite.config.ts`,
+  `scripts/release/package-macos.sh`, `scripts/render-app-icon.mjs`,
+  `resources/branding/siftcut-app-icon-master.svg`,
+  `resources/branding/siftcut-app-icon-1024.png`,
+  `src/electron/renderer-smoke.ts`, `src/ui/App.tsx`, and
+  `src/ui/styles.css`.
+- Brand verification and exploration: `tests/product-brand.test.ts` and
+  `docs/siftcut-color-options.html`.
+- Session records: `tasks/todo.md`, `tasks/history.md`, `tasks/lessons.md`, and
+  `tasks/ship-manifest.md`.
+
+No path under the ignored generated `.claude/skills/` or `.codex/skills/`
+roots is tracked or included. `.agents/project.json` is tracked and unchanged.
+The unsigned app bundle, extracted icon sets, screenshots, and size-study
+contact sheets remain generated local artifacts outside the commit.
+
+### Per-file purpose
+
+- Naming changes consistently expose SiftCut to users, contributors, release
+  readers, diagnostics, media metadata, and support flows while retaining
+  compatibility-sensitive bundle IDs, data paths, environment variables, and
+  repository identity.
+- The SVG is the canonical deterministic icon source; its export script
+  produces the required 1024px RGBA PNG. The vertical violet/orange film frame
+  communicates top/bottom composition on one deep-indigo squircle.
+- Package configuration supplies the PNG to electron-builder. The release
+  script resolves output paths from `productName` and now runs a renderer smoke
+  before packaging.
+- Vite's relative base and the renderer smoke ensure packaged `file:` loading
+  uses relative local assets and produces a non-empty React application with
+  SiftCut branding.
+- The sidebar reuses the canonical SVG master directly, avoiding a duplicate
+  UI logo asset. CSS sizes it for the compact navigation header.
+- Product-brand coverage locks the display name, unchanged bundle identity,
+  icon path, PNG dimensions/alpha format, retained vector master, and vertical
+  orientation.
+- The color-study HTML offers eight CSS-rendered palettes, keyboard-accessible
+  selection, rationale, exact colors, and light/dark small-size contexts.
+- Task and lesson records close the work, preserve the user's orientation
+  correction as a repeatable rule, and document exact verification and
+  rollback boundaries.
+
+### User-goal mapping
+
+- The packaged icon has one transparent-corner indigo tile, one vertical film
+  frame, a narrow diagonal cut, violet top and orange bottom clips, four large
+  perforations, and one restrained highlight. It contains no inset plate,
+  black matte, scissors, stacking, glow, extrusion, texture, text, or watermark.
+- The same canonical mark appears beside SiftCut in the top-left navigation
+  header and in the macOS ICNS generated from the 1024px master.
+- The public product name is SiftCut everywhere changed by this boundary;
+  `com.lexcorp.shorteditor` remains unchanged.
+- The standalone HTML study makes the current color rationale and seven
+  alternatives directly comparable without changing the selected product
+  palette.
+
+### Tests run
+
+Executable verification against the shipping boundary:
+
+- `npm test`: all 51 test files and 365 tests passed. The stderr line
+  `Unexpected internal error` is the intentional redacted-500 fixture, not a
+  warning or regression.
+- `npx vitest run tests/product-brand.test.ts --config vitest.config.ts`:
+  both branding tests passed before the final orientation assertion.
+- `npx vitest run tests/ui-workflows.test.tsx tests/product-brand.test.ts
+  --config vitest.config.ts`: all 13 targeted UI/brand tests passed after the
+  sidebar-logo integration.
+- `npm run build`: typecheck, Vite production renderer build, and Node
+  TypeScript compilation passed after the final UI change.
+- `npx electron scripts/render-app-icon.mjs`: two final vertical-icon exports
+  produced the identical SHA-256
+  `f6984f684fa86e6500cb25094c5581dccc17a563bed1cc1f3bbd1cefb561c158`.
+- The PNG was inspected at 16, 32, 64, 128, 256, and 1024 px on light and dark
+  backgrounds. All four 1024px corner pixels are fully transparent.
+- `electron-builder --mac dir --arm64 -c.mac.identity=null` produced an
+  unsigned native arm64 `SiftCut.app`.
+- `iconutil -c iconset` extracted every expected alpha representation from 16
+  through 1024 px. The packaged 1024px representation compared pixel-identical
+  to the PNG master.
+- Computer Use and a read-only system capture verified the packaged icon in
+  Finder and the live Dock, then verified the canonical logo in the running
+  top-left app header.
+- A JSDOM executable check found all eight palette cards and proved selection,
+  preview color, and single pressed-state updates.
+
+Documentation/task verification:
+
+- `scripts/audit-task-docs.mjs` is absent, so the repository defines no
+  task-document audit command.
+- `tasks/todo.md` records the SiftCut identity work under Completed.
+- `tasks/lessons.md` records and enforces the user's vertical-orientation
+  correction.
+
+### Skipped tests
+
+- No lint script or standalone check target exists in `package.json`; available
+  typecheck, build, unit, focused UI, Electron smoke, packaging, icon, and live
+  visual gates cover this boundary.
+- The full 365-test suite was not repeated after the final header-only and
+  documentation/color-study changes. The affected renderer and brand paths
+  received focused UI/brand tests, a production build, a packaged live-app
+  inspection, and the color-study interaction check.
+- Signed packaging, Gatekeeper assessment, notarization, stapling, and clean
+  external-macOS acceptance remain release-owner gates. This session explicitly
+  built the credential-free unsigned arm64 app.
+- Native Windows icon and package inspection remains part of the existing
+  Windows release gate and cannot be closed on this macOS host.
+
+### Adversarial review
+
+A failure-oriented changed-file review is the equivalent review lane because
+no repository-local `quality-sweep` or `expert-review` command is installed.
+It checks user-facing naming versus compatibility-sensitive identifiers;
+relative `file:` asset loading; missing or empty React roots; renderer/preload
+failure and timeout behavior; vector/PNG divergence; alpha corners and baked
+matte risk; small-size silhouette; horizontal-orientation regression; ICNS
+contents; packaging output paths with spaces; missing SVG header assets;
+keyboard and pressed-state semantics in the color study; responsive layouts;
+secret-like additions; generated skill/cache boundaries; and accidental
+credential inclusion.
+
+The review found that the user's vertical-orientation refinement was preserved
+only visually. `tests/product-brand.test.ts` now asserts both the vertical SVG
+description and exact clockwise transform, and `tasks/lessons.md` records the
+repeatable product rule. No blocking finding remains.
+
+### Residual risk
+
+- The selected violet/orange colors remain provisional brand choices; the
+  color-study page deliberately supports owner review before semantic meaning
+  is formalized.
+- The About screen retains its existing compact `S` badge because the user
+  requested the logo specifically in the top-left header. It can be unified in
+  a later brand-consistency pass.
+- Windows packaging may require a platform-specific icon treatment even though
+  the macOS package and renderer are verified.
+
+### Rollback note
+
+Revert the feature commits to restore the Short Editor display name, prior
+renderer configuration, and placeholder brand tile. Existing application data
+requires no migration because bundle identity, data paths, database schema, and
+environment variables are unchanged.
+
+### Next command
+
+Open `docs/siftcut-color-options.html` for owner palette review; if the current
+palette is accepted, promote its semantic meaning into the brand documentation.
+
 ## Reproducible macOS release inputs and OSS preparation — 2026-07-30
 
 ### User goal

@@ -1,5 +1,32 @@
 # Session history
 
+## 2026-07-31
+
+- Renamed the public product surface from Short Editor to SiftCut while
+  preserving the `com.lexcorp.shorteditor` bundle identifier, existing data
+  locations, environment variables, and compatibility-facing internal names.
+  Repository, support, diagnostics, renderer, release, issue-template, and
+  third-party notice copy now use the SiftCut display name.
+- Added a deterministic vector app-icon master and Electron exporter. The
+  macOS package now uses a single deep-indigo squircle with transparent
+  corners and a flat violet/orange film-cut mark. User review refined the mark
+  from a horizontal strip to a vertical top/bottom composition; executable
+  brand coverage protects that orientation.
+- Added a relative-asset renderer smoke test to the release path, generated and
+  validated the arm64 `.icns`, and visually accepted the icon at 16–1024 px on
+  light/dark backgrounds plus its live Finder and Dock presentation.
+- Replaced the sidebar's placeholder `S` tile with the canonical SVG logo,
+  rebuilt the unsigned arm64 app, and visually verified the running packaged
+  header.
+- Added `docs/siftcut-color-options.html`, a self-contained interactive study
+  comparing eight purposeful palettes with rationale, hex values, selection
+  behavior, and light/dark size contexts.
+- Executable verification passed all 51 test files and 365 tests, targeted
+  branding/UI runs, production typecheck/build, deterministic icon export,
+  exact packaged-ICNS comparison, arm64 packaging, and live packaged-app
+  inspection. The intentional `Unexpected internal error` stderr line remains
+  the established redacted-500 fixture.
+
 ## 2026-07-30
 
 - Published `GeorgeQLe/short-editor` as a public MIT repository at commit

@@ -60,6 +60,11 @@
 
 ## Completed
 
+- [x] Establish the SiftCut product identity across application copy, release
+  metadata, support surfaces, and repository documentation; add a reproducible
+  vertical film-cut app icon, use it in the macOS package and sidebar header,
+  validate the packaged renderer and icon set, and provide an interactive
+  eight-palette color study.
 - [x] Produce reproducible macOS release inputs, secure model installation,
   concrete runtime manifests, GPL corresponding source, unsigned arm64 test
   artifacts, and automated release validation.
