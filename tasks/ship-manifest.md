@@ -1,5 +1,120 @@
 # Ship manifest
 
+## UI-01.5 scheduling workflow and acceptance — 2026-07-30
+
+### User goal
+
+Replace the Calendar placeholder with the complete revision-safe desktop
+scheduling workflow while preserving the frozen HTTP/MCP interface.
+
+### Changed files
+
+`src/shared/schedule-time.ts`, `src/shared/domain.ts`,
+`src/core/scheduler.ts`, `src/ui/api.ts`, `src/ui/App.tsx`,
+`src/ui/CalendarWorkspace.tsx`, `src/ui/styles.css`,
+`tests/ui-api.test.ts`, `tests/calendar-workspace.test.tsx`,
+`docs/ui-01.5-macos-uat.md`, `tasks/todo.md`, `tasks/history.md`, and
+`tasks/ship-manifest.md`.
+
+Generated local skill material under `.agents/skillpacks/`, `.claude/`, and
+`.codex/` remains untracked and excluded. The isolated database, seed SQL,
+screenshots, and Electron profile remain under `/tmp` and are not shipped.
+
+### Per-file purpose
+
+- `src/shared/schedule-time.ts`, `src/shared/domain.ts`, and
+  `src/core/scheduler.ts` share the browser-safe zoned wall-time resolver
+  without changing scheduling policy.
+- `src/ui/api.ts`, `src/ui/App.tsx`, `src/ui/CalendarWorkspace.tsx`, and
+  `src/ui/styles.css` expose paginated schedule reads and exact mutations in a
+  complete Calendar workflow with a synchronous duplicate-operation guard.
+- `tests/ui-api.test.ts` and `tests/calendar-workspace.test.tsx` freeze request
+  bodies, pagination, Render eligibility, rule revision behavior, DST details,
+  move legality, publication locking, and repeated-submission suppression.
+- `docs/ui-01.5-macos-uat.md` records the isolated accepted walkthrough and
+  credential-free persisted evidence.
+- `tasks/todo.md`, `tasks/history.md`, and `tasks/ship-manifest.md` close the
+  executable task and record its implementation, acceptance, review, and ship
+  proof.
+
+### User-goal mapping
+
+The Calendar placeholder is replaced by the complete revision-safe desktop
+scheduling workflow: first-run and revisioned rules, eligible newest-Render
+drafting with priorities, DST detail, list/month inspection, legal moves with
+collision explanations, rerender publication blocking, and permanently locked
+manual publication records. The shared resolver preserves the frozen scheduler
+policy and the API client consumes existing HTTP contracts without changing
+release-facing routes or schemas.
+
+### Tests run
+
+- Executable verification on the pre-review implementation:
+  `npm test` passed all 49 files and 355 tests. The intentional
+  `Unexpected internal error` stderr line is the existing redacted-500 fixture,
+  not a warning or regression.
+- Executable verification on the final reviewed source:
+  `npx vitest run --config vitest.config.ts tests/calendar-workspace.test.tsx tests/ui-api.test.ts tests/scheduler.test.ts`
+  passed 3 files and 21 tests, including the synchronous double-submit
+  regression.
+- Executable verification on the final source: `npm run build` passed
+  TypeScript typecheck, Vite production compilation, and Node TypeScript
+  compilation without warnings.
+- Executable verification: `npm run smoke:preload` passed all 11 Electron
+  bridge functions before the UI-only operation guard; the guard does not
+  change preload or Electron bridge code.
+- Interactive verification: isolated macOS Electron UAT passed the complete
+  workflow recorded in `docs/ui-01.5-macos-uat.md`. Evidence SHA-256 is
+  `21214f4c07d2c80ca791a29aa8f446bb66c6ae403370e2b992ccf425dfb4c7f2`.
+- Repository verification: `git diff --check` passed. Focused
+  credential-signature review found only established synthetic fixtures in
+  unchanged credential-contract tests and no credential material in the
+  shipping boundary.
+
+### Skipped tests
+
+- The complete 49-file suite was not repeated after the narrow synchronous
+  operation guard. It had just passed on the preceding implementation, and the
+  final 21-test scheduling/API/UI run plus full build directly cover the only
+  post-suite source and test changes.
+- Release-interface regeneration was skipped because no HTTP route, MCP tool,
+  schema, package, migration, or generated release artifact changed.
+- Native packaged Windows acceptance is unavailable on this macOS host and
+  remains owned by WIN-03.7. No task-document audit or lint command exists;
+  typechecking is part of the successful production build.
+
+### Adversarial review
+
+A failure-oriented changed-file review served as the explicit equivalent lane
+because no repository-local `quality-sweep` or `expert-review` command is
+installed. It checked exact revision ownership, dirty rule preservation,
+eligible Render identity, stale async refreshes, DST gap/overlap selection,
+collision and same-Episode spacing, permanent publication locks, URL
+validation, generated-root exclusion, and credential/artifact leakage.
+
+The review found that React's `busy` state alone did not synchronously block a
+second same-tick mutation. A ref-backed operation guard now covers rule saves,
+drafts, moves, and publication recording. The regression submits the rule form
+twice while the first request remains unresolved and proves one API mutation.
+No blocking finding remains.
+
+### Residual risk
+
+DST UI warning rendering is covered with executable fixtures because the
+accepted July/August interactive fixture does not cross a transition. Native
+packaged Windows behavior remains assigned to WIN-03.7.
+
+### Rollback note
+
+Revert this boundary to restore the Calendar placeholder. No migration or
+persisted-data rollback is required; existing schedule rules and entries remain
+valid core entities.
+
+### Next command
+
+No executable item remains in `tasks/todo.md`; begin only after the next task is
+promoted there.
+
 ## UI-01.4 completed render workflow acceptance — 2026-07-30
 
 ### User goal

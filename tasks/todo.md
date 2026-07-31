@@ -45,8 +45,18 @@
     `b8c16af623862ac2753d3bf18d15b53b5e244ca900063ad5927e19652837bcc3`.
     Native packaged Windows acceptance remains assigned to the Windows release
     gate.
-- [ ] UI-01.5 — Complete schedule rules, list/calendar, move, collision, and
+- [x] UI-01.5 — Complete schedule rules, list/calendar, move, collision, and
   publication-recording workflow.
+  - Isolated credential-free macOS acceptance passed with fixture
+    `UI-01.5-macos-2026-07-30`. First-run and exact revisioned rules,
+    prioritized eligible-Render drafting, list/month inspection, local occupied
+    collision feedback, legal move preview/submission, rerender publication
+    blocking, optional YouTube URL recording, and locked restart persistence
+    passed. The attach-only evidence is `UI-01.5-macos-2026-07-30.png`,
+    SHA-256
+    `21214f4c07d2c80ca791a29aa8f446bb66c6ae403370e2b992ccf425dfb4c7f2`.
+    No upload, authentication, or remote verification occurred. Native packaged
+    Windows acceptance remains assigned to WIN-03.7.
 
 ## Completed
 

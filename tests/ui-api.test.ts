@@ -94,6 +94,62 @@ describe("UI v1 API client", () => {
       ]);
   });
 
+  it("uses exact schedule contracts, pagination, encoded IDs, and optional URL omission", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(ok({ items: [{ id: "entry-1" }], nextCursor: "page 2/next" }))
+      .mockResolvedValueOnce(ok({ items: [{ id: "entry-2" }], nextCursor: null }))
+      .mockResolvedValueOnce(ok({ id: "default", revision: 1 }))
+      .mockResolvedValueOnce(ok({ id: "default", revision: 2 }))
+      .mockResolvedValueOnce(ok({ id: "default", revision: 1 }))
+      .mockResolvedValueOnce(ok({ entries: [], warnings: [] }))
+      .mockResolvedValueOnce(ok({ id: "moved" }))
+      .mockResolvedValueOnce(ok({ id: "published-1" }))
+      .mockResolvedValueOnce(ok({ id: "published-2" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const rules = {
+      startDate: "2026-08-03",
+      timezone: "America/New_York",
+      allowedWeekdays: [1, 3, 5],
+      times: ["09:00"],
+      maxPerDay: 1,
+      blackoutDates: [],
+      minimumSameEpisodeSpacingHours: 48
+    };
+
+    await expect(api.scheduleEntries()).resolves.toEqual([{ id: "entry-1" }, { id: "entry-2" }]);
+    await api.scheduleRules();
+    await api.updateScheduleRules(rules, 1);
+    await api.updateScheduleRules(rules);
+    await api.draftSchedule([{
+      shortId: "short-1", renderId: "render-1", episodeId: "episode-1", priority: 7
+    }], 2);
+    await api.moveScheduleEntry("entry/id", 4, "2026-08-03T13:00:00.000Z");
+    await api.markSchedulePublished("entry/id", 5);
+    await api.markSchedulePublished("entry/id", 6, "https://youtu.be/example");
+
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("cursor=page%202%2Fnext");
+    expect(JSON.parse(String(fetchMock.mock.calls[3]?.[1]?.body))).toEqual({
+      ...rules, expectedRevision: 1
+    });
+    expect(JSON.parse(String(fetchMock.mock.calls[4]?.[1]?.body))).toEqual(rules);
+    expect(JSON.parse(String(fetchMock.mock.calls[5]?.[1]?.body))).toEqual({
+      shorts: [{
+        shortId: "short-1", renderId: "render-1", episodeId: "episode-1", priority: 7
+      }],
+      expectedRulesRevision: 2
+    });
+    expect(fetchMock.mock.calls[6]?.[0]).toContain("/schedule/entry%2Fid/move");
+    expect(JSON.parse(String(fetchMock.mock.calls[6]?.[1]?.body))).toEqual({
+      expectedRevision: 4, publishAt: "2026-08-03T13:00:00.000Z"
+    });
+    expect(JSON.parse(String(fetchMock.mock.calls[7]?.[1]?.body))).toEqual({
+      expectedRevision: 5
+    });
+    expect(JSON.parse(String(fetchMock.mock.calls[8]?.[1]?.body))).toEqual({
+      expectedRevision: 6, youtubeUrl: "https://youtu.be/example"
+    });
+  });
+
   it("sends exact provider operation bodies without forged authorization", async () => {
     const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(ok({ id: "job" })));
     vi.stubGlobal("fetch", fetchMock);

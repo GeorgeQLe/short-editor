@@ -5,6 +5,7 @@ import { CloudAccess, type CloudAccessTarget } from "./CloudAccess";
 import { CandidatesWorkspace } from "./CandidatesWorkspace";
 import { LibraryWorkspace, type LibraryTab } from "./LibraryWorkspace";
 import { EditorWorkspace } from "./EditorWorkspace";
+import { CalendarWorkspace } from "./CalendarWorkspace";
 import "./desktop";
 import { errorMessage } from "./utils";
 
@@ -137,6 +138,8 @@ export function App() {
               setLibraryTab("episodes");
               setView("Library");
             }} />
+        ) : view === "Calendar" ? (
+          <CalendarWorkspace announce={setMessage} onChanged={refresh} />
         ) : view === "Cloud Access" ? (
           <CloudAccess
             episodes={episodes}
@@ -144,7 +147,7 @@ export function App() {
             announce={setMessage}
             onChanged={refresh}
           />
-        ) : <ComingSoon view={view} />}
+        ) : null}
       </main>
     </div>
   );
@@ -152,14 +155,6 @@ export function App() {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return <article><span>{label}</span><strong>{value}</strong></article>;
-}
-
-function ComingSoon({ view }: { view: "Calendar" }) {
-  const copy = {
-    Calendar: "Approved, validated renders can be assigned to deterministic legal publishing slots."
-  }[view];
-  return <section className="panel empty"><div className="empty-icon" aria-hidden="true">◇</div>
-    <h2>{view} workspace</h2><p>{copy}</p></section>;
 }
 
 const icons: Record<View, string> = {

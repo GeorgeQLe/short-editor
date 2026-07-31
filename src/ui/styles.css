@@ -357,6 +357,60 @@ details summary { cursor: pointer; color: #bbc2cf; font-size: 12px; margin: 9px 
 .attempt-progress span { color: #9ba4b2; font-size: 10px; text-transform: capitalize; }
 .attempt-findings { color: #f1c47f; font-size: 10px; padding-left: 18px; }
 .attempt-actions small { color: #8f98a7; font-size: 10px; }
+.calendar-workspace { min-height: 650px; overflow: visible; }
+.calendar-toolbar { display: flex; align-items: end; justify-content: space-between;
+  border-bottom: 1px solid #242a36; padding-right: 15px; }
+.calendar-toolbar .tabs { border-bottom: 0; }
+.calendar-disclaimer { padding: 10px 20px; color: #b8b2e4; background: #171725;
+  border-bottom: 1px solid #2d2b42; font-size: 11px; }
+.calendar-message { margin: 13px 20px; }
+.rules-editor, .draft-queue, .schedule-inspector { padding: 20px 22px 30px; }
+.rules-editor .section-heading, .draft-queue .section-heading,
+.schedule-inspector .section-heading { top: 0; }
+.rule-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.rule-grid label, .rules-editor fieldset, .dialog label { display: grid; gap: 6px;
+  color: #aab1bf; font-size: 11px; }
+.rule-grid input, .rule-grid select, .rules-editor input:not([type="checkbox"]),
+.dialog input, .dialog select, .priority-input { width: 100%; border: 1px solid #2b3240;
+  border-radius: 7px; background: #0c1017; color: #fff; padding: 8px 10px; }
+.rules-editor fieldset { border: 1px solid #2a3140; border-radius: 9px;
+  padding: 12px 14px; margin: 15px 0; }
+.rules-editor legend { color: #c1c7d2; padding: 0 6px; font-weight: 700; }
+.weekday-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); }
+.weekday-grid .check { margin: 5px 0; }
+.repeatable-list { display: grid; gap: 7px; }
+.repeatable-list > div { display: grid; grid-template-columns: minmax(120px,220px) auto;
+  gap: 8px; justify-content: start; }
+.repeatable-list > button { justify-self: start; }
+.calendar-empty { min-height: 260px; display: grid; place-items: center; text-align: center;
+  color: #7d8695; padding: 40px; }
+.priority-input { max-width: 110px; }
+.segmented { display: flex; background: #0b0e14; border: 1px solid #2a3140; border-radius: 8px;
+  overflow: hidden; }
+.segmented button { border: 0; background: transparent; color: #87909f; padding: 7px 12px; }
+.segmented button[aria-pressed="true"] { background: #292440; color: #fff; }
+.dst-warnings { border: 1px solid #76572f; background: #2b2218; color: #efc77f;
+  border-radius: 9px; padding: 12px; margin-bottom: 14px; display: grid; gap: 8px; }
+.dst-warnings > div { display: grid; grid-template-columns: repeat(auto-fit,minmax(170px,1fr));
+  gap: 5px 12px; font-size: 10px; }
+.entry-indicators { display: flex; flex-wrap: wrap; gap: 4px; }
+.entry-indicators > span { background: #252c38; color: #aeb6c4; border-radius: 20px;
+  font-size: 9px; padding: 3px 6px; text-transform: uppercase; }
+.month-nav { display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  text-align: center; margin-bottom: 10px; }
+.month-grid { display: grid; grid-template-columns: repeat(7,minmax(95px,1fr));
+  border-top: 1px solid #2a3140; border-left: 1px solid #2a3140; }
+.month-weekday { padding: 7px; color: #798292; text-align: center; font-size: 10px;
+  text-transform: uppercase; border-right: 1px solid #2a3140; border-bottom: 1px solid #2a3140; }
+.month-cell { min-height: 105px; padding: 7px; border-right: 1px solid #2a3140;
+  border-bottom: 1px solid #2a3140; background: #0d1119; }
+.month-cell.outside { background: #0a0d12; }
+.month-cell > span { color: #7f8998; font-size: 10px; }
+.month-entry { display: grid; gap: 4px; width: 100%; margin-top: 6px; padding: 6px;
+  border: 1px solid #373354; border-radius: 6px; background: #191725; color: #ddd9ff;
+  text-align: left; font-size: 9px; }
+.month-entry:disabled { opacity: .75; cursor: not-allowed; }
+.month-entry .entry-indicators > span { font-size: 7px; }
 @media (max-width: 1050px) {
   main { padding: 28px 25px; }
   .shell { grid-template-columns: 190px 1fr; }
@@ -370,4 +424,6 @@ details summary { cursor: pointer; color: #bbc2cf; font-size: 12px; margin: 9px 
   .editor-grid { grid-template-columns: 1fr; }
   .preview-column { border-right: 0; border-bottom: 1px solid #272d3a; }
   .editor-inspector { max-height: none; }
+  .weekday-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .month-grid { grid-template-columns: repeat(7,minmax(82px,1fr)); }
 }

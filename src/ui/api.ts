@@ -22,6 +22,11 @@ import type {
   RenderPreflightResult,
   RenderStartRequest,
   RenderStartResult,
+  ScheduleDraftResult,
+  ScheduleEntry,
+  ScheduleRuleSet,
+  ScheduleRules,
+  SchedulableShort,
   ShortProject,
   Template,
   RelinkSourceResult,
@@ -191,6 +196,35 @@ export const api = {
     request<RenderStartResult>(`/renders/${encodeURIComponent(renderId)}/retry`, {
       method: "POST", body: "{}"
     }),
+  scheduleRules: () => request<ScheduleRuleSet>("/schedule/rules"),
+  updateScheduleRules: (rules: ScheduleRules, expectedRevision?: number) =>
+    request<ScheduleRuleSet>("/schedule/rules", {
+      method: "PUT",
+      body: JSON.stringify({
+        ...rules,
+        ...(expectedRevision === undefined ? {} : { expectedRevision })
+      })
+    }),
+  scheduleEntries: () => requestAll<ScheduleEntry>("/schedule"),
+  draftSchedule: (shorts: SchedulableShort[], expectedRulesRevision: number) =>
+    request<ScheduleDraftResult>("/schedule/draft", {
+      method: "POST", body: JSON.stringify({ shorts, expectedRulesRevision })
+    }),
+  moveScheduleEntry: (entryId: string, expectedRevision: number, publishAt: string) =>
+    request<ScheduleEntry>(`/schedule/${encodeURIComponent(entryId)}/move`, {
+      method: "POST", body: JSON.stringify({ expectedRevision, publishAt })
+    }),
+  markSchedulePublished: (
+    entryId: string,
+    expectedRevision: number,
+    youtubeUrl?: string
+  ) => request<ScheduleEntry>(`/schedule/${encodeURIComponent(entryId)}/published`, {
+    method: "POST",
+    body: JSON.stringify({
+      expectedRevision,
+      ...(youtubeUrl === undefined ? {} : { youtubeUrl })
+    })
+  }),
   importAsset: (path: string, provenance: string, reusable: boolean) =>
     request<Asset>("/assets/import", {
       method: "POST", body: JSON.stringify({ path, provenance, reusable })

@@ -2,6 +2,30 @@
 
 ## 2026-07-30
 
+- Closed UI-01.5 with isolated credential-free fixture
+  `UI-01.5-macos-2026-07-30`. The Electron walkthrough passed first-run rule
+  creation, exact revision editing, newest eligible-Render selection,
+  prioritized atomic drafting, list/month navigation, occupied-slot feedback,
+  a legal planned move, rerender publication blocking, optional YouTube URL
+  recording, permanent lock, and complete restart persistence.
+- Added `CalendarWorkspace`, paginated schedule API reads and exact mutations,
+  a browser-safe shared wall-time resolver, active-zone list/month formatting,
+  detailed DST warnings, local legal-move explanations, irreversible publication
+  confirmation, and permanent stored-state indicators without changing frozen
+  HTTP/MCP contracts.
+- Interactive UAT found and fixed a strict replacement defect where persisted
+  rule metadata leaked into the editable form. Existing rules now become an
+  explicit seven-field `ScheduleRules` snapshot; a component regression proves
+  that revisioned saves contain no entity metadata. Final evidence is
+  `UI-01.5-macos-2026-07-30.png`, SHA-256
+  `21214f4c07d2c80ca791a29aa8f446bb66c6ae403370e2b992ccf425dfb4c7f2`.
+  The accepted database contained zero cloud authorizations, and no upload,
+  authentication, or remote verification occurred.
+- Failure-oriented shipping review found that React's `busy` state alone left
+  a same-tick duplicate schedule mutation window. A synchronous operation guard
+  now covers rule saves, drafts, moves, and publication recording; the exact
+  rule-save regression submits twice while the first request is unresolved and
+  proves only one mutation is sent.
 - Closed UI-01.4 with the fresh credential-free macOS fixture
   `UI-01.4-macos-2026-07-30-v2`. The accepted lineage visibly encoded, cancelled
   once with both Job and Render at `cancelled`/`JOB_CANCELLED`, retried from the

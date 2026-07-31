@@ -3,34 +3,23 @@ import {
   scheduleDstPolicyId,
   type ScheduleDraftEntry,
   type ScheduleDraftResult,
-  type ScheduleDstWarning,
   type ScheduleRules,
   type SchedulableShort
 } from "../shared/domain.js";
 import { AppError } from "../shared/errors.js";
+import {
+  resolveZonedWallTime,
+  type ResolvedScheduleSlot
+} from "../shared/schedule-time.js";
+
+export { resolveZonedWallTime } from "../shared/schedule-time.js";
 
 export type { SchedulableShort };
-
-interface ResolvedSlot {
-  instant: Date;
-  warning?: ScheduleDstWarning;
-}
-
-interface ZonedParts {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  second: number;
-}
 
 export interface OccupiedScheduleEntry {
   publishAt: string;
   episodeId: string;
 }
-
-const zoneFormatters = new Map<string, Intl.DateTimeFormat>();
 
 export function timezoneDatabaseVersion(): string {
   return process.versions.tz ?? "unknown";
@@ -47,7 +36,7 @@ export function draftSchedule(
   const occupied = new Set(occupiedInstants.map((instant) => new Date(instant).toISOString()));
   const sorted = [...shorts].sort((a, b) => b.priority - a.priority || a.shortId.localeCompare(b.shortId));
   const entries: ScheduleDraftEntry[] = [];
-  const warnings: ScheduleDstWarning[] = [];
+  const warnings: ScheduleDraftResult["warnings"] = [];
   const episodeTimes = new Map<string, number[]>();
   for (const entry of occupiedEntries) {
     const time = new Date(entry.publishAt).getTime();
@@ -94,12 +83,13 @@ export function draftSchedule(
 export function isLegalScheduleInstant(publishAt: string, rules: ScheduleRules): boolean {
   const instant = new Date(publishAt);
   if (Number.isNaN(instant.getTime())) return false;
-  const local = partsInZone(instant, rules.timezone);
+  const nearbyDate = new Date(Date.UTC(
+    instant.getUTCFullYear(),
+    instant.getUTCMonth(),
+    instant.getUTCDate()
+  ));
   for (const dayOffset of [-1, 0, 1]) {
-    const candidateDate = addUtcDays(
-      new Date(Date.UTC(local.year, local.month - 1, local.day)),
-      dayOffset
-    );
+    const candidateDate = addUtcDays(nearbyDate, dayOffset);
     const dateKey = formatDate(candidateDate);
     if (
       dateKey < rules.startDate ||
@@ -115,88 +105,8 @@ export function isLegalScheduleInstant(publishAt: string, rules: ScheduleRules):
   return false;
 }
 
-export function resolveZonedWallTime(
-  localDate: string,
-  localTime: string,
-  timezone: string
-): ResolvedSlot {
-  validateTimezone(timezone);
-  const [year, month, day] = localDate.split("-").map(Number) as [number, number, number];
-  const [hour, minute] = localTime.split(":").map(Number) as [number, number];
-  const desired = Date.UTC(year, month - 1, day, hour, minute);
-  const desiredParts: ZonedParts = { year, month, day, hour, minute, second: 0 };
-
-  const offsets = new Set<number>();
-  for (let hours = -72; hours <= 72; hours += 6) {
-    const instant = desired + hours * 3_600_000;
-    offsets.add(offsetAt(instant, timezone));
-  }
-  const candidates = [...offsets]
-    .map((offset) => new Date(desired - offset))
-    .filter((instant) => sameParts(partsInZone(instant, timezone), desiredParts))
-    .sort((left, right) => left.getTime() - right.getTime())
-    .filter((instant, index, all) => index === 0 || instant.getTime() !== all[index - 1]!.getTime());
-
-  if (candidates.length === 1) return { instant: candidates[0]! };
-  if (candidates.length > 1) {
-    const selected = candidates[0]!;
-    return {
-      instant: selected,
-      warning: {
-        kind: "ambiguous_local_time",
-        localDate,
-        localTime,
-        timezone,
-        selectedUtcInstant: selected.toISOString(),
-        alternativeUtcInstant: candidates[1]!.toISOString(),
-        adjustmentMinutes: 0
-      }
-    };
-  }
-
-  const orderedOffsets = [...offsets].sort((left, right) => left - right);
-  let beforeOffset: number | undefined;
-  let gapMilliseconds = 0;
-  for (let index = 1; index < orderedOffsets.length; index++) {
-    const gap = orderedOffsets[index]! - orderedOffsets[index - 1]!;
-    if (gap > gapMilliseconds) {
-      beforeOffset = orderedOffsets[index - 1]!;
-      gapMilliseconds = gap;
-    }
-  }
-  if (beforeOffset === undefined || gapMilliseconds <= 0) {
-    throw new AppError(
-      "INVALID_STATE",
-      `Could not resolve ${localDate} ${localTime} in ${timezone}`,
-      422
-    );
-  }
-  const selected = new Date(desired - beforeOffset);
-  const shifted = partsInZone(selected, timezone);
-  if (
-    localPartsValue(shifted) - localPartsValue(desiredParts) !== gapMilliseconds
-  ) {
-    throw new AppError(
-      "INVALID_STATE",
-      `Could not apply the timezone gap policy for ${localDate} ${localTime} in ${timezone}`,
-      422
-    );
-  }
-  return {
-    instant: selected,
-    warning: {
-      kind: "nonexistent_local_time",
-      localDate,
-      localTime,
-      timezone,
-      selectedUtcInstant: selected.toISOString(),
-      adjustmentMinutes: gapMilliseconds / 60_000
-    }
-  };
-}
-
-function legalSlots(rules: ScheduleRules, horizonDays: number): ResolvedSlot[] {
-  const slots: ResolvedSlot[] = [];
+function legalSlots(rules: ScheduleRules, horizonDays: number): ResolvedScheduleSlot[] {
+  const slots: ResolvedScheduleSlot[] = [];
   const start = parseDate(rules.startDate);
   for (let day = 0; day < horizonDays; day++) {
     const date = addUtcDays(start, day);
@@ -207,53 +117,6 @@ function legalSlots(rules: ScheduleRules, horizonDays: number): ResolvedSlot[] {
     }
   }
   return slots.sort((left, right) => left.instant.getTime() - right.instant.getTime());
-}
-
-function offsetAt(instant: number, timezone: string): number {
-  return localPartsValue(partsInZone(new Date(instant), timezone)) - instant;
-}
-
-function localPartsValue(parts: ZonedParts): number {
-  return Date.UTC(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-    parts.minute,
-    parts.second
-  );
-}
-
-function sameParts(left: ZonedParts, right: ZonedParts): boolean {
-  return left.year === right.year &&
-    left.month === right.month &&
-    left.day === right.day &&
-    left.hour === right.hour &&
-    left.minute === right.minute &&
-    left.second === right.second;
-}
-
-function partsInZone(date: Date, timezone: string): ZonedParts {
-  let formatter = zoneFormatters.get(timezone);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hourCycle: "h23"
-    });
-    zoneFormatters.set(timezone, formatter);
-  }
-  const parts = formatter.formatToParts(date);
-  return Object.fromEntries(
-    parts
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, Number(part.value)])
-  ) as unknown as ZonedParts;
 }
 
 function validateTimezone(timezone: string): void {
