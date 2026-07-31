@@ -2,6 +2,12 @@
 
 ## 2026-07-30
 
+- Published `GeorgeQLe/short-editor` as a public MIT repository at commit
+  `db8e151`, enabled issues, OSS topics, private vulnerability reporting,
+  dependency alerts and security updates, secret scanning with push
+  protection, and immutable releases. Published the exact
+  `model-small.en-e0e3c0a` model archive and manifest; GitHub's server-side
+  digests match the staged SHA-256 values, and anonymous download checks pass.
 - Closed UI-01.5 with isolated credential-free fixture
   `UI-01.5-macos-2026-07-30`. The Electron walkthrough passed first-run rule
   creation, exact revision editing, newest eligible-Render selection,

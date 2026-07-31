@@ -1,7 +1,8 @@
 # macOS release-input evidence — 2026-07-30
 
-This record covers the locally staged Apple Silicon release inputs and unsigned
-test package. It is not final publication approval.
+This record covers the published open-source repository, immutable model
+release, locally staged Apple Silicon release inputs, and unsigned test
+package. It is not final application-release approval.
 
 ## Reproducible inputs
 
@@ -59,15 +60,28 @@ developer-machine paths in the three executable runtime inputs.
 As expected for an unsigned build, Developer ID verification, Gatekeeper,
 notarization, and staple validation are not passed.
 
+## Public repository and immutable model release
+
+- Repository: <https://github.com/GeorgeQLe/short-editor>
+- Visibility: public.
+- Source license detected by GitHub: MIT.
+- Release: <https://github.com/GeorgeQLe/short-editor/releases/tag/model-small.en-e0e3c0a>
+- GitHub immutable releases: enabled before release creation.
+- Private vulnerability reporting, dependency vulnerability alerts, Dependabot
+  security updates, secret scanning, and push protection: enabled.
+- Published manifest: 1,823 bytes, GitHub digest
+  `sha256:7b7c1d4b1bcef38f99a0920748914538d0e82791e60b3c65025547e75cfdd1db`.
+- Published archive: 445,185,198 bytes, GitHub digest
+  `sha256:65dcc9aabf93c44a2d23931df9aaabeb2a45278df7fded9a428501ec45fe3455`.
+- An unauthenticated manifest download reproduced the expected SHA-256, and an
+  unauthenticated archive request followed GitHub's release-asset redirect to
+  HTTP 200.
+
 ## Remaining owner gates
 
-1. The GitHub repository is currently private. Setup Center uses anonymous
-   download URLs, so the repository must be public before the guarded
-   `npm run release:publish-model` command can create the versioned release.
-2. Enable GitHub release immutability before creating that release.
-3. Supply a Developer ID Application identity and notarization authorization,
+1. Supply a Developer ID Application identity and notarization authorization,
    rebuild, then require all Apple validation fields to pass.
-4. Complete the clean-macOS checklist in `docs/macos-public-beta-acceptance.md`
+2. Complete the clean-macOS checklist in `docs/macos-public-beta-acceptance.md`
    and give final owner approval.
 
 The model manifest shipped in the application is covered by the eventual

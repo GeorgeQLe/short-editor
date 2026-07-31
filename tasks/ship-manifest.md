@@ -153,9 +153,29 @@ versioned tag and a new signed application manifest.
 
 ### Next command
 
-Commit and push the reviewed source while private, enable public visibility and
-immutable releases, publish the versioned model assets, verify anonymous
-downloads, then record the resulting GitHub evidence in a follow-up commit.
+Supply a Developer ID Application identity and notarization authorization,
+rebuild with `npm run package:mac`, require every Apple validation field to
+pass, and complete `docs/macos-public-beta-acceptance.md` before final owner
+approval.
+
+### Publication evidence
+
+- Source commit `db8e151` was pushed before the visibility transition.
+- GitHub reports <https://github.com/GeorgeQLe/short-editor> as public with an
+  MIT license, issues, OSS topics, branch cleanup, private vulnerability
+  reporting, dependency alerts and security updates, secret scanning with push
+  protection, and immutable releases enabled.
+- Release
+  <https://github.com/GeorgeQLe/short-editor/releases/tag/model-small.en-e0e3c0a>
+  is published, non-draft, and non-prerelease.
+- GitHub reports the 1,823-byte manifest digest as
+  `sha256:7b7c1d4b1bcef38f99a0920748914538d0e82791e60b3c65025547e75cfdd1db`
+  and the 445,185,198-byte archive digest as
+  `sha256:65dcc9aabf93c44a2d23931df9aaabeb2a45278df7fded9a428501ec45fe3455`.
+  These exactly match the staged inputs and committed runtime manifest.
+- An anonymous manifest fetch reproduced its expected SHA-256, and an
+  anonymous archive HEAD request followed the public release redirect and
+  returned HTTP 200.
 
 ## UI-01.5 scheduling workflow and acceptance — 2026-07-30
 
