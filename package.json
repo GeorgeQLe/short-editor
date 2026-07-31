@@ -21,6 +21,7 @@
     "dev:web": "vite",
     "build": "npm run typecheck && vite build && tsc -p tsconfig.node.json",
     "smoke:preload": "electron dist/electron/preload-smoke.js",
+    "smoke:renderer": "electron dist/electron/renderer-smoke.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
@@ -81,7 +82,7 @@
   },
   "build": {
     "appId": "com.lexcorp.shorteditor",
-    "productName": "Short Editor",
+    "productName": "SiftCut",
     "asarUnpack": [
       "**/*.node",
       "resources/bin/**"
@@ -135,6 +136,7 @@
       "target": "nsis"
     },
     "mac": {
+      "icon": "resources/branding/siftcut-app-icon-1024.png",
       "target": [
         {
           "target": "dmg",

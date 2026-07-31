@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Short Editor v1 local provider worker.
+"""SiftCut v1 local provider worker.
 
 The worker never opens application storage and never downloads a model. Local
 faster-whisper models are resolved to an existing directory before the provider

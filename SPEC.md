@@ -1,15 +1,15 @@
-# Short Editor v1 Engineering Specification
+# SiftCut v1 Engineering Specification
 
 | Field | Value |
 | --- | --- |
 | Specification version | 1.6.0 |
 | Status | Active; owner review required before acceptance |
 | Last updated | 2026-07-30 |
-| Owners | Short Editor maintainers |
+| Owners | SiftCut maintainers |
 | Normative review | Must be recorded by an owner in REL-01 evidence |
 | Release-acceptance platform | Apple Silicon macOS 14+ |
 
-This document is the authoritative engineering specification for Short Editor v1.
+This document is the authoritative engineering specification for SiftCut v1.
 If this document conflicts with the README, source comments, tests, UI copy, an
 issue, or an implementation detail, this document wins. Code describes current
 behavior; it does not silently redefine required behavior.
@@ -37,7 +37,7 @@ when, they appear in all capitals.
 
 ### 2.1 Goal and users
 
-Short Editor is an English-only, offline-first, single-user macOS desktop
+SiftCut is an English-only, offline-first, single-user macOS desktop
 application that turns a user's long-form, spoken-word media into a reviewed set
 of vertical YouTube Shorts and a manual publication schedule.
 
@@ -78,7 +78,7 @@ workstation. The product MUST support the complete workflow:
 
 ### 2.3 Non-goals
 
-Short Editor v1 MUST NOT:
+SiftCut v1 MUST NOT:
 
 - publish to YouTube or implement YouTube OAuth;
 - provide a general-purpose multitrack nonlinear editor;
@@ -312,7 +312,7 @@ and validation passed, with persisted normalized determinism evidence marked
 
 Schedule-entry status MUST distinguish at least `draft`, `planned`, and
 `published`. Published entries MUST be locked. A published record MUST NOT imply
-that Short Editor performed the upload.
+that SiftCut performed the upload.
 
 ### 5.3 Revisions and invalidation
 
@@ -592,7 +592,7 @@ requirement:
   movement of unlocked entries, rule editing, and marking an entry published.
 - Marking published MUST be a manual recordkeeping action with an optional valid
   YouTube URL. It MUST lock the entry.
-- Short Editor MUST NOT upload, authenticate to YouTube, or claim to confirm
+- SiftCut MUST NOT upload, authenticate to YouTube, or claim to confirm
   remote publication in v1.
 
 As of 2026-07-26, YouTube states that eligible square or vertical uploads up to

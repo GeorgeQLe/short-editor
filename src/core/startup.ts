@@ -38,7 +38,7 @@ export function prepareDataDirectory(
   if (nativePopulated && legacyPopulated) {
     throw new AppError(
       "INVALID_STATE",
-      "Both the native and legacy data locations contain Short Editor data. Neither was opened; move one aside and restart.",
+      "Both the native and legacy data locations contain SiftCut data. Neither was opened; move one aside and restart.",
       409,
       { nativeDirectory: native, legacyDirectory: legacy }
     );
@@ -133,7 +133,7 @@ function checkpointLegacyDatabase(directory: string): void {
     if (checkpoint[0]?.busy) {
       throw new AppError(
         "DEPENDENCY_UNAVAILABLE",
-        "The legacy database is busy; close other Short Editor processes and retry",
+        "The legacy database is busy; close other SiftCut processes and retry",
         503
       );
     }

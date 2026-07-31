@@ -1,4 +1,4 @@
-# Short Editor v1 Implementation Plan
+# SiftCut v1 Implementation Plan
 
 This is the issue-ready execution roadmap for the outstanding requirements in
 [`SPEC.md`](SPEC.md). The specification remains authoritative. This plan does

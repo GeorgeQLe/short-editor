@@ -12,7 +12,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
 aside { border-right: 1px solid #232834; padding: 28px 18px; display: flex; flex-direction: column; background: #0d1017; overflow-y: auto; }
 .brand { display: flex; gap: 11px; align-items: center; padding: 0 10px 30px; }
-.brand > span { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; font-weight: 900; background: linear-gradient(135deg,#856cff,#49c7f2); }
+.brand > img { width: 34px; height: 34px; flex: 0 0 34px; }
 nav { display: grid; gap: 7px; }
 nav button { border: 0; color: #929aaa; background: transparent; padding: 11px 13px; border-radius: 9px; text-align: left; display: flex; gap: 12px; }
 nav button:hover { color: #fff; background: #151a24; }

@@ -1,4 +1,4 @@
-Short Editor distributes FFmpeg 8.1.2 configured with --enable-gpl and
+SiftCut distributes FFmpeg 8.1.2 configured with --enable-gpl and
 libx264. The resulting FFmpeg binaries are distributed under GPL-2.0-or-later.
 The build also statically includes MIT-licensed FreeType and HarfBuzz for
 caption rendering and text shaping.

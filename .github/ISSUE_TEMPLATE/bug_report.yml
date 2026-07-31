@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible Short Editor problem
+description: Report a reproducible SiftCut problem
 title: "[Bug]: "
 labels:
   - bug
@@ -11,7 +11,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Short Editor version
+      label: SiftCut version
       placeholder: 0.1.0 or commit SHA
     validations:
       required: true

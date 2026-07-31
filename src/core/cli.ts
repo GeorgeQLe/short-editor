@@ -6,7 +6,7 @@ const host = DEFAULT_API_HOST;
 const port = Number(process.env.SHORT_EDITOR_PORT ?? 43120);
 const service = createCore(undefined, process.send ? new ProcessOpenAiProvider() : undefined);
 const server = createApi(service, process.env.SHORT_EDITOR_DESKTOP_TOKEN).listen(port, host, () => {
-  console.log(`Short Editor core listening on http://${host}:${port}`);
+  console.log(`SiftCut core listening on http://${host}:${port}`);
 });
 
 const shutdown = () => server.close(() => {

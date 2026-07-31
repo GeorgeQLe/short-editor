@@ -1,6 +1,6 @@
 # Third-party notices
 
-The MIT license in `LICENSE` applies to Short Editor's original source code.
+The MIT license in `LICENSE` applies to SiftCut's original source code.
 Third-party components retain their own licenses:
 
 - Release builds of FFmpeg 8.1.2 statically link x264 r3222 and are distributed

@@ -1,6 +1,6 @@
 # Redistributable release sources
 
-Short Editor's macOS FFmpeg binaries are GPL builds because they statically
+SiftCut's macOS FFmpeg binaries are GPL builds because they statically
 link x264. Release archives must include the notices in `resources/licenses`.
 
 ## Exact inputs

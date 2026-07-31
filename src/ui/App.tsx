@@ -13,6 +13,11 @@ import { errorMessage } from "./utils";
 type View = "Library" | "Candidates" | "Editor" | "Calendar" | "Cloud Access" |
   "Setup" | "Recovery" | "About";
 
+const siftCutLogoUrl = new URL(
+  "../../resources/branding/siftcut-app-icon-master.svg",
+  import.meta.url,
+).href;
+
 export function App() {
   const [view, setView] = useState<View>("Library");
   const [libraryTab, setLibraryTab] = useState<LibraryTab>("episodes");
@@ -88,7 +93,10 @@ export function App() {
   return (
     <div className="shell">
       <aside aria-label="Primary navigation">
-        <div className="brand"><span aria-hidden="true">S</span><strong>Short Editor</strong></div>
+        <div className="brand">
+          <img src={siftCutLogoUrl} alt="" aria-hidden="true" />
+          <strong>SiftCut</strong>
+        </div>
         <nav>
           {(["Library", "Candidates", "Editor", "Calendar", "Cloud Access", "Setup",
             "Recovery", "About"] as View[]).map((item) => (

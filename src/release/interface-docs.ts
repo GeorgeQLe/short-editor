@@ -107,7 +107,7 @@ export function serializeReleaseInterfaceDocumentation(): string {
       `| \`${tool.name}\` | \`${tool.http.operationId}\` | ${tool.http.method} | ${tool.annotations.readOnlyHint ? "read" : "write"} |`
     ).join("\n");
 
-  return `# Short Editor v1 release interfaces
+  return `# SiftCut v1 release interfaces
 
 This document is generated. The checked-in JSON artifacts are the exact
 machine-readable compatibility boundary:

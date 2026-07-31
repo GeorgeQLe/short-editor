@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>SiftCut — Icon Color Studies</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f3f1fa;
+      background: #0b0a10;
+      font-synthesis: none;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        radial-gradient(circle at 18% -10%, #2b214b 0, transparent 34rem),
+        radial-gradient(circle at 88% 14%, #352213 0, transparent 28rem),
+        #0b0a10;
+    }
+
+    button { font: inherit; }
+
+    .page {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 72px 0 84px;
+    }
+
+    .masthead {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr);
+      gap: 64px;
+      align-items: center;
+      padding-bottom: 64px;
+      border-bottom: 1px solid #ffffff18;
+    }
+
+    .kicker,
+    .section-label {
+      margin: 0 0 14px;
+      color: #a99cf3;
+      font-size: 12px;
+      font-weight: 760;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(48px, 7vw, 86px);
+      line-height: .95;
+      letter-spacing: -.065em;
+    }
+
+    .intro {
+      max-width: 680px;
+      margin: 26px 0 0;
+      color: #aaa5b6;
+      font-size: 18px;
+      line-height: 1.65;
+    }
+
+    .hero-preview {
+      display: grid;
+      place-items: center;
+      min-height: 430px;
+      border: 1px solid #ffffff1a;
+      border-radius: 32px;
+      background:
+        linear-gradient(145deg, #ffffff0d, transparent 50%),
+        #111018cc;
+      box-shadow: 0 32px 90px #0008;
+    }
+
+    .hero-preview .icon { width: 260px; }
+
+    .study {
+      padding-top: 64px;
+    }
+
+    .study-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 30px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 44px);
+      letter-spacing: -.04em;
+    }
+
+    .study-heading p {
+      max-width: 440px;
+      margin: 0;
+      color: #8f899a;
+      line-height: 1.55;
+    }
+
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .palette {
+      min-width: 0;
+      padding: 0;
+      overflow: hidden;
+      color: inherit;
+      text-align: left;
+      border: 1px solid #ffffff16;
+      border-radius: 22px;
+      background: #121118e8;
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .palette:hover {
+      transform: translateY(-3px);
+      border-color: #ffffff36;
+      background: #17151e;
+    }
+
+    .palette:focus-visible {
+      outline: 3px solid #a99cf3;
+      outline-offset: 3px;
+    }
+
+    .palette[aria-pressed="true"] {
+      border-color: #b4a8ff;
+      box-shadow: inset 0 0 0 1px #b4a8ff;
+    }
+
+    .palette-stage {
+      min-height: 226px;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 50% 40%, #ffffff12, transparent 48%),
+        #0e0d13;
+    }
+
+    .palette-stage .icon { width: 148px; }
+
+    .palette-copy {
+      padding: 20px 20px 22px;
+      border-top: 1px solid #ffffff10;
+    }
+
+    .palette-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .palette-title > strong {
+      margin: 0;
+      font-size: 17px;
+      letter-spacing: -.015em;
+    }
+
+    .tag {
+      flex: none;
+      padding: 5px 8px;
+      color: #bbb3cc;
+      border: 1px solid #ffffff18;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 720;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .palette-copy p {
+      min-height: 57px;
+      margin: 10px 0 18px;
+      color: #8e8998;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+
+    .swatch {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr);
+      gap: 6px;
+      align-items: center;
+      min-width: 0;
+      color: #777280;
+      font: 9px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .swatch i {
+      width: 18px;
+      height: 18px;
+      border: 1px solid #ffffff26;
+      border-radius: 6px;
+      background: var(--color);
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr);
+      gap: 18px;
+      margin-top: 64px;
+    }
+
+    .selection,
+    .context-panel {
+      border: 1px solid #ffffff16;
+      border-radius: 26px;
+      background: #111016d9;
+    }
+
+    .selection {
+      padding: 30px;
+    }
+
+    .selection h2 { font-size: 32px; }
+
+    .selection p {
+      margin: 14px 0 26px;
+      color: #918b9b;
+      line-height: 1.6;
+    }
+
+    .selected-colors {
+      display: grid;
+      gap: 9px;
+    }
+
+    .selected-color {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 12px 14px;
+      border: 1px solid #ffffff12;
+      border-radius: 12px;
+      color: #aaa4b1;
+      font-size: 12px;
+    }
+
+    .selected-color span {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .selected-color i {
+      width: 20px;
+      height: 20px;
+      border-radius: 7px;
+      background: var(--color);
+    }
+
+    .selected-color code {
+      color: #e5e1eb;
+      font-size: 12px;
+    }
+
+    .context-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+    }
+
+    .context {
+      min-height: 350px;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 22px;
+      padding: 30px;
+    }
+
+    .context + .context { border-left: 1px solid #ffffff18; }
+    .context.light { color: #19171e; background: #f2f0eb; }
+    .context.dark { color: #f2eef8; background: #17151c; }
+
+    .size-row {
+      display: flex;
+      align-items: end;
+      gap: 18px;
+    }
+
+    .size-row .icon:nth-child(1) { width: 112px; }
+    .size-row .icon:nth-child(2) { width: 48px; }
+    .size-row .icon:nth-child(3) { width: 24px; }
+
+    .context strong {
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      opacity: .62;
+    }
+
+    .icon {
+      --tile: #19164a;
+      --top: #8658f5;
+      --bottom: #f39a3f;
+      position: relative;
+      display: block;
+      aspect-ratio: 1;
+      overflow: hidden;
+      border-radius: 22%;
+      background: linear-gradient(145deg, color-mix(in srgb, var(--tile), white 8%), var(--tile));
+      box-shadow: 0 12px 28px #0005;
+    }
+
+    .icon::before {
+      content: "";
+      position: absolute;
+      z-index: 2;
+      top: 4.4%;
+      left: 14%;
+      width: 72%;
+      height: 1.45%;
+      border-radius: 999px;
+      background: #ffffff16;
+    }
+
+    .film {
+      position: absolute;
+      inset: 22% 32%;
+    }
+
+    .segment {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 52%;
+      background: var(--color);
+    }
+
+    .segment::after {
+      content: "";
+      position: absolute;
+      left: 12%;
+      width: 17%;
+      height: 30%;
+      border-radius: 32%;
+      background: var(--tile);
+      box-shadow: calc(347% + 1px) 0 0 var(--tile);
+    }
+
+    .segment.top {
+      top: 0;
+      --color: var(--top);
+      border-radius: 15% 15% 0 0;
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 82%);
+    }
+
+    .segment.top::after { top: 20%; }
+
+    .segment.bottom {
+      bottom: 0;
+      --color: var(--bottom);
+      border-radius: 0 0 15% 15%;
+      clip-path: polygon(0 0, 100% 18%, 100% 100%, 0 100%);
+    }
+
+    .segment.bottom::after { top: 52%; }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      margin-top: 48px;
+      padding-top: 24px;
+      color: #706a77;
+      border-top: 1px solid #ffffff12;
+      font-size: 12px;
+    }
+
+    @media (max-width: 960px) {
+      .masthead { grid-template-columns: 1fr; }
+      .hero-preview { min-height: 360px; }
+      .palette-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .comparison { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 600px) {
+      .page { width: min(100% - 24px, 1180px); padding-top: 42px; }
+      .masthead { gap: 38px; padding-bottom: 44px; }
+      .hero-preview { min-height: 300px; }
+      .hero-preview .icon { width: 210px; }
+      .study { padding-top: 46px; }
+      .study-heading { display: block; }
+      .study-heading p { margin-top: 14px; }
+      .palette-grid { grid-template-columns: 1fr; }
+      .context-panel { grid-template-columns: 1fr; }
+      .context + .context { border-top: 1px solid #ffffff18; border-left: 0; }
+      footer { display: block; line-height: 1.6; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .palette { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="masthead" aria-labelledby="page-title">
+      <div>
+        <p class="kicker">SiftCut identity study · 01</p>
+        <h1 id="page-title">What should a cut feel like?</h1>
+        <p class="intro">
+          Eight color directions for the vertical film-cut mark. Each option keeps
+          the same silhouette, so the decision can focus on meaning, energy, and
+          how clearly the top and bottom clips separate at small sizes.
+        </p>
+      </div>
+      <div class="hero-preview" aria-label="Selected SiftCut icon preview">
+        <span class="icon selected-icon" aria-hidden="true">
+          <span class="film">
+            <span class="segment top"></span>
+            <span class="segment bottom"></span>
+          </span>
+        </span>
+      </div>
+    </section>
+
+    <section class="study" aria-labelledby="directions-title">
+      <div class="study-heading">
+        <div>
+          <p class="section-label">Color directions</p>
+          <h2 id="directions-title">Eight plausible personalities</h2>
+        </div>
+        <p>Select any card to compare it at Dock, sidebar, and favicon scale on both light and dark surfaces.</p>
+      </div>
+
+      <div class="palette-grid">
+        <button class="palette" type="button" aria-pressed="true"
+          data-name="Creator Contrast" data-description="Expressive, energetic, and already connected to the violet UI. Orange makes the finished clip feel warm and active."
+          data-tile="#19164A" data-top="#8658F5" data-bottom="#F39A3F">
+          <span class="palette-stage">
+            <span class="icon" style="--tile:#19164A;--top:#8658F5;--bottom:#F39A3F" aria-hidden="true"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+          </span>
+          <span class="palette-copy">
+            <span class="palette-title"><strong>Creator Contrast</strong><span class="tag">Current</span></span>
+            <p>Playful and memorable. Strongest link to SiftCut’s existing violet interface.</p>
+            <span class="swatches"><span class="swatch"><i style="--color:#19164A"></i>#19164A</span><span class="swatch"><i style="--color:#8658F5"></i>#8658F5</span><span class="swatch"><i style="--color:#F39A3F"></i>#F39A3F</span></span>
+          </span>
+        </button>
+
+        <button class="palette" type="button" aria-pressed="false"
+          data-name="Electric Edit" data-description="Blue reads as precise source footage; coral signals the decisive cut. Crisp, contemporary, and product-oriented."
+          data-tile="#0B1635" data-top="#3B82F6" data-bottom="#F43F5E">
+          <span class="palette-stage">
+            <span class="icon" style="--tile:#0B1635;--top:#3B82F6;--bottom:#F43F5E" aria-hidden="true"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+          </span>
+          <span class="palette-copy">
+            <span class="palette-title"><strong>Electric Edit</strong><span class="tag">Precise</span></span>
+            <p>A sharper software identity with a clear “source to cut” transition.</p>
+            <span class="swatches"><span class="swatch"><i style="--color:#0B1635"></i>#0B1635</span><span class="swatch"><i style="--color:#3B82F6"></i>#3B82F6</span><span class="swatch"><i style="--color:#F43F5E"></i>#F43F5E</span></span>
+          </span>
+        </button>
+
+        <button class="palette" type="button" aria-pressed="false"
+          data-name="Signal Flow" data-description="Cyan and acid green feel fast, automated, and technical. Best for positioning SiftCut as an AI-assisted production tool."
+          data-tile="#082F36" data-top="#22D3EE" data-bottom="#A3E635">
+          <span class="palette-stage">
+            <span class="icon" style="--tile:#082F36;--top:#22D3EE;--bottom:#A3E635" aria-hidden="true"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+          </span>
+          <span class="palette-copy">
+            <span class="palette-title"><strong>Signal Flow</strong><span class="tag">AI native</span></span>
+            <p>Fast, technical, and optimistic—closer to an intelligent workflow tool.</p>
+            <span class="swatches"><span class="swatch"><i style="--color:#082F36"></i>#082F36</span><span class="swatch"><i style="--color:#22D3EE"></i>#22D3EE</span><span class="swatch"><i style="--color:#A3E635"></i>#A3E635</span></span>
+          </span>
+        </button>
+
+        <button class="palette" type="button" aria-pressed="false"
+          data-name="Cinema Cut" data-description="Crimson and gold borrow from cinema, projection, and premiere graphics. Richer and more editorial than software-like."
+          data-tile="#2A0F1B" data-top="#E11D48" data-bottom="#F5C451">
+          <span class="palette-stage">
+            <span class="icon" style="--tile:#2A0F1B;--top:#E11D48;--bottom:#F5C451" aria-hidden="true"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+          </span>
+          <span class="palette-copy">
+            <span class="palette-title"><strong>Cinema Cut</strong><span class="tag">Editorial</span></span>
+            <p>Warm, premium, and rooted in film rather than general-purpose software.</p>
+            <span class="swatches"><span class="swatch"><i style="--color:#2A0F1B"></i>#2A0F1B</span><span class="swatch"><i style="--color:#E11D48"></i>#E11D48</span><span class="swatch"><i style="--color:#F5C451"></i>#F5C451</span></span>
+          </span>
+        </button>
+
+        <button class="palette" type="button" aria-pressed="false"
+          data-name="Post House" data-description="Sky and coral are polished without feeling corporate. A friendly creative-tool palette with excellent separation."
+          data-tile="#161B2B" data-top="#7DD3FC" data-bottom="#FB7185">
+          <span class="palette-stage">
+            <span class="icon" style="--tile:#161B2B;--top:#7DD3FC;--bottom:#FB7185" aria-hidden="true"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+          </span>
+          <span class="palette-copy">
+            <span class="palette-title"><strong>Post House</strong><span class="tag">Friendly</span></span>
+            <p>Creative and polished, with softer contrast than Electric Edit.</p>
+            <span class="swatches"><span class="swatch"><i style="--color:#161B2B"></i>#161B2B</span><span class="swatch"><i style="--color:#7DD3FC"></i>#7DD3FC</span><span class="swatch"><i style="--color:#FB7185"></i>#FB7185</span></span>
+          </span>
+        </button>
+
+        <button class="palette" type="button" aria-pressed="false"
+          data-name="Violet System" data-description="A focused monochromatic family. It integrates most quietly with the current interface, though the two clips feel less semantically distinct."
+          data-tile="#211943" data-top="#8B5CF6" data-bottom="#C4B5FD">
+          <span class="palette-stage">
+            <span class="icon" style="--tile:#211943;--top:#8B5CF6;--bottom:#C4B5FD" aria-hidden="true"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+          </span>
+          <span class="palette-copy">
+            <span class="palette-title"><strong>Violet System</strong><span class="tag">Cohesive</span></span>
+            <p>Calm and unified. The most natural extension of the existing product UI.</p>
+            <span class="swatches"><span class="swatch"><i style="--color:#211943"></i>#211943</span><span class="swatch"><i style="--color:#8B5CF6"></i>#8B5CF6</span><span class="swatch"><i style="--color:#C4B5FD"></i>#C4B5FD</span></span>
+          </span>
+        </button>
+
+        <button class="palette" type="button" aria-pressed="false"
+          data-name="Clean Pro" data-description="White and slate make the silhouette the brand. Understated, durable, and suitable for a serious professional utility."
+          data-tile="#111827" data-top="#F8FAFC" data-bottom="#94A3B8">
+          <span class="palette-stage">
+            <span class="icon" style="--tile:#111827;--top:#F8FAFC;--bottom:#94A3B8" aria-hidden="true"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+          </span>
+          <span class="palette-copy">
+            <span class="palette-title"><strong>Clean Pro</strong><span class="tag">Utility</span></span>
+            <p>Quiet confidence. Less ownable by color, but highly durable and legible.</p>
+            <span class="swatches"><span class="swatch"><i style="--color:#111827"></i>#111827</span><span class="swatch"><i style="--color:#F8FAFC"></i>#F8FAFC</span><span class="swatch"><i style="--color:#94A3B8"></i>#94A3B8</span></span>
+          </span>
+        </button>
+
+        <button class="palette" type="button" aria-pressed="false"
+          data-name="Publish Ready" data-description="Teal suggests a trustworthy editing process; amber reads as the output or ready state. Purposeful and approachable."
+          data-tile="#102A24" data-top="#2DD4BF" data-bottom="#FBBF24">
+          <span class="palette-stage">
+            <span class="icon" style="--tile:#102A24;--top:#2DD4BF;--bottom:#FBBF24" aria-hidden="true"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+          </span>
+          <span class="palette-copy">
+            <span class="palette-title"><strong>Publish Ready</strong><span class="tag">Purposeful</span></span>
+            <p>A clear process-to-output story without borrowing the current violet accent.</p>
+            <span class="swatches"><span class="swatch"><i style="--color:#102A24"></i>#102A24</span><span class="swatch"><i style="--color:#2DD4BF"></i>#2DD4BF</span><span class="swatch"><i style="--color:#FBBF24"></i>#FBBF24</span></span>
+          </span>
+        </button>
+      </div>
+    </section>
+
+    <section class="comparison" aria-labelledby="selected-name">
+      <div class="selection">
+        <p class="section-label">Selected direction</p>
+        <h2 id="selected-name">Creator Contrast</h2>
+        <p id="selected-description">Expressive, energetic, and already connected to the violet UI. Orange makes the finished clip feel warm and active.</p>
+        <div class="selected-colors">
+          <div class="selected-color"><span><i id="tile-chip" style="--color:#19164A"></i>Tile</span><code id="tile-code">#19164A</code></div>
+          <div class="selected-color"><span><i id="top-chip" style="--color:#8658F5"></i>Top clip</span><code id="top-code">#8658F5</code></div>
+          <div class="selected-color"><span><i id="bottom-chip" style="--color:#F39A3F"></i>Bottom clip</span><code id="bottom-code">#F39A3F</code></div>
+        </div>
+      </div>
+
+      <div class="context-panel">
+        <div class="context light">
+          <div class="size-row" aria-hidden="true">
+            <span class="icon selected-icon"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+            <span class="icon selected-icon"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+            <span class="icon selected-icon"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+          </div>
+          <strong>Light surfaces</strong>
+        </div>
+        <div class="context dark">
+          <div class="size-row" aria-hidden="true">
+            <span class="icon selected-icon"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+            <span class="icon selected-icon"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+            <span class="icon selected-icon"><span class="film"><span class="segment top"></span><span class="segment bottom"></span></span></span>
+          </div>
+          <strong>Dark surfaces</strong>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <span>SiftCut icon color study</span>
+      <span>Same mark · three colors · eight personalities</span>
+    </footer>
+  </main>
+
+  <script>
+    const palettes = [...document.querySelectorAll(".palette")];
+    const selectedIcons = [...document.querySelectorAll(".selected-icon")];
+    const selectedName = document.querySelector("#selected-name");
+    const selectedDescription = document.querySelector("#selected-description");
+
+    const fields = {
+      tile: [document.querySelector("#tile-chip"), document.querySelector("#tile-code")],
+      top: [document.querySelector("#top-chip"), document.querySelector("#top-code")],
+      bottom: [document.querySelector("#bottom-chip"), document.querySelector("#bottom-code")]
+    };
+
+    function selectPalette(palette) {
+      palettes.forEach((item) => item.setAttribute("aria-pressed", String(item === palette)));
+
+      const colors = {
+        tile: palette.dataset.tile,
+        top: palette.dataset.top,
+        bottom: palette.dataset.bottom
+      };
+
+      selectedIcons.forEach((icon) => {
+        icon.style.setProperty("--tile", colors.tile);
+        icon.style.setProperty("--top", colors.top);
+        icon.style.setProperty("--bottom", colors.bottom);
+      });
+
+      selectedName.textContent = palette.dataset.name;
+      selectedDescription.textContent = palette.dataset.description;
+
+      Object.entries(colors).forEach(([key, value]) => {
+        fields[key][0].style.setProperty("--color", value);
+        fields[key][1].textContent = value;
+      });
+    }
+
+    palettes.forEach((palette) => {
+      palette.addEventListener("click", () => selectPalette(palette));
+    });
+  </script>
+</body>
+</html>

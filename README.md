@@ -1,9 +1,9 @@
-# Short Editor
+# SiftCut
 
 A macOS-first, local desktop application for turning long-form episodes into
 vertical YouTube Shorts.
 
-Short Editor is open source under the [MIT License](LICENSE). Release builds
+SiftCut is open source under the [MIT License](LICENSE). Release builds
 also contain separately licensed third-party components; see
 [Third-party notices](THIRD_PARTY_NOTICES.md).
 
@@ -62,7 +62,7 @@ Install the worker dependency independently from the Node dependencies:
 python3 -m pip install -r resources/worker/requirements.txt
 ```
 
-Short Editor deliberately does not download models while transcribing. Put a
+SiftCut deliberately does not download models while transcribing. Put a
 faster-whisper/CTranslate2 model containing `model.bin` below a dedicated model
 directory, then identify the selectable local models:
 
@@ -94,7 +94,7 @@ notarization credentials are supplied only by the release environment.
 
 ### macOS data
 
-During macOS development, Short Editor stores its database at
+During macOS development, SiftCut stores its database at
 `~/Library/Application Support/ShortEditor/short-editor.db`. Set
 `SHORT_EDITOR_DATA_DIR` to override the containing data directory,
 `SHORT_EDITOR_FFMPEG` to override the FFmpeg executable, or

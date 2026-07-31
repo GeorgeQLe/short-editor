@@ -106,7 +106,7 @@ function SetupCenter({ announce }: Pick<SupportCenterProps, "announce">) {
       <div className="disclosure-card">
         <strong>English transcription model</strong>
         <p>Systran/faster-whisper-small.en revision e0e3c0a is MIT licensed. The immutable
-          445.2 MB archive is downloaded from the Short Editor GitHub Release only after
+          445.2 MB archive is downloaded from the SiftCut GitHub Release only after
           confirmation. Every archive member is verified before an atomic install.</p>
         <small>Local files remain on this Mac. Ollama and OpenAI are optional and do not block the
           transcription → edit → render workflow.</small>
@@ -246,7 +246,7 @@ function AboutCenter() {
   useEffect(() => { void window.desktop?.applicationVersion?.().then(setInfo); }, []);
   return <section className="panel support-panel about-card" aria-labelledby="about-title">
     <div className="brand-mark" aria-hidden="true">S</div>
-    <h2 id="about-title">Short Editor</h2>
+    <h2 id="about-title">SiftCut</h2>
     <p>Version {info.version} · {info.platform} {info.arch}</p>
     <span className={`pill ${info.supportedPlatform ? "ready" : "optional"}`}>
       {info.supportedPlatform ? "Supported beta platform" : "Development platform"}

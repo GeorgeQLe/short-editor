@@ -1,4 +1,4 @@
-# Short Editor v1 release interfaces
+# SiftCut v1 release interfaces
 
 This document is generated. The checked-in JSON artifacts are the exact
 machine-readable compatibility boundary:

@@ -218,7 +218,7 @@ export async function buildDiagnosticPreview(input: {
 }): Promise<DiagnosticPreview> {
   const raw = {
     generatedAt: new Date().toISOString(),
-    application: { name: "Short Editor", version: input.appVersion },
+    application: { name: "SiftCut", version: input.appVersion },
     platform: { os: input.platform ?? process.platform, arch: input.arch ?? process.arch },
     health: input.readiness,
     core: input.coreHealth ?? { status: "unavailable" },
@@ -237,7 +237,7 @@ export async function buildDiagnosticPreview(input: {
   });
   return {
     policyVersion: "diagnostic-export-v1",
-    fileName: `short-editor-diagnostics-${new Date().toISOString().slice(0, 10)}.zip`,
+    fileName: `siftcut-diagnostics-${new Date().toISOString().slice(0, 10)}.zip`,
     payload: filterDiagnosticExport(consentFiltered, {
       includeSensitive: input.includePaths === true || input.includeTranscripts === true
     })

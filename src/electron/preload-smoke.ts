@@ -29,7 +29,7 @@ async function run(): Promise<void> {
   });
 
   try {
-    await window.loadURL("data:text/html,<title>Short Editor preload smoke</title>");
+    await window.loadURL("data:text/html,<title>SiftCut preload smoke</title>");
     if (preloadFailure) throw preloadFailure;
     const missing = await window.webContents.executeJavaScript(`
       (() => {

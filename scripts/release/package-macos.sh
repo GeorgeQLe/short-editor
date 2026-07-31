@@ -16,6 +16,7 @@ trap restore_development_native_binding EXIT
 
 npm run validate:runtime
 npm run build
+npm run smoke:renderer
 
 developer_identity="$(security find-identity -v -p codesigning 2>/dev/null |
   sed -n 's/.*"\\(Developer ID Application:.*\\)"/\\1/p' | head -1)"
@@ -27,8 +28,9 @@ else
   CSC_NAME="${developer_identity}" npx electron-builder --mac dmg --arm64
 fi
 
-release_app="dist/mac-arm64/Short Editor.app"
-release_dmg="dist/Short Editor-$(node -p "require('./package.json').version")-arm64.dmg"
+product_name="$(node -p "require('./package.json').build.productName")"
+release_app="dist/mac-arm64/${product_name}.app"
+release_dmg="dist/${product_name}-$(node -p "require('./package.json').version")-arm64.dmg"
 if [[ -n "${developer_identity}" ]] && [[ -n "${SHORT_EDITOR_NOTARY_PROFILE:-}" ]]; then
   xcrun notarytool submit "${release_dmg}" \
     --keychain-profile "${SHORT_EDITOR_NOTARY_PROFILE}" --wait

@@ -179,7 +179,7 @@ export function buildRenderGraph(
     "-movflags", "+faststart",
     "-map_metadata", "-1",
     "-metadata", "creation_time=1970-01-01T00:00:00Z",
-    "-metadata", "encoder=short-editor",
+    "-metadata", "encoder=siftcut",
     "-progress", "pipe:1",
     "-nostats",
     "-t", durationSeconds,

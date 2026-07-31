@@ -1,6 +1,6 @@
-# Contributing to Short Editor
+# Contributing to SiftCut
 
-Thanks for helping improve Short Editor.
+Thanks for helping improve SiftCut.
 
 ## Before opening a change
 
@@ -14,7 +14,7 @@ Thanks for helping improve Short Editor.
 
 ## Development
 
-Short Editor requires Node.js 22 or newer:
+SiftCut requires Node.js 22 or newer:
 
 ```bash
 npm ci
