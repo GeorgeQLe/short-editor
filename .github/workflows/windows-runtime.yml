@@ -55,7 +55,7 @@ jobs:
       - name: Run hermetic default suite with the thread pool
         shell: pwsh
         run: |
-          npm test 2>&1 |
+          npm.cmd test 2>&1 |
             Tee-Object build/validation-logs/windows-x64/default-tests.log
           $TestExitCode = $LASTEXITCODE
           if ($TestExitCode -ne 0) {
@@ -86,7 +86,7 @@ jobs:
       - name: Stage and validate complete x64 runtime
         shell: pwsh
         run: |
-          npm run release:stage-win:x64 2>&1 |
+          npm.cmd run release:stage-win:x64 2>&1 |
             Tee-Object build/validation-logs/windows-x64/stage-runtime.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Render with staged x64 FFmpeg and FFprobe
@@ -96,7 +96,7 @@ jobs:
           SHORT_EDITOR_TEST_FFMPEG: ${{ github.workspace }}\build\runtime\windows-x64\bin\ffmpeg.exe
           SHORT_EDITOR_TEST_FFPROBE: ${{ github.workspace }}\build\runtime\windows-x64\bin\ffprobe.exe
         run: |
-          npm run test:real-media 2>&1 |
+          npm.cmd run test:real-media 2>&1 |
             Tee-Object build/validation-logs/windows-x64/real-media.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Accept frozen worker with verified model, cancellation, restart, and offline retry
@@ -108,7 +108,7 @@ jobs:
       - name: Build and verify unsigned x64 NSIS installer
         shell: pwsh
         run: |
-          npm run package:win:x64 2>&1 |
+          npm.cmd run package:win:x64 2>&1 |
             Tee-Object build/validation-logs/windows-x64/package-installer.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Record installer and runtime hashes
@@ -175,7 +175,7 @@ jobs:
       - name: Stage mixed native ARM64 and emulated x64 runtime
         shell: pwsh
         run: |
-          npm run release:stage-win:arm64 2>&1 |
+          npm.cmd run release:stage-win:arm64 2>&1 |
             Tee-Object build/validation-logs/windows-arm64/stage-runtime.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Render under emulation with staged x64 FFmpeg and FFprobe
@@ -185,7 +185,7 @@ jobs:
           SHORT_EDITOR_TEST_FFMPEG: ${{ github.workspace }}\build\runtime\windows-arm64\bin\ffmpeg.exe
           SHORT_EDITOR_TEST_FFPROBE: ${{ github.workspace }}\build\runtime\windows-arm64\bin\ffprobe.exe
         run: |
-          npm run test:real-media 2>&1 |
+          npm.cmd run test:real-media 2>&1 |
             Tee-Object build/validation-logs/windows-arm64/real-media.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Accept emulated worker with verified model, cancellation, restart, and offline retry
@@ -197,7 +197,7 @@ jobs:
       - name: Build and verify unsigned ARM64 NSIS installer
         shell: pwsh
         run: |
-          npm run package:win:arm64 2>&1 |
+          npm.cmd run package:win:arm64 2>&1 |
             Tee-Object build/validation-logs/windows-arm64/package-installer.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Record installer and runtime hashes
