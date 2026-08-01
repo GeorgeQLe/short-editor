@@ -397,7 +397,12 @@ function normalizeArtifactError(error: unknown, fallback: string): AppError {
       "Storage is full; free disk space and retry this Render"
     );
   }
-  return new AppError("INTERNAL_ERROR", fallback);
+  const normalized = new AppError("INTERNAL_ERROR", fallback);
+  Object.defineProperty(normalized, "cause", {
+    configurable: true,
+    value: error
+  });
+  return normalized;
 }
 
 function writeExclusiveAndSync(path: string, bytes: Uint8Array): void {
