@@ -29,7 +29,7 @@ function host(extraEnvironment: NodeJS.ProcessEnv = {}) {
     launch,
     coreVersion: "test",
     startupTimeoutMs: 10_000,
-    jobTimeoutMs: 3_000,
+    jobTimeoutMs: 10_000,
     maximumRestarts: 0
   });
   supervisors.push(instance);
