@@ -329,13 +329,31 @@ async function hashFile(
   const hash = createHash("sha256");
   await new Promise<void>((resolvePromise, reject) => {
     const stream = createReadStream(path);
+    let ended = false;
+    let settled = false;
     const cancellation = setInterval(() => {
       if (cancelled()) stream.destroy(new AppError("JOB_CANCELLED", "Render was cancelled", 409));
     }, 100);
     stream.on("data", (chunk) => hash.update(chunk));
-    stream.on("close", () => clearInterval(cancellation));
-    stream.on("end", resolvePromise);
-    stream.on("error", reject);
+    stream.on("end", () => {
+      ended = true;
+    });
+    stream.on("close", () => {
+      clearInterval(cancellation);
+      if (settled) return;
+      settled = true;
+      if (ended) {
+        resolvePromise();
+      } else {
+        reject(new AppError("INTERNAL_ERROR", "Artifact hashing closed before completion"));
+      }
+    });
+    stream.on("error", (error) => {
+      clearInterval(cancellation);
+      if (settled) return;
+      settled = true;
+      reject(error);
+    });
   });
   return `sha256:${hash.digest("hex")}`;
 }
