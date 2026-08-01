@@ -38,11 +38,8 @@ await rm(stage, { recursive: true, force: true });
 await mkdir(stage, { recursive: true });
 await downloadVerified(ffmpeg.url, ffmpeg.sha256, download);
 await rm(extraction, { recursive: true, force: true });
-await execute("powershell.exe", [
-  "-NoProfile", "-NonInteractive", "-Command",
-  "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
-  download, extraction
-]);
+await mkdir(extraction, { recursive: true });
+await execute("tar.exe", ["-xf", download, "-C", extraction]);
 const extractedFiles = await walk(extraction);
 const ffmpegPath = extractedFiles.find((path) => basename(path).toLowerCase() === "ffmpeg.exe");
 const ffprobePath = extractedFiles.find((path) => basename(path).toLowerCase() === "ffprobe.exe");
