@@ -2,13 +2,14 @@
 
 import { execFile, spawn } from "node:child_process";
 import { copyFile, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 import { parsePeArchitecture } from "./runtime-manifest-lib.mjs";
 
 const execute = promisify(execFile);
-const root = resolve(new URL("../..", import.meta.url).pathname);
+const root = fileURLToPath(new URL("../..", import.meta.url));
 const architecture = process.argv[2];
 if (!["x64", "arm64"].includes(architecture)) {
   throw new Error("Usage: package-windows.mjs <x64|arm64>");

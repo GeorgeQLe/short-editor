@@ -5,11 +5,12 @@ import {
   copyFile, cp, mkdir, readFile, readdir, rename, rm, stat, writeFile
 } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { digest, parsePeArchitecture } from "./runtime-manifest-lib.mjs";
 
 const execute = promisify(execFile);
-const repositoryRoot = resolve(new URL("../..", import.meta.url).pathname);
+const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 const architecture = process.argv[2];
 if (!["x64", "arm64"].includes(architecture)) {
   throw new Error("Usage: stage-windows-runtime.mjs <x64|arm64>");
