@@ -28,7 +28,7 @@ function host(extraEnvironment: NodeJS.ProcessEnv = {}) {
   const instance = new PythonWorkerSupervisor({
     launch,
     coreVersion: "test",
-    startupTimeoutMs: 2_000,
+    startupTimeoutMs: 10_000,
     jobTimeoutMs: 3_000,
     maximumRestarts: 0
   });

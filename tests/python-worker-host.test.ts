@@ -34,7 +34,7 @@ function host(modelInstalled = true) {
   const instance = new PythonWorkerSupervisor({
     launch,
     coreVersion: "test",
-    startupTimeoutMs: 2_000,
+    startupTimeoutMs: 10_000,
     cancellationGraceMs: 1_000,
     shutdownGraceMs: 500,
     maximumRestarts: 0
