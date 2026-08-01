@@ -88,7 +88,13 @@ jobs:
         run: |
           npm.cmd run release:stage-win:x64 2>&1 |
             Tee-Object build/validation-logs/windows-x64/stage-runtime.log
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $StageExitCode = $LASTEXITCODE
+          if ($StageExitCode -ne 0) {
+            $Tail = (Get-Content build/validation-logs/windows-x64/stage-runtime.log -Tail 120) `
+              -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'
+            Write-Output "::error title=x64 runtime staging failure::$($Tail -join '%0A')"
+            exit $StageExitCode
+          }
       - name: Render with staged x64 FFmpeg and FFprobe
         shell: pwsh
         env:
