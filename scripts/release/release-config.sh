@@ -7,6 +7,10 @@ FFMPEG_VERSION="8.1.2"
 FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz"
 FFMPEG_SHA256="464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c"
 
+WINDOWS_FFMPEG_VERSION="8.1.2"
+WINDOWS_FFMPEG_URL="https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip"
+WINDOWS_FFMPEG_SHA256="db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec"
+
 X264_REVISION="b35605ace3ddf7c1a5d67a2eb553f034aef41d55"
 X264_VERSION="r3222"
 X264_URL="https://code.videolan.org/videolan/x264/-/archive/${X264_REVISION}/x264-${X264_REVISION}.tar.gz"

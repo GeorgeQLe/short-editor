@@ -17,26 +17,56 @@ const modelManifest = JSON.parse(await readFile(modelManifestPath, "utf8"));
 const specs = [
   {
     id: "ffmpeg", version: "8.1.2+x264-r3222", path: "bin/ffmpeg",
-    licenseEvidence: "licenses/FFmpeg-GPLv2.txt", executable: true
+    licenseEvidence: "licenses/FFmpeg-GPLv2.txt", executable: true,
+    architecture: "arm64", executionMode: "native",
+    source: {
+      url: "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+      sha256: "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c"
+    }
   },
   {
     id: "ffprobe", version: "8.1.2", path: "bin/ffprobe",
-    licenseEvidence: "licenses/FFmpeg-GPLv2.txt", executable: true
+    licenseEvidence: "licenses/FFmpeg-GPLv2.txt", executable: true,
+    architecture: "arm64", executionMode: "native",
+    source: {
+      url: "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+      sha256: "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c"
+    }
   },
   {
     id: "python-worker",
     version: "0.3.0+python-3.12.12+faster-whisper-1.2.1+ctranslate2-4.8.1",
     path: "worker/short-editor-worker",
     licenseEvidence: "licenses/worker-notices.txt",
-    executable: true
+    executable: true, architecture: "arm64", executionMode: "native",
+    source: {
+      url: "resources/worker/requirements.lock",
+      sha256: createHash("sha256").update(
+        await readFile(join(resourcesRoot, "worker/requirements.lock"))
+      ).digest("hex")
+    }
   },
   {
     id: "inter-regular", version: fontVersion("fonts/Inter-Regular.otf"),
-    path: "fonts/Inter-Regular.otf", licenseEvidence: "fonts/OFL.txt"
+    path: "fonts/Inter-Regular.otf", licenseEvidence: "fonts/OFL.txt",
+    architecture: "neutral", executionMode: "native",
+    source: {
+      url: "https://github.com/rsms/inter",
+      sha256: createHash("sha256").update(
+        await readFile(join(resourcesRoot, "fonts/Inter-Regular.otf"))
+      ).digest("hex")
+    }
   },
   {
     id: "inter-bold", version: fontVersion("fonts/Inter-Bold.otf"),
-    path: "fonts/Inter-Bold.otf", licenseEvidence: "fonts/OFL.txt"
+    path: "fonts/Inter-Bold.otf", licenseEvidence: "fonts/OFL.txt",
+    architecture: "neutral", executionMode: "native",
+    source: {
+      url: "https://github.com/rsms/inter",
+      sha256: createHash("sha256").update(
+        await readFile(join(resourcesRoot, "fonts/Inter-Bold.otf"))
+      ).digest("hex")
+    }
   }
 ];
 
@@ -60,6 +90,9 @@ const resources = await Promise.all(specs.map(async (spec) => {
     version: spec.version,
     path: spec.path,
     licenseEvidence: spec.licenseEvidence,
+    architecture: spec.architecture,
+    executionMode: spec.executionMode,
+    source: spec.source,
     size: info.size,
     sha256: createHash("sha256").update(bytes).digest("hex")
   };
@@ -67,12 +100,12 @@ const resources = await Promise.all(specs.map(async (spec) => {
 
 const manifestBytes = await readFile(modelManifestPath);
 const manifest = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   generatedBy: "scripts/release/generate-runtime-manifest.mjs",
   releasePlatform: {
     os: "macos",
     minimumVersion: "14.0",
-    architecture: "arm64"
+    applicationArchitecture: "arm64"
   },
   resources,
   models: [{

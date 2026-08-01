@@ -43,12 +43,17 @@ export interface InspectedAssetSource {
   durationMs: number | null;
 }
 
+type ProbeLaunch = string | {
+  command: string;
+  args: string[];
+};
+
 export class MediaService {
   private identityFinalization = Promise.resolve();
 
   constructor(
     private readonly repository: Repository,
-    private readonly ffprobePath = process.env.SHORT_EDITOR_FFPROBE ?? "ffprobe"
+    private readonly ffprobeLaunch: ProbeLaunch = process.env.SHORT_EDITOR_FFPROBE ?? "ffprobe"
   ) {}
 
   async importPaths(paths: string[]): Promise<ImportResult> {
@@ -89,7 +94,7 @@ export class MediaService {
     if (!before.isFile()) throw new AppError("VALIDATION_ERROR", "Asset path is not a file", 422);
     if (before.size === 0) throw new AppError("VALIDATION_ERROR", "Asset file is empty", 422);
 
-    const result = await runJson(this.ffprobePath, [
+    const result = await runJson(this.ffprobeLaunch, [
       "-v", "error", "-show_entries",
       "format=duration:stream=codec_type,codec_name,width,height,duration",
       "-of", "json", sourcePath
@@ -390,7 +395,7 @@ export class MediaService {
   }
 
   private async probePath(path: string): Promise<ProbeResult> {
-    const result = await runJson(this.ffprobePath, [
+    const result = await runJson(this.ffprobeLaunch, [
       "-v", "error", "-show_entries",
       "format=duration:stream=codec_type,codec_name,width,height,duration",
       "-of", "json", path
@@ -544,9 +549,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function runJson(binary: string, args: string[]): Promise<Record<string, unknown>> {
+async function runJson(launch: ProbeLaunch, args: string[]): Promise<Record<string, unknown>> {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(binary, args, { windowsHide: true });
+    const command = typeof launch === "string" ? launch : launch.command;
+    const launchArgs = typeof launch === "string" ? args : [...launch.args, ...args];
+    const child = spawn(command, launchArgs, { windowsHide: true });
     let stdout = "";
     child.stdout.on("data", (chunk) => { stdout += String(chunk); });
     child.stderr.resume();

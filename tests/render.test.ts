@@ -40,6 +40,10 @@ import { captionState, episode } from "./factories";
 
 const directories: string[] = [];
 const repositories: Repository[] = [];
+const realFfmpeg = process.env.SHORT_EDITOR_TEST_FFMPEG ?? "";
+const realFfprobe = process.env.SHORT_EDITOR_TEST_FFPROBE ?? "";
+const runRealMedia = process.env.CI_REAL_MEDIA === "1" &&
+  realFfmpeg.length > 0 && realFfprobe.length > 0;
 
 afterEach(() => {
   repositories.splice(0).forEach((repository) => repository.db.open && repository.db.close());
@@ -296,11 +300,11 @@ describe("explicit FFmpeg render contracts and graph", () => {
   );
 });
 
-describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32")(
+describe.runIf(runRealMedia)(
   "real FFmpeg composition",
   () => {
     it("renders the news split with related media, source audio, topic, and captions", () => {
-      if (!execFileSync("ffmpeg", ["-hide_banner", "-filters"], {
+      if (!execFileSync(realFfmpeg, ["-hide_banner", "-filters"], {
         encoding: "utf8"
       }).includes(" drawtext ")) return;
       const directory = mkdtempSync(join(tmpdir(), "short-editor-news-render-"));
@@ -309,13 +313,13 @@ describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32
       const imagePath = join(directory, "related.png");
       const filterPath = join(directory, "filter.txt");
       const outputPath = join(directory, "news.mp4");
-      execFileSync("ffmpeg", [
+      execFileSync(realFfmpeg, [
         "-hide_banner", "-loglevel", "error",
         "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=30:duration=1",
         "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=1",
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", sourcePath
       ]);
-      execFileSync("ffmpeg", [
+      execFileSync(realFfmpeg, [
         "-hide_banner", "-loglevel", "error",
         "-f", "lavfi", "-i", "color=c=navy:s=640x360",
         "-frames:v", "1", imagePath
@@ -359,12 +363,12 @@ describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32
         new CaptionEngine().fontDirectory
       );
       writeFileSync(filterPath, graph.script);
-      execFileSync("ffmpeg", [
+      execFileSync(realFfmpeg, [
         "-hide_banner", "-loglevel", "error",
         ...graph.inputArgs,
         ...graph.outputArgs
       ]);
-      const probe = JSON.parse(execFileSync("ffprobe", [
+      const probe = JSON.parse(execFileSync(realFfprobe, [
         "-v", "error",
         "-show_entries", "stream=codec_type,width,height",
         "-of", "json",
@@ -382,7 +386,7 @@ describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32
       const directory = mkdtempSync(join(tmpdir(), "short-editor-render-"));
       directories.push(directory);
       const sourcePath = join(directory, "source with spaces.mp4");
-      execFileSync("ffmpeg", [
+      execFileSync(realFfmpeg, [
         "-hide_banner", "-loglevel", "error",
         "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=30:duration=2",
         "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=2",
@@ -414,7 +418,7 @@ describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32
           templateId: template.id, templateVersion: 1, parentTemplateId: null
         },
         composition: structuredClone(template.composition),
-        captions: captionState(execFileSync("ffmpeg", ["-hide_banner", "-filters"], {
+        captions: captionState(execFileSync(realFfmpeg, ["-hide_banner", "-filters"], {
           encoding: "utf8"
         }).includes(" drawtext ")
           ? [{
@@ -449,7 +453,9 @@ describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32
       const jobs = new JobQueue(repository);
       const captions = new CaptionEngine();
       const preflight = await new RenderPreflightService(repository, captions, {
-        resolveOwnedPath: (path) => store.resolveOwnedPath(path)
+        resolveOwnedPath: (path) => store.resolveOwnedPath(path),
+        ffmpegPath: realFfmpeg,
+        ffprobePath: realFfprobe
       }).preflight(project.id, 1);
       expect(preflight.status).toBe("passed");
       const failedPreflight = repository.insertRenderPreflight(
@@ -483,7 +489,10 @@ describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32
         "SELECT payload_json FROM jobs WHERE id=?"
       ).get(started.job.id) as { payload_json: string };
       try {
-        await new CompositionRenderer(repository, store, jobs, captions).render(
+        await new CompositionRenderer(repository, store, jobs, captions, {
+          ffmpegPath: realFfmpeg,
+          ffprobePath: realFfprobe
+        }).render(
           started.job,
           JSON.parse(payload.payload_json)
         );
@@ -523,36 +532,39 @@ describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32
       const baselineBytes = readFileSync(store.resolveOwnedPath(completed.outputPath!));
       const baselinePath = store.resolveOwnedPath(completed.outputPath!);
       const remuxPath = join(directory, "metadata-remux.mp4");
-      execFileSync("ffmpeg", [
+      execFileSync(realFfmpeg, [
         "-hide_banner", "-loglevel", "error", "-i", baselinePath,
         "-map", "0", "-c", "copy", "-metadata", "title=Different container metadata", remuxPath
       ]);
-      const remuxEvidence = await normalizeRender(remuxPath, "ffmpeg", 1_000);
+      const remuxEvidence = await normalizeRender(remuxPath, realFfmpeg, 1_000);
       expect(remuxEvidence.video).toEqual(completed.determinism!.video);
       expect(remuxEvidence.audio).toEqual(completed.determinism!.audio);
 
       const changedVideoPath = join(directory, "changed-video.mp4");
-      execFileSync("ffmpeg", [
+      execFileSync(realFfmpeg, [
         "-hide_banner", "-loglevel", "error", "-i", baselinePath,
         "-vf", "eq=brightness=0.05", "-c:v", "libx264", "-pix_fmt", "yuv420p",
         "-c:a", "copy", changedVideoPath
       ]);
-      const changedVideo = await normalizeRender(changedVideoPath, "ffmpeg", 1_000);
+      const changedVideo = await normalizeRender(changedVideoPath, realFfmpeg, 1_000);
       expect(changedVideo.video.sha256).not.toBe(completed.determinism!.video.sha256);
       expect(changedVideo.audio).toEqual(completed.determinism!.audio);
 
       const changedAudioPath = join(directory, "changed-audio.mp4");
-      execFileSync("ffmpeg", [
+      execFileSync(realFfmpeg, [
         "-hide_banner", "-loglevel", "error", "-i", baselinePath,
         "-c:v", "copy", "-af", "volume=0.5", "-c:a", "aac", changedAudioPath
       ]);
-      const changedAudio = await normalizeRender(changedAudioPath, "ffmpeg", 1_000);
+      const changedAudio = await normalizeRender(changedAudioPath, realFfmpeg, 1_000);
       expect(changedAudio.video).toEqual(completed.determinism!.video);
       expect(changedAudio.audio.sha256).not.toBe(completed.determinism!.audio.sha256);
 
       const runAttempt = async (
         sidecarFormat: "srt" | "webvtt" | null,
-        renderer = new CompositionRenderer(repository, store, jobs, captions)
+        renderer = new CompositionRenderer(repository, store, jobs, captions, {
+          ffmpegPath: realFfmpeg,
+          ffprobePath: realFfprobe
+        })
       ) => {
         const attempt = repository.startRenderAttempt({
           shortId: project.id,
@@ -590,6 +602,8 @@ describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32
       ).get(mismatchingStart.job.id) as { payload_json: string };
       const baselineEvidence = completed.determinism!;
       await expect(new CompositionRenderer(repository, store, jobs, captions, {
+        ffmpegPath: realFfmpeg,
+        ffprobePath: realFfprobe,
         normalize: async () => ({
           version: "render-determinism-v1",
           algorithm: "sha256",
@@ -674,6 +688,8 @@ describe.runIf(Boolean(process.env.CI_REAL_MEDIA) || process.platform !== "win32
         "SELECT payload_json FROM jobs WHERE id=?"
       ).get(normalizationStart.job.id) as { payload_json: string };
       await expect(new CompositionRenderer(repository, store, jobs, captions, {
+        ffmpegPath: realFfmpeg,
+        ffprobePath: realFfprobe,
         normalize: async () => {
           throw new AppError("ARTIFACT_CORRUPT", "Render normalization failed", 422);
         }

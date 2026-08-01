@@ -24,6 +24,7 @@
     "smoke:renderer": "electron dist/electron/renderer-smoke.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
+    "test:real-media": "node scripts/test-real-media.mjs",
     "test:watch": "vitest --config vitest.config.ts",
     "generate:api-inventory": "tsx scripts/generate-api-route-inventory.ts",
     "generate:mcp-inventory": "tsx scripts/generate-mcp-tool-inventory.ts",
@@ -40,11 +41,15 @@
     "release:manifest": "node scripts/release/generate-runtime-manifest.mjs",
     "validate:runtime": "node scripts/validate-runtime-resources.mjs",
     "package:mac": "scripts/release/package-macos.sh",
-    "package:win": "npm run build && electron-builder --win nsis"
+    "package:win": "npm run package:win:x64",
+    "package:win:x64": "node scripts/release/package-windows.mjs x64",
+    "package:win:arm64": "node scripts/release/package-windows.mjs arm64",
+    "release:stage-win:x64": "node scripts/release/stage-windows-runtime.mjs x64",
+    "release:stage-win:arm64": "node scripts/release/stage-windows-runtime.mjs arm64"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "better-sqlite3": "^12.2.0",
+    "better-sqlite3": "12.11.1",
     "chokidar": "^4.0.3",
     "cors": "^2.8.5",
     "express": "^5.1.0",
@@ -68,7 +73,7 @@
     "@types/tar-stream": "^3.1.4",
     "@vitejs/plugin-react": "^5.0.2",
     "concurrently": "^9.2.1",
-    "electron": "^43.2.0",
+    "electron": "43.2.0",
     "electron-builder": "^26.15.3",
     "jsdom": "^29.1.1",
     "tsx": "^4.20.5",
@@ -85,7 +90,8 @@
     "productName": "SiftCut",
     "asarUnpack": [
       "**/*.node",
-      "resources/bin/**"
+      "resources/bin/**",
+      "resources/worker/**"
     ],
     "files": [
       "dist/**",
@@ -133,7 +139,8 @@
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "artifactName": "${productName}-${version}-windows-${arch}.${ext}"
     },
     "mac": {
       "icon": "resources/branding/siftcut-app-icon-1024.png",

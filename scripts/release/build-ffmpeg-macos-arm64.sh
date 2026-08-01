@@ -148,7 +148,10 @@ install -m 0755 ffmpeg "${release_output}/ffmpeg"
 install -m 0755 ffprobe "${release_output}/ffprobe"
 popd >/dev/null
 
-"${script_dir}/smoke-ffmpeg.sh" "${release_output}/ffmpeg" "${release_output}/ffprobe"
+node "${script_dir}/smoke-ffmpeg.mjs" \
+  "${release_output}/ffmpeg" \
+  "${release_output}/ffprobe" \
+  "${release_repo_root}/resources/fonts/Inter-Regular.otf"
 reject_nonredistributable_paths "${release_output}/ffmpeg"
 reject_nonredistributable_paths "${release_output}/ffprobe"
 

@@ -94,7 +94,12 @@ function SetupCenter({ announce }: Pick<SupportCenterProps, "announce">) {
           {readiness.checks.map((check) => <li key={check.id}>
             <span className={`state-marker ${check.state}`} aria-hidden="true" />
             <div><strong>{check.label}</strong><p>{check.detail}</p>
-              {check.version && <small>{check.version}</small>}</div>
+              {(check.version || check.architecture) && <small>{[
+                check.version,
+                check.architecture && `${check.architecture}${
+                  check.executionMode === "emulated" ? " · emulated" : " · native"
+                }`
+              ].filter(Boolean).join(" · ")}</small>}</div>
             <span className={`pill ${check.state}`}>{stateLabel(check.state)}</span>
             {check.id === "model" && check.state !== "ready" &&
               <button className="secondary" onClick={() =>
@@ -108,7 +113,7 @@ function SetupCenter({ announce }: Pick<SupportCenterProps, "announce">) {
         <p>Systran/faster-whisper-small.en revision e0e3c0a is MIT licensed. The immutable
           445.2 MB archive is downloaded from the SiftCut GitHub Release only after
           confirmation. Every archive member is verified before an atomic install.</p>
-        <small>Local files remain on this Mac. Ollama and OpenAI are optional and do not block the
+        <small>Local files remain on this computer. Ollama and OpenAI are optional and do not block the
           transcription → edit → render workflow.</small>
         {install && <div className="model-install-status">
           <div><span>{install.message}</span><span>{progress}%</span></div>
@@ -251,7 +256,9 @@ function AboutCenter() {
     <span className={`pill ${info.supportedPlatform ? "ready" : "optional"}`}>
       {info.supportedPlatform ? "Supported beta platform" : "Development platform"}
     </span>
-    <p>macOS 14+ · Apple Silicon · Public beta</p>
+    <p>{info.platform === "win32"
+      ? `Windows 11 · ${info.arch} · Development preview`
+      : "macOS 14+ · Apple Silicon · Public beta"}</p>
     <p>Updates are manually downloaded signed releases. This application does not include an
       automatic updater, telemetry, or automatic diagnostic uploads.</p>
   </section>;

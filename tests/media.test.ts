@@ -258,7 +258,7 @@ function createFixture(ffprobePath?: string) {
   };
 }
 
-function createFakeProbe(directory: string): string {
+function createFakeProbe(directory: string) {
   const path = join(directory, "fake-ffprobe.mjs");
   writeFileSync(path, `#!/usr/bin/env node
 import { basename } from "node:path";
@@ -294,7 +294,7 @@ const streams = name === "asset-streamless.dat"
 process.stdout.write(JSON.stringify({ format: { duration: "12.5" }, streams }));
 `);
   chmodSync(path, 0o755);
-  return path;
+  return { command: process.execPath, args: [path] };
 }
 
 function snapshot(path: string) {

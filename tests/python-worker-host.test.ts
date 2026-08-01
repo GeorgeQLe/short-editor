@@ -28,7 +28,8 @@ function host(modelInstalled = true) {
       process.env.PYTHONPATH
     ].filter(Boolean).join(delimiter),
     SHORT_EDITOR_WHISPER_MODEL_DIR: directory,
-    SHORT_EDITOR_WHISPER_MODEL_IDS: "fixture"
+    SHORT_EDITOR_WHISPER_MODEL_IDS: "fixture",
+    SHORT_EDITOR_FFMPEG_PATH: join(directory, "intentionally-missing-ffmpeg")
   };
   const instance = new PythonWorkerSupervisor({
     launch,
@@ -62,7 +63,7 @@ describe("development Python faster-whisper host", () => {
     const instance = host();
     await expect(instance.start()).resolves.toMatchObject({
       workerVersion: "0.3.0",
-      status: { state: "ready" }
+      status: { state: "degraded" }
     });
     expect(await instance.capabilities()).toContainEqual({
       operation: "transcription",

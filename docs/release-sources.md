@@ -3,6 +3,23 @@
 SiftCut's macOS FFmpeg binaries are GPL builds because they statically
 link x264. Release archives must include the notices in `resources/licenses`.
 
+Windows 11 releases use the immutable Gyan FFmpeg 8.1.2 essentials archive:
+`https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip`,
+SHA-256 `db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec`.
+Gyan's x64 FFmpeg and ffprobe run natively in the x64 package and under Windows
+11 x64 emulation in the ARM64 package. Their GPLv3 evidence, third-party
+notices, SPDX SBOM, and pinned provenance are staged with each package; the
+written corresponding-source offer is also emitted adjacent to each installer.
+
+The Windows worker is built only on Windows x64 from
+`resources/worker/requirements.windows-x64.lock`, using CPython 3.12.12,
+PyInstaller 6.21.0, faster-whisper 1.2.1, and CTranslate2 4.8.1. It is a
+one-directory frozen bundle so every non-system DLL remains inspectable beside
+the executable. The x64 bundle is reused under Windows 11 emulation on ARM64.
+Electron 43.2.0 and better-sqlite3 12.11.1 are exact application pins; Electron
+Builder rebuilds and the release gate executes the matching SQLite binding for
+each application architecture.
+
 ## Exact inputs
 
 - FFmpeg 8.1.2: `https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz`,

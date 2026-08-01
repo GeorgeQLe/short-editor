@@ -25,12 +25,14 @@ const execute = promisify(execFile);
 export type ReadinessState = "ready" | "optional" | "needs_attention";
 
 export interface RuntimeCheck {
-  id: "ffmpeg" | "ffprobe" | "python" | "worker" | "model" | "ollama" | "storage";
+  id: "resources" | "ffmpeg" | "ffprobe" | "python" | "worker" | "model" | "ollama" | "storage";
   label: string;
   state: ReadinessState;
   detail: string;
   action: "none" | "install_model" | "open_setup";
   version?: string;
+  architecture?: "x64" | "arm64" | "neutral";
+  executionMode?: "native" | "emulated";
 }
 
 export interface RuntimeReadiness {
@@ -47,6 +49,38 @@ export interface RuntimePaths {
   modelManifest: string;
   models: string;
   data: string;
+  runtimeManifest: string;
+  packaged: boolean;
+  targetOs?: "macos" | "windows";
+  targetArchitecture?: "x64" | "arm64";
+}
+
+export interface RuntimeManifestResource {
+  id: string;
+  version: string;
+  path: string;
+  architecture: "x64" | "arm64" | "neutral";
+  executionMode: "native" | "emulated";
+  licenseEvidence: string;
+  source: {
+    url: string;
+    sha256: string;
+    revision?: string;
+  };
+  size: number;
+  sha256: string;
+}
+
+export interface RuntimeManifestV3 {
+  schemaVersion: 3;
+  generatedBy: string;
+  releasePlatform: {
+    os: "macos" | "windows";
+    minimumVersion: string;
+    applicationArchitecture: "x64" | "arm64";
+  };
+  resources: RuntimeManifestResource[];
+  models: Array<Record<string, unknown>>;
 }
 
 export interface ModelReleaseManifest {
@@ -91,16 +125,29 @@ export interface DiagnosticPreview {
 
 export async function inspectRuntime(paths: RuntimePaths): Promise<RuntimeReadiness> {
   const manifest = await readModelManifest(paths.modelManifest).catch(() => null);
-  const [ffmpeg, ffprobe, python, worker, model, ollama, storage] = await Promise.all([
-    executableCheck("ffmpeg", "FFmpeg", paths.ffmpeg, ["-version"]),
-    executableCheck("ffprobe", "ffprobe", paths.ffprobe, ["-version"]),
-    executableCheck("python", "Python worker runtime", paths.python, ["--version"]),
-    fileCheck("worker", "Transcription worker", paths.worker),
+  const runtimeManifest = paths.packaged
+    ? await readRuntimeManifest(paths.runtimeManifest, paths).catch(() => null)
+    : null;
+  const resource = (id: string) => runtimeManifest?.resources.find((item) => item.id === id);
+  const [resources, ffmpeg, ffprobe, python, worker, model, ollama, storage] = await Promise.all([
+    paths.packaged
+      ? runtimeManifestCheck(paths.runtimeManifest, runtimeManifest)
+      : Promise.resolve<RuntimeCheck | null>(null),
+    executableCheck("ffmpeg", "FFmpeg", paths.ffmpeg, ["-version"], resource("ffmpeg"),
+      paths.packaged),
+    executableCheck("ffprobe", "ffprobe", paths.ffprobe, ["-version"], resource("ffprobe"),
+      paths.packaged),
+    paths.packaged
+      ? fileCheck("python", "Frozen worker runtime", paths.python, resource("python-worker"), true)
+      : executableCheck("python", "Python worker runtime", paths.python, ["--version"]),
+    fileCheck("worker", "Transcription worker", paths.worker, resource("python-worker"),
+      paths.packaged),
     modelCheck(paths.models, manifest),
     ollamaCheck(),
     storageCheck(paths.data)
   ]);
-  const checks = [ffmpeg, ffprobe, python, worker, model, ollama, storage];
+  const checks = [resources, ffmpeg, ffprobe, python, worker, model, ollama, storage]
+    .filter((check): check is RuntimeCheck => check !== null);
   return {
     checkedAt: new Date().toISOString(),
     localWorkflowReady: checks
@@ -110,21 +157,67 @@ export async function inspectRuntime(paths: RuntimePaths): Promise<RuntimeReadin
   };
 }
 
+async function runtimeManifestCheck(
+  manifestPath: string,
+  manifest: RuntimeManifestV3 | null
+): Promise<RuntimeCheck> {
+  if (!manifest) {
+    return {
+      id: "resources", label: "Bundled runtime manifest", state: "needs_attention",
+      detail: "The runtime manifest is missing, invalid, or targets another architecture.",
+      action: "open_setup"
+    };
+  }
+  try {
+    const root = dirname(manifestPath);
+    for (const resource of manifest.resources) {
+      await verifyRuntimeResource(join(root, resource.path), resource);
+      const evidence = await stat(join(root, resource.licenseEvidence));
+      if (!evidence.isFile() || evidence.size === 0) throw new Error(
+        `${resource.id} license evidence is missing`
+      );
+    }
+    return {
+      id: "resources", label: "Bundled runtime manifest", state: "ready",
+      detail: "Every packaged runtime resource and license matches its pinned manifest.",
+      action: "none"
+    };
+  } catch (error) {
+    return {
+      id: "resources", label: "Bundled runtime manifest", state: "needs_attention",
+      detail: `Packaged runtime validation failed${
+        error instanceof Error ? ` (${error.message})` : ""
+      }`,
+      action: "open_setup"
+    };
+  }
+}
+
 async function executableCheck(
   id: RuntimeCheck["id"],
   label: string,
   path: string,
-  args: string[]
+  args: string[],
+  resource?: RuntimeManifestResource,
+  requireManifest = false
 ): Promise<RuntimeCheck> {
   try {
+    if (requireManifest && !resource) throw new Error("resource is absent from the runtime manifest");
     if (path.includes("/") || path.includes("\\")) await access(path, constants.X_OK);
+    if (resource) await verifyRuntimeResource(path, resource);
     const result = await execute(path, args, { timeout: 5_000 });
     const version = `${result.stdout || result.stderr}`.split(/\r?\n/, 1)[0]?.trim();
-    return { id, label, state: "ready", detail: basename(path), action: "none", version };
-  } catch {
+    return {
+      id, label, state: "ready", detail: basename(path), action: "none", version,
+      architecture: resource?.architecture, executionMode: resource?.executionMode
+    };
+  } catch (error) {
     return {
       id, label, state: "needs_attention", action: "open_setup",
-      detail: `Required application resource is unavailable: ${basename(path)}`
+      detail: `Required application resource is unavailable: ${basename(path)}${
+        error instanceof Error ? ` (${error.message})` : ""
+      }`,
+      architecture: resource?.architecture, executionMode: resource?.executionMode
     };
   }
 }
@@ -132,14 +225,138 @@ async function executableCheck(
 async function fileCheck(
   id: RuntimeCheck["id"],
   label: string,
-  path: string
+  path: string,
+  resource?: RuntimeManifestResource,
+  requireManifest = false
 ): Promise<RuntimeCheck> {
   try {
+    if (requireManifest && !resource) throw new Error("resource is absent from the runtime manifest");
     const info = await stat(path);
     if (!info.isFile() || info.size === 0) throw new Error("invalid");
-    return { id, label, state: "ready", detail: `${basename(path)} is available`, action: "none" };
-  } catch {
-    return { id, label, state: "needs_attention", detail: "Bundled worker is missing", action: "open_setup" };
+    if (resource) await verifyRuntimeResource(path, resource);
+    return {
+      id, label, state: "ready", detail: `${basename(path)} is available`, action: "none",
+      version: resource?.version, architecture: resource?.architecture,
+      executionMode: resource?.executionMode
+    };
+  } catch (error) {
+    return {
+      id, label, state: "needs_attention",
+      detail: `Bundled worker is unavailable${
+        error instanceof Error ? ` (${error.message})` : ""
+      }`,
+      action: "open_setup", architecture: resource?.architecture,
+      executionMode: resource?.executionMode
+    };
+  }
+}
+
+export function parsePeArchitecture(bytes: Buffer): "x64" | "arm64" {
+  if (bytes.length < 0x40 || bytes.readUInt16LE(0) !== 0x5a4d) {
+    throw new Error("not a PE executable");
+  }
+  const peOffset = bytes.readUInt32LE(0x3c);
+  if (peOffset + 6 > bytes.length || bytes.readUInt32LE(peOffset) !== 0x00004550) {
+    throw new Error("invalid PE signature");
+  }
+  const machine = bytes.readUInt16LE(peOffset + 4);
+  if (machine === 0x8664) return "x64";
+  if (machine === 0xaa64) return "arm64";
+  throw new Error(`unsupported PE machine type 0x${machine.toString(16)}`);
+}
+
+export function validateRuntimeManifestV3(
+  input: unknown,
+  expected?: { os?: "macos" | "windows"; architecture?: "x64" | "arm64" }
+): RuntimeManifestV3 {
+  if (!input || typeof input !== "object") throw new Error("runtime manifest is not an object");
+  const manifest = input as Partial<RuntimeManifestV3>;
+  if (manifest.schemaVersion !== 3) throw new Error("runtime manifest schema must be version 3");
+  if (
+    !manifest.releasePlatform ||
+    !["macos", "windows"].includes(manifest.releasePlatform.os) ||
+    !["x64", "arm64"].includes(manifest.releasePlatform.applicationArchitecture)
+  ) throw new Error("runtime manifest target is invalid");
+  if (expected?.os && manifest.releasePlatform.os !== expected.os) {
+    throw new Error(`runtime manifest targets ${manifest.releasePlatform.os}, expected ${expected.os}`);
+  }
+  if (
+    expected?.architecture &&
+    manifest.releasePlatform.applicationArchitecture !== expected.architecture
+  ) throw new Error(
+    `runtime manifest targets ${manifest.releasePlatform.applicationArchitecture}, ` +
+    `expected ${expected.architecture}`
+  );
+  if (!Array.isArray(manifest.resources) || !Array.isArray(manifest.models)) {
+    throw new Error("runtime manifest resource and model lists are required");
+  }
+  const ids = new Set<string>();
+  for (const resource of manifest.resources) {
+    if (!resource || typeof resource !== "object" || typeof resource.id !== "string") {
+      throw new Error("runtime manifest resource is invalid");
+    }
+    if (ids.has(resource.id)) throw new Error(`duplicate runtime resource ${resource.id}`);
+    ids.add(resource.id);
+    if (!["x64", "arm64", "neutral"].includes(resource.architecture)) {
+      throw new Error(`${resource.id}: resource architecture is invalid`);
+    }
+    if (!["native", "emulated"].includes(resource.executionMode)) {
+      throw new Error(`${resource.id}: execution mode is invalid`);
+    }
+    const appArch = manifest.releasePlatform.applicationArchitecture;
+    if (resource.executionMode === "native" &&
+      resource.architecture !== "neutral" && resource.architecture !== appArch) {
+      throw new Error(`${resource.id}: native resource architecture does not match the application`);
+    }
+    if (resource.executionMode === "emulated" &&
+      !(manifest.releasePlatform.os === "windows" && appArch === "arm64" &&
+        resource.architecture === "x64")) {
+      throw new Error(`${resource.id}: unsupported emulation declaration`);
+    }
+    if (
+      typeof resource.path !== "string" || resource.path.includes("..") ||
+      !Number.isSafeInteger(resource.size) || resource.size <= 0 ||
+      !/^[a-f0-9]{64}$/.test(resource.sha256 ?? "") ||
+      typeof resource.version !== "string" || resource.version.length < 2 ||
+      typeof resource.licenseEvidence !== "string" ||
+      !resource.source || typeof resource.source.url !== "string" ||
+      resource.source.url.length === 0 ||
+      !/^[a-f0-9]{64}$/.test(resource.source.sha256 ?? "")
+    ) throw new Error(`${resource.id}: pinned resource metadata is incomplete`);
+  }
+  if (manifest.releasePlatform.os === "windows") {
+    const ids = new Set(manifest.resources.map((resource) => resource.id));
+    for (const id of ["ffmpeg", "ffprobe", "python-worker", "inter-regular", "inter-bold"]) {
+      if (!ids.has(id)) throw new Error(`${id}: required Windows resource is missing`);
+    }
+  }
+  return manifest as RuntimeManifestV3;
+}
+
+async function readRuntimeManifest(
+  path: string,
+  paths: RuntimePaths
+): Promise<RuntimeManifestV3> {
+  const input = JSON.parse(await readFile(path, "utf8"));
+  return validateRuntimeManifestV3(input, {
+    os: paths.targetOs,
+    architecture: paths.targetArchitecture
+  });
+}
+
+async function verifyRuntimeResource(
+  path: string,
+  resource: RuntimeManifestResource
+): Promise<void> {
+  const bytes = await readFile(path);
+  if (bytes.length !== resource.size) throw new Error("size does not match the runtime manifest");
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  if (hash !== resource.sha256) throw new Error("checksum does not match the runtime manifest");
+  if (path.toLowerCase().endsWith(".exe")) {
+    const actual = parsePeArchitecture(bytes);
+    if (resource.architecture !== actual) {
+      throw new Error(`PE architecture is ${actual}, expected ${resource.architecture}`);
+    }
   }
 }
 

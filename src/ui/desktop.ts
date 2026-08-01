@@ -67,12 +67,14 @@ export interface DesktopBridge {
 }
 
 export interface RuntimeCheck {
-  id: "ffmpeg" | "ffprobe" | "python" | "worker" | "model" | "ollama" | "storage";
+  id: "resources" | "ffmpeg" | "ffprobe" | "python" | "worker" | "model" | "ollama" | "storage";
   label: string;
   state: "ready" | "optional" | "needs_attention";
   detail: string;
   action: "none" | "install_model" | "open_setup";
   version?: string;
+  architecture?: "x64" | "arm64" | "neutral";
+  executionMode?: "native" | "emulated";
 }
 
 export interface RuntimeReadiness {

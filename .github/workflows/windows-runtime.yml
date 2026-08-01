@@ -1,0 +1,211 @@
+name: Windows runtime installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - "win-01-*"
+    paths:
+      - ".github/workflows/windows-runtime.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "resources/**"
+      - "scripts/release/**"
+      - "src/**"
+      - "tests/**"
+  pull_request:
+    paths:
+      - ".github/workflows/windows-runtime.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "resources/**"
+      - "scripts/release/**"
+      - "src/**"
+      - "tests/**"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    name: Windows 11 x64 resources and installer
+    runs-on: windows-2025
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.4.1"
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.8.14"
+      - uses: actions/cache@v4
+        with:
+          path: build/windows-worker-acceptance/faster-whisper-small.en-e0e3c0a.tar.gz
+          key: small-en-e0e3c0a-65dcc9aabf93c44a2d23931df9aaabeb2a45278df7fded9a428501ec45fe3455
+      - name: Create validation log directory
+        shell: pwsh
+        run: New-Item build/validation-logs/windows-x64 -ItemType Directory -Force | Out-Null
+      - run: npm ci
+      - name: Run hermetic default suite with the thread pool
+        shell: pwsh
+        run: |
+          npm test 2>&1 |
+            Tee-Object build/validation-logs/windows-x64/default-tests.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build hash-pinned frozen x64 worker
+        shell: pwsh
+        run: |
+          ./scripts/release/build-worker-windows-x64.ps1 2>&1 |
+            Tee-Object build/validation-logs/windows-x64/build-worker.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Stage and validate complete x64 runtime
+        shell: pwsh
+        run: |
+          npm run release:stage-win:x64 2>&1 |
+            Tee-Object build/validation-logs/windows-x64/stage-runtime.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Render with staged x64 FFmpeg and FFprobe
+        shell: pwsh
+        env:
+          CI_REAL_MEDIA: "1"
+          SHORT_EDITOR_TEST_FFMPEG: ${{ github.workspace }}\build\runtime\windows-x64\bin\ffmpeg.exe
+          SHORT_EDITOR_TEST_FFPROBE: ${{ github.workspace }}\build\runtime\windows-x64\bin\ffprobe.exe
+        run: |
+          npm run test:real-media 2>&1 |
+            Tee-Object build/validation-logs/windows-x64/real-media.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Accept frozen worker with verified model, cancellation, restart, and offline retry
+        shell: pwsh
+        run: |
+          ./scripts/release/accept-worker-windows.ps1 -Architecture x64 2>&1 |
+            Tee-Object build/validation-logs/windows-x64/worker-acceptance.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and verify unsigned x64 NSIS installer
+        shell: pwsh
+        run: |
+          npm run package:win:x64 2>&1 |
+            Tee-Object build/validation-logs/windows-x64/package-installer.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Record installer and runtime hashes
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/windows-x64 -File |
+            Get-FileHash -Algorithm SHA256 |
+            Select-Object Path, Hash |
+            ConvertTo-Json |
+            Set-Content dist/windows-x64/SHA256SUMS.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-compute-x64
+          path: build/windows-compute-x64
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload x64 validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-validation-x64
+          path: |
+            build/validation-logs/windows-x64
+            build/runtime/windows-x64/runtime-manifest.json
+            build/runtime/windows-x64/release/SBOM.spdx.json
+            build/runtime/windows-x64/release/build-provenance.json
+          if-no-files-found: warn
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: SiftCut-windows-x64
+          path: |
+            dist/windows-x64/SiftCut-0.1.0-windows-x64.exe
+            dist/windows-x64/SiftCut-0.1.0-windows-x64-source-offer.txt
+            dist/windows-x64/SHA256SUMS.json
+            build/runtime/windows-x64/runtime-manifest.json
+            build/runtime/windows-x64/release/SBOM.spdx.json
+            build/runtime/windows-x64/release/build-provenance.json
+          if-no-files-found: error
+
+  windows-arm64:
+    name: Windows 11 ARM64 hybrid resources and installer
+    needs: windows-x64
+    runs-on: windows-11-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.4.1"
+      - uses: actions/cache@v4
+        with:
+          path: build/windows-worker-acceptance/faster-whisper-small.en-e0e3c0a.tar.gz
+          key: small-en-e0e3c0a-65dcc9aabf93c44a2d23931df9aaabeb2a45278df7fded9a428501ec45fe3455
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-compute-x64
+          path: build/windows-compute-x64
+      - name: Create validation log directory
+        shell: pwsh
+        run: New-Item build/validation-logs/windows-arm64 -ItemType Directory -Force | Out-Null
+      - run: npm ci
+      - name: Stage mixed native ARM64 and emulated x64 runtime
+        shell: pwsh
+        run: |
+          npm run release:stage-win:arm64 2>&1 |
+            Tee-Object build/validation-logs/windows-arm64/stage-runtime.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Render under emulation with staged x64 FFmpeg and FFprobe
+        shell: pwsh
+        env:
+          CI_REAL_MEDIA: "1"
+          SHORT_EDITOR_TEST_FFMPEG: ${{ github.workspace }}\build\runtime\windows-arm64\bin\ffmpeg.exe
+          SHORT_EDITOR_TEST_FFPROBE: ${{ github.workspace }}\build\runtime\windows-arm64\bin\ffprobe.exe
+        run: |
+          npm run test:real-media 2>&1 |
+            Tee-Object build/validation-logs/windows-arm64/real-media.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Accept emulated worker with verified model, cancellation, restart, and offline retry
+        shell: pwsh
+        run: |
+          ./scripts/release/accept-worker-windows.ps1 -Architecture arm64 2>&1 |
+            Tee-Object build/validation-logs/windows-arm64/worker-acceptance.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and verify unsigned ARM64 NSIS installer
+        shell: pwsh
+        run: |
+          npm run package:win:arm64 2>&1 |
+            Tee-Object build/validation-logs/windows-arm64/package-installer.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Record installer and runtime hashes
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/windows-arm64 -File |
+            Get-FileHash -Algorithm SHA256 |
+            Select-Object Path, Hash |
+          ConvertTo-Json |
+            Set-Content dist/windows-arm64/SHA256SUMS.json
+      - name: Upload ARM64 validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-validation-arm64
+          path: |
+            build/validation-logs/windows-arm64
+            build/runtime/windows-arm64/runtime-manifest.json
+            build/runtime/windows-arm64/release/SBOM.spdx.json
+            build/runtime/windows-arm64/release/build-provenance.json
+          if-no-files-found: warn
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: SiftCut-windows-arm64
+          path: |
+            dist/windows-arm64/SiftCut-0.1.0-windows-arm64.exe
+            dist/windows-arm64/SiftCut-0.1.0-windows-arm64-source-offer.txt
+            dist/windows-arm64/SHA256SUMS.json
+            build/runtime/windows-arm64/runtime-manifest.json
+            build/runtime/windows-arm64/release/SBOM.spdx.json
+            build/runtime/windows-arm64/release/build-provenance.json
+          if-no-files-found: error

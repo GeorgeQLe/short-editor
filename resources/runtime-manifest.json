@@ -1,10 +1,10 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "generatedBy": "scripts/release/generate-runtime-manifest.mjs",
   "releasePlatform": {
     "os": "macos",
     "minimumVersion": "14.0",
-    "architecture": "arm64"
+    "applicationArchitecture": "arm64"
   },
   "resources": [
     {
@@ -12,6 +12,12 @@
       "version": "8.1.2+x264-r3222",
       "path": "bin/ffmpeg",
       "licenseEvidence": "licenses/FFmpeg-GPLv2.txt",
+      "architecture": "arm64",
+      "executionMode": "native",
+      "source": {
+        "url": "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+        "sha256": "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c"
+      },
       "size": 8082200,
       "sha256": "847026157a13b451b83fb1d8838dc87cdb47800f71bd88516627d1bde2a0853a"
     },
@@ -20,6 +26,12 @@
       "version": "8.1.2",
       "path": "bin/ffprobe",
       "licenseEvidence": "licenses/FFmpeg-GPLv2.txt",
+      "architecture": "arm64",
+      "executionMode": "native",
+      "source": {
+        "url": "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+        "sha256": "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c"
+      },
       "size": 7922520,
       "sha256": "e1b7b664daa16d66c3bb4eea9bce964d635cc9f8646bd2e6cef0e49f8b542356"
     },
@@ -28,6 +40,12 @@
       "version": "0.3.0+python-3.12.12+faster-whisper-1.2.1+ctranslate2-4.8.1",
       "path": "worker/short-editor-worker",
       "licenseEvidence": "licenses/worker-notices.txt",
+      "architecture": "arm64",
+      "executionMode": "native",
+      "source": {
+        "url": "resources/worker/requirements.lock",
+        "sha256": "46259f126dd99c28ac408be1bae24f2fd723f8a9733adeeef06461b3c148c77e"
+      },
       "size": 61054592,
       "sha256": "7722b60469a5f48087c6c9638848f9340b30c62a17c4ef0192a871117fb3a033"
     },
@@ -36,6 +54,12 @@
       "version": "Inter",
       "path": "fonts/Inter-Regular.otf",
       "licenseEvidence": "fonts/OFL.txt",
+      "architecture": "neutral",
+      "executionMode": "native",
+      "source": {
+        "url": "https://github.com/rsms/inter",
+        "sha256": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799"
+      },
       "size": 609600,
       "sha256": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799"
     },
@@ -44,6 +68,12 @@
       "version": "Inter",
       "path": "fonts/Inter-Bold.otf",
       "licenseEvidence": "fonts/OFL.txt",
+      "architecture": "neutral",
+      "executionMode": "native",
+      "source": {
+        "url": "https://github.com/rsms/inter",
+        "sha256": "9fc6261e817d0b1b2bf1953d8799bb1c837d11aeebbf83ae352e7b4d6de6425d"
+      },
       "size": 631880,
       "sha256": "9fc6261e817d0b1b2bf1953d8799bb1c837d11aeebbf83ae352e7b4d6de6425d"
     }

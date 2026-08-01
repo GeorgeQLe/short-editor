@@ -224,7 +224,7 @@ process.stdout.write(JSON.stringify({
 `);
     chmodSync(probe, 0o755);
     const repository = new Repository(openDatabase(":memory:"));
-    const media = new MediaService(repository, probe);
+    const media = new MediaService(repository, { command: process.execPath, args: [probe] });
     const context = setup({ repository, media });
     const assetPath = join(directory, "subject.png");
     writeFileSync(assetPath, "unchanged image fixture");

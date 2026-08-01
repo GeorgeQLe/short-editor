@@ -22,6 +22,7 @@ import {
   writeDiagnosticZip,
   type RuntimePaths
 } from "./runtime-support.js";
+import { resolveApplicationRuntimePaths } from "./runtime-paths.js";
 
 const directory = fileURLToPath(new URL(".", import.meta.url));
 let core: ChildProcess | undefined;
@@ -436,20 +437,12 @@ function coreEnvironment(): NodeJS.ProcessEnv {
 
 function applicationRuntimePaths(): RuntimePaths {
   const resources = app.isPackaged ? process.resourcesPath : join(directory, "../../resources");
-  const executable = (name: string) => join(resources, "bin", name);
-  const packagedWorker = process.platform === "win32"
-    ? join(resources, "worker", "short-editor-worker.exe")
-    : join(resources, "worker", "short-editor-worker");
-  return {
-    ffmpeg: app.isPackaged ? executable("ffmpeg") : (process.env.SHORT_EDITOR_FFMPEG ?? "ffmpeg"),
-    ffprobe: app.isPackaged ? executable("ffprobe") :
-      (process.env.SHORT_EDITOR_FFPROBE ?? "ffprobe"),
-    python: app.isPackaged ? packagedWorker : (process.env.SHORT_EDITOR_PYTHON ?? "python3"),
-    worker: app.isPackaged ? packagedWorker : join(resources, "worker", "worker.py"),
-    modelManifest: join(resources, "models", "faster-whisper-small.en-e0e3c0a.manifest.json"),
-    models: join(app.getPath("userData"), "models"),
-    data: app.getPath("userData")
-  };
+  return resolveApplicationRuntimePaths({
+    packaged: app.isPackaged,
+    platform: process.platform,
+    resourcesPath: resources,
+    userDataPath: app.getPath("userData")
+  });
 }
 
 async function diagnosticPreview(runtimePaths: RuntimePaths, options: unknown) {

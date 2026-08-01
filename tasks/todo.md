@@ -1,5 +1,11 @@
 # Current work
 
+- [ ] WIN-01 — Package complete Windows 11 x64 and hybrid ARM64 runtime
+  resources.
+  - Architecture-specific staging, manifests, unsigned NSIS commands, frozen
+    x64 compute resources, native SQLite gates, and Windows CI are implemented.
+    Closure remains blocked on passing both Windows jobs and the two clean-VM
+    evidence runs in `docs/windows-runtime-acceptance.md`.
 - [x] UI-01.1 — Complete the library, watched-folder, relink, provider-status,
   and cloud-authorization workflow.
   - Named-fixture macOS acceptance passed on commit `af8ab23` with isolated

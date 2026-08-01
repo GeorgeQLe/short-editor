@@ -196,7 +196,10 @@ function createFixture() {
   const repository = new Repository(openDatabase(":memory:"));
   databases.push(repository.db);
   const jobs = new JobQueue(repository);
-  const mediaService = new MediaService(repository, createFakeProbe(directory));
+  const mediaService = new MediaService(repository, {
+    command: process.execPath,
+    args: [createFakeProbe(directory)]
+  });
   return {
     directory,
     repository,
