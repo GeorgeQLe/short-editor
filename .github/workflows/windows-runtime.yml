@@ -63,9 +63,16 @@ jobs:
       - name: Build hash-pinned frozen x64 worker
         shell: pwsh
         run: |
-          ./scripts/release/build-worker-windows-x64.ps1 2>&1 |
-            Tee-Object build/validation-logs/windows-x64/build-worker.log
-          $BuildExitCode = $LASTEXITCODE
+          $BuildExitCode = 0
+          try {
+            ./scripts/release/build-worker-windows-x64.ps1 2>&1 |
+              Tee-Object build/validation-logs/windows-x64/build-worker.log
+            $BuildExitCode = $LASTEXITCODE
+          } catch {
+            $_ | Out-String |
+              Tee-Object build/validation-logs/windows-x64/build-worker.log -Append
+            $BuildExitCode = 1
+          }
           if ($BuildExitCode -ne 0) {
             $Tail = (Get-Content build/validation-logs/windows-x64/build-worker.log -Tail 120) `
               -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'
