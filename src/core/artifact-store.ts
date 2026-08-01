@@ -132,7 +132,7 @@ export class ArtifactStore {
         state: "complete",
         createdAt: new Date().toISOString()
       };
-      renameSync(temporaryPath, finalPath);
+      await renameExternalArtifact(temporaryPath, finalPath, cancelled);
       syncDirectory(dirname(finalPath));
       try {
         this.repository.saveArtifactRecord(artifact);
@@ -360,6 +360,30 @@ async function hashFile(
 
 function throwIfArtifactCancelled(cancelled: () => boolean): void {
   if (cancelled()) throw new AppError("JOB_CANCELLED", "Render was cancelled", 409);
+}
+
+async function renameExternalArtifact(
+  temporaryPath: string,
+  finalPath: string,
+  cancelled: () => boolean
+): Promise<void> {
+  const maximumAttempts = process.platform === "win32" ? 12 : 1;
+  for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+    throwIfArtifactCancelled(cancelled);
+    try {
+      renameSync(temporaryPath, finalPath);
+      return;
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : "";
+      const sharingViolation = code === "EACCES" || code === "EBUSY" || code === "EPERM";
+      if (!sharingViolation || attempt === maximumAttempts) throw error;
+      await new Promise<void>((resolvePromise) => {
+        setTimeout(resolvePromise, Math.min(25 * attempt, 200));
+      });
+    }
+  }
 }
 
 function normalizeArtifactError(error: unknown, fallback: string): AppError {
