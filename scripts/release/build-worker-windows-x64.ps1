@@ -21,9 +21,12 @@ New-Item $BuildRoot -ItemType Directory | Out-Null
 New-Item $Output -ItemType Directory | Out-Null
 
 $env:UV_CACHE_DIR = Join-Path $RepositoryRoot "build/uv-cache-windows"
-$env:UV_PYTHON_INSTALL_DIR = Join-Path $RepositoryRoot "build/uv-python-windows"
-uv python install 3.12.12
-uv venv --python 3.12.12 --seed $VirtualEnvironment
+$SystemPython = (Get-Command python -CommandType Application -ErrorAction Stop).Source
+$SystemPythonVersion = & $SystemPython -c "import platform; print(platform.python_version())"
+if ($SystemPythonVersion.Trim() -ne "3.12.12") {
+  throw "The worker build requires CPython 3.12.12, found $SystemPythonVersion."
+}
+uv venv --python $SystemPython --seed $VirtualEnvironment
 $Python = Join-Path $VirtualEnvironment "Scripts/python.exe"
 uv pip sync --python $Python $Lock
 
