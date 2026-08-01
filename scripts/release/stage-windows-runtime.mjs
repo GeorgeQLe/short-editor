@@ -100,7 +100,7 @@ await addResource({
 });
 await addResource({
   id: "python-worker",
-  version: "0.3.0+python-3.12.12+pyinstaller-6.21.0+faster-whisper-1.2.1+ctranslate2-4.8.1",
+  version: "0.3.0+python-3.12.10+pyinstaller-6.21.0+faster-whisper-1.2.1+ctranslate2-4.8.1",
   path: "worker/short-editor-worker.exe", architecture: "x64",
   licenseEvidence: "licenses/worker-notices.txt",
   source: computeSource
@@ -259,7 +259,7 @@ async function writeReleaseEvidence() {
       { name: "SiftCut", versionInfo: packageJson.version, SPDXID: "SPDXRef-SiftCut" },
       { name: "FFmpeg-Gyan-essentials", versionInfo: ffmpeg.version, SPDXID: "SPDXRef-FFmpeg",
         downloadLocation: ffmpeg.url, checksums: [{ algorithm: "SHA256", checksumValue: ffmpeg.sha256 }] },
-      { name: "Python", versionInfo: "3.12.12", SPDXID: "SPDXRef-Python" },
+      { name: "Python", versionInfo: "3.12.10", SPDXID: "SPDXRef-Python" },
       { name: "PyInstaller", versionInfo: "6.21.0", SPDXID: "SPDXRef-PyInstaller" },
       { name: "faster-whisper", versionInfo: "1.2.1", SPDXID: "SPDXRef-faster-whisper" },
       { name: "CTranslate2", versionInfo: "4.8.1", SPDXID: "SPDXRef-CTranslate2" },

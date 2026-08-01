@@ -23,8 +23,8 @@ New-Item $Output -ItemType Directory | Out-Null
 $env:UV_CACHE_DIR = Join-Path $RepositoryRoot "build/uv-cache-windows"
 $SystemPython = (Get-Command python -CommandType Application -ErrorAction Stop).Source
 $SystemPythonVersion = & $SystemPython -c "import platform; print(platform.python_version())"
-if ($SystemPythonVersion.Trim() -ne "3.12.12") {
-  throw "The worker build requires CPython 3.12.12, found $SystemPythonVersion."
+if ($SystemPythonVersion.Trim() -ne "3.12.10") {
+  throw "The worker build requires CPython 3.12.10, found $SystemPythonVersion."
 }
 uv venv --python $SystemPython --seed $VirtualEnvironment
 $Python = Join-Path $VirtualEnvironment "Scripts/python.exe"
@@ -59,4 +59,4 @@ $env:SHORT_EDITOR_WHISPER_MODEL_DIR = Join-Path $BuildRoot "missing-models"
 node (Join-Path $PSScriptRoot "smoke-worker.mjs") $Worker
 node (Join-Path $PSScriptRoot "windows-compute-manifest.mjs") `
   (Join-Path $RepositoryRoot "build/windows-compute-x64") --write
-Write-Output "Built frozen Python 3.12.12 x64 worker bundle at $Output"
+Write-Output "Built frozen Python 3.12.10 x64 worker bundle at $Output"

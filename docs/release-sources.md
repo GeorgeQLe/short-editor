@@ -12,7 +12,7 @@ notices, SPDX SBOM, and pinned provenance are staged with each package; the
 written corresponding-source offer is also emitted adjacent to each installer.
 
 The Windows worker is built only on Windows x64 from
-`resources/worker/requirements.windows-x64.lock`, using CPython 3.12.12,
+`resources/worker/requirements.windows-x64.lock`, using CPython 3.12.10,
 PyInstaller 6.21.0, faster-whisper 1.2.1, and CTranslate2 4.8.1. It is a
 one-directory frozen bundle so every non-system DLL remains inspectable beside
 the executable. The x64 bundle is reused under Windows 11 emulation on ARM64.

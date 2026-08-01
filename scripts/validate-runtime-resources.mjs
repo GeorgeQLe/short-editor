@@ -161,7 +161,7 @@ async function validateWindowsEvidence() {
         versions.get("Electron") !== "43.2.0" ||
         versions.get("better-sqlite3") !== "12.11.1" ||
         versions.get("FFmpeg-Gyan-essentials") !== "8.1.2" ||
-        versions.get("Python") !== "3.12.12") {
+        versions.get("Python") !== "3.12.10") {
       failures.push("Windows SPDX SBOM is incomplete or contains unpinned versions");
     }
   } catch {

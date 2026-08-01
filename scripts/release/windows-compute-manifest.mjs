@@ -24,7 +24,7 @@ if (operation === "--write") {
     schemaVersion: 1,
     architecture: "x64",
     worker: {
-      python: "3.12.12",
+      python: "3.12.10",
       pyinstaller: "6.21.0",
       fasterWhisper: "1.2.1",
       ctranslate2: "4.8.1"
@@ -37,7 +37,7 @@ if (operation === "--write") {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const failures = [];
   if (manifest.schemaVersion !== 1 || manifest.architecture !== "x64" ||
-      manifest.worker?.python !== "3.12.12" ||
+      manifest.worker?.python !== "3.12.10" ||
       manifest.worker?.pyinstaller !== "6.21.0" ||
       manifest.worker?.fasterWhisper !== "1.2.1" ||
       manifest.worker?.ctranslate2 !== "4.8.1" ||
