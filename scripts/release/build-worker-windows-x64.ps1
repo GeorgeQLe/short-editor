@@ -21,7 +21,12 @@ New-Item $BuildRoot -ItemType Directory | Out-Null
 New-Item $Output -ItemType Directory | Out-Null
 
 $env:UV_CACHE_DIR = Join-Path $RepositoryRoot "build/uv-cache-windows"
-$SystemPython = (Get-Command python -CommandType Application -ErrorAction Stop).Source
+$SystemPython = Get-Command python -CommandType Application -ErrorAction Stop |
+  Where-Object Source -NotMatch "\\WindowsApps\\" |
+  Select-Object -First 1 -ExpandProperty Source
+if (-not $SystemPython) {
+  throw "The worker build could not locate the provisioned CPython interpreter."
+}
 $SystemPythonVersion = & $SystemPython -c "import platform; print(platform.python_version())"
 if ($SystemPythonVersion.Trim() -ne "3.12.10") {
   throw "The worker build requires CPython 3.12.10, found $SystemPythonVersion."
