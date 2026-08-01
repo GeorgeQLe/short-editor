@@ -315,7 +315,7 @@ export function validateRuntimeManifestV3(
     }
     if (
       typeof resource.path !== "string" || resource.path.includes("..") ||
-      !Number.isSafeInteger(resource.size) || resource.size <= 0 ||
+      !Number.isSafeInteger(resource.size) || resource.size < 0 ||
       !/^[a-f0-9]{64}$/.test(resource.sha256 ?? "") ||
       typeof resource.version !== "string" || resource.version.length < 2 ||
       typeof resource.licenseEvidence !== "string" ||

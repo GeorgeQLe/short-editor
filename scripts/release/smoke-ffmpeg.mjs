@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 
 const execute = promisify(execFile);
-const [ffmpeg, ffprobe, font] = process.argv.slice(2).map(resolve);
+const [ffmpeg, ffprobe, font] = process.argv.slice(2).map((path) => resolve(path));
 if (!ffmpeg || !ffprobe || !font) {
   throw new Error("Usage: smoke-ffmpeg.mjs <ffmpeg> <ffprobe> <font>");
 }

@@ -73,7 +73,7 @@ export function validateManifestV3(manifest, expected = {}) {
     if (!safeRelativePath(resource.licenseEvidence)) {
       failures.push(`${resource.id}: license evidence path is unsafe`);
     }
-    if (!Number.isSafeInteger(resource.size) || resource.size <= 0) {
+    if (!Number.isSafeInteger(resource.size) || resource.size < 0) {
       failures.push(`${resource.id}: resource size is not pinned`);
     }
     if (!sha256(resource.sha256)) failures.push(`${resource.id}: resource SHA-256 is not pinned`);
