@@ -47,7 +47,8 @@ describe("v1 HTTP contract inventory", () => {
       && (typeof entry.revisionRequired === "boolean"
         || entry.revisionRequired === "after-initial-creation")
     )).toBe(true);
-    expect(await readFile("docs/api-v1-routes.json", "utf8")).toBe(serializeApiRouteInventory());
+    expect((await readFile("docs/api-v1-routes.json", "utf8")).replaceAll("\r\n", "\n"))
+      .toBe(serializeApiRouteInventory());
   });
 
   it("contains no destructive durable-entity deletion operation", () => {

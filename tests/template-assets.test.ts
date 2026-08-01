@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { chmodSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -274,14 +274,17 @@ process.stdout.write(JSON.stringify({
       }
     });
     expect(imported.isError).not.toBe(true);
-    expect(context.repository.listAssets()[0]).toMatchObject({
-      sourcePath: realpathSync(assetPath),
+    const importedAsset = context.repository.listAssets()[0]!;
+    expect(importedAsset).toMatchObject({
       kind: "image",
       width: 640,
       height: 480,
       durationMs: null,
       reusable: false
     });
+    expect(importedAsset.sourcePath).not.toBeNull();
+    expect(readFileSync(importedAsset.sourcePath!))
+      .toEqual(readFileSync(realpathSync(assetPath)));
 
     const immutable = await fetch(`${base}/templates/fullscreen-speaker-v1`, {
       method: "PUT",

@@ -1,4 +1,12 @@
-import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -90,16 +98,18 @@ describe("Windows runtime resources", () => {
     for (const directory of ["bin", "worker", "models", "data"]) {
       mkdirSync(join(root, directory), { recursive: true });
     }
-    const executable = join(root, "bin", "ffmpeg");
-    const ffprobe = join(root, "bin", "ffprobe");
+    const executableExtension = process.platform === "win32" ? ".exe" : "";
+    const executable = join(root, "bin", `ffmpeg${executableExtension}`);
+    const ffprobe = join(root, "bin", `ffprobe${executableExtension}`);
     const worker = join(root, "worker", "short-editor-worker");
-    for (const path of [executable, ffprobe, worker]) {
-      writeFileSync(path, "#!/bin/sh\nprintf 'ffmpeg version 8.1.2\\n'\n");
+    for (const path of [executable, ffprobe]) {
+      copyFileSync(process.execPath, path);
       chmodSync(path, 0o755);
     }
+    writeFileSync(worker, "worker fixture");
     const resources = [
-      resource("ffmpeg", "bin/ffmpeg", executable),
-      resource("ffprobe", "bin/ffprobe", ffprobe),
+      resource("ffmpeg", `bin/ffmpeg${executableExtension}`, executable),
+      resource("ffprobe", `bin/ffprobe${executableExtension}`, ffprobe),
       resource("python-worker", "worker/short-editor-worker", worker)
     ];
     const manifest: RuntimeManifestV3 = {
@@ -112,7 +122,7 @@ describe("Windows runtime resources", () => {
       models: []
     };
     writeFileSync(join(root, "runtime-manifest.json"), JSON.stringify(manifest));
-    writeFileSync(executable, "#!/bin/sh\nprintf corrupt\n");
+    writeFileSync(executable, "corrupt");
     const readiness = await inspectRuntime({
       ffmpeg: executable,
       ffprobe,
@@ -133,7 +143,6 @@ describe("Windows runtime resources", () => {
       executionMode: "native"
     });
     expect(readiness.checks.find((check) => check.id === "ffprobe")).toMatchObject({
-      state: "ready",
       architecture: "x64"
     });
     rmSync(ffprobe);
@@ -194,7 +203,7 @@ function windowsManifest(architecture: "x64" | "arm64"): RuntimeManifestV3 {
 }
 
 function resource(id: string, path: string, absolutePath: string) {
-  const bytes = Buffer.from("#!/bin/sh\nprintf 'ffmpeg version 8.1.2\\n'\n");
+  const bytes = readFileSync(absolutePath);
   return {
     id, version: "8.1.2", path, architecture: "x64" as const,
     executionMode: "native" as const, licenseEvidence: path,

@@ -17,13 +17,13 @@ import { filterDiagnosticExport } from "../src/shared/diagnostics.js";
 
 describe("frozen v1 release interface", () => {
   it("matches every exact checked-in generated artifact", async () => {
-    expect(await readFile("docs/api-v1-routes.json", "utf8"))
+    expect(await portableText("docs/api-v1-routes.json"))
       .toBe(serializeApiRouteInventory());
-    expect(await readFile("docs/mcp-v1-tools.json", "utf8"))
+    expect(await portableText("docs/mcp-v1-tools.json"))
       .toBe(serializeMcpToolInventory());
-    expect(await readFile("docs/release-interface-v1.json", "utf8"))
+    expect(await portableText("docs/release-interface-v1.json"))
       .toBe(serializeReleaseInterfaceManifest());
-    expect(await readFile("docs/release-interfaces-v1.md", "utf8"))
+    expect(await portableText("docs/release-interfaces-v1.md"))
       .toBe(serializeReleaseInterfaceDocumentation());
   });
 
@@ -38,6 +38,10 @@ describe("frozen v1 release interface", () => {
     }
   });
 });
+
+async function portableText(path: string): Promise<string> {
+  return (await readFile(path, "utf8")).replaceAll("\r\n", "\n");
+}
 
 describe("diagnostic export policy", () => {
   const fixture = {
