@@ -2,6 +2,30 @@
 
 ## 2026-08-02
 
+- Implemented SAAS-M2 Clerk organizations and permissions with production
+  configuration, RS256 issuer/audience/expiry/authorized-party verification,
+  active-organization and synchronized-role enforcement, signed raw-body
+  webhooks, idempotent payload hashes, sequence-aware user/organization/
+  membership/invitation convergence, and five-seat enforcement.
+- Added the Clerk-backed browser workspace for sign-in/out, organization
+  creation and switching, member management, role-aware project controls, and
+  immediate tenant-state invalidation during switches. Owner organization
+  deletion now requires exact typed confirmation and a signed Clerk
+  factor-verification age within five minutes.
+- Shipped the pending Screenletter hosted contract foundation: typed project
+  kind/origin and recording lifecycle contracts, tenant-safe PostgreSQL
+  persistence, candidate-free edit launches, revisioned publish/rollback,
+  signed unlisted playback, abuse reporting, HTTP routes, and service tests.
+- Failure-oriented review found and fixed two Clerk convergence defects before
+  shipping: forced membership RLS prevented `user.deleted` from discovering
+  memberships to revoke, and a rejoin with a new Clerk membership ID could
+  collide with the stable organization/user key. Tenant-scoped revocation and
+  primary-key upsert coverage now protect both paths.
+- Executable verification passed 34 SaaS unit tests, 8 PostgreSQL integration
+  tests, all 51 desktop files and 365 tests, every SaaS workspace build, the
+  desktop production build, and diff hygiene. M2 remains in progress at the
+  roadmap level until live staging Clerk invitation, switching, and
+  reverification acceptance is completed.
 - Completed SAAS-M1 with a runnable role-separated PostgreSQL 17.5 harness,
   checksum- and advisory-lock-aware migrations, transaction-local tenant
   context, forced row-level security, production project/upload/usage/event/job

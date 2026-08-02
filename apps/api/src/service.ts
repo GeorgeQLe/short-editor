@@ -56,6 +56,8 @@ export class ApiService {
     return this.dependencies.projects.create(context, {
       id: randomUUID(),
       name: input.name,
+      kind: input.kind,
+      origin: input.origin,
       revision: 1,
       state: "active",
       createdAt: timestamp,

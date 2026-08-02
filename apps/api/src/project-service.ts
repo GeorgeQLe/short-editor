@@ -26,7 +26,8 @@ export class ProjectApiService {
     const input = createProjectInputSchema.parse(raw);
     const timestamp = this.now().toISOString();
     return this.projects.create(context, {
-      id: randomUUID(), name: input.name, revision: 1, state: "active",
+      id: randomUUID(), name: input.name, kind: input.kind, origin: input.origin,
+      revision: 1, state: "active",
       createdAt: timestamp, updatedAt: timestamp
     });
   }

@@ -30,6 +30,7 @@ export class CloudApi {
         ...init.headers
       }
     });
+    if (response.status === 204) return undefined as T;
     const body = await response.json() as { apiVersion: "v1"; data: T } | ErrorEnvelope;
     if (!response.ok) throw new CloudApiError(response.status, body as ErrorEnvelope);
     return (body as { data: T }).data;

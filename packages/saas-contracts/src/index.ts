@@ -37,7 +37,8 @@ export const authenticatedContextSchema = z.strictObject({
   userId: idSchema,
   organizationId: idSchema,
   role: roleSchema,
-  sessionId: z.string().min(1)
+  sessionId: z.string().min(1),
+  authenticatedAt: utcInstantSchema.optional()
 });
 export type AuthenticatedContext = z.infer<typeof authenticatedContextSchema>;
 
@@ -61,9 +62,16 @@ export const membershipSchema = z.strictObject({
 });
 export type Membership = z.infer<typeof membershipSchema>;
 
+export const projectKindSchema = z.enum(["episode_to_shorts", "screenletter_recording"]);
+export type ProjectKind = z.infer<typeof projectKindSchema>;
+export const projectOriginSchema = z.enum(["siftcut_web", "screenletter_ios"]);
+export type ProjectOrigin = z.infer<typeof projectOriginSchema>;
+
 export const projectSchema = z.strictObject({
   id: idSchema,
   name: z.string().trim().min(1).max(160),
+  kind: projectKindSchema,
+  origin: projectOriginSchema,
   revision: z.number().int().positive(),
   state: z.enum(["active", "deleting"]),
   createdAt: utcInstantSchema,
@@ -72,7 +80,9 @@ export const projectSchema = z.strictObject({
 export type Project = z.infer<typeof projectSchema>;
 
 export const createProjectInputSchema = z.strictObject({
-  name: z.string().trim().min(1).max(160)
+  name: z.string().trim().min(1).max(160),
+  kind: projectKindSchema.optional().default("episode_to_shorts"),
+  origin: projectOriginSchema.optional().default("siftcut_web")
 });
 export const updateProjectInputSchema = z.strictObject({
   expectedRevision: z.number().int().positive(),
@@ -155,6 +165,79 @@ export const assetSchema = z.strictObject({
   createdAt: utcInstantSchema
 });
 export type Asset = z.infer<typeof assetSchema>;
+
+export const screenletterRecordingModeSchema = z.enum(["screen_microphone", "camera"]);
+export type ScreenletterRecordingMode = z.infer<typeof screenletterRecordingModeSchema>;
+export const screenletterRecordingStateSchema = z.enum([
+  "created",
+  "recording",
+  "awaiting_upload",
+  "uploading",
+  "processing",
+  "ready",
+  "failed",
+  "deleted"
+]);
+export type ScreenletterRecordingState = z.infer<typeof screenletterRecordingStateSchema>;
+
+export const screenletterRecordingSchema = z.strictObject({
+  id: idSchema,
+  projectId: idSchema,
+  ownerId: idSchema,
+  name: z.string().trim().min(1).max(160),
+  mode: screenletterRecordingModeSchema,
+  state: screenletterRecordingStateSchema,
+  sourceAssetId: idSchema.nullable(),
+  proxyAssetId: idSchema.nullable(),
+  publishedAssetId: idSchema.nullable(),
+  shareToken: idSchema,
+  shareRevision: z.number().int().positive(),
+  failureCode: z.string().min(1).nullable(),
+  createdAt: utcInstantSchema,
+  updatedAt: utcInstantSchema,
+  deletedAt: utcInstantSchema.nullable()
+});
+export type ScreenletterRecording = z.infer<typeof screenletterRecordingSchema>;
+
+export const createScreenletterRecordingInputSchema = z.strictObject({
+  name: z.string().trim().min(1).max(160),
+  mode: screenletterRecordingModeSchema
+});
+export const publishScreenletterRecordingInputSchema = z.strictObject({
+  renderAssetId: idSchema,
+  expectedRevision: z.number().int().positive()
+});
+export const rollbackScreenletterRecordingInputSchema = z.strictObject({
+  expectedRevision: z.number().int().positive()
+});
+export const startScreenletterEditInputSchema = z.strictObject({
+  transcribe: z.boolean().optional().default(true)
+});
+export const screenletterEditLaunchSchema = z.strictObject({
+  recordingId: idSchema,
+  projectId: idSchema,
+  sourceAssetId: idSchema,
+  candidateId: z.null(),
+  transcribe: z.boolean(),
+  maximumDurationMs: z.literal(180_000),
+  editorUrl: z.string().url()
+});
+export type ScreenletterEditLaunch = z.infer<typeof screenletterEditLaunchSchema>;
+
+export const publicScreenletterShareSchema = z.strictObject({
+  name: z.string().min(1),
+  mode: screenletterRecordingModeSchema,
+  shareRevision: z.number().int().positive(),
+  previewUrl: z.string().url(),
+  previewExpiresAt: utcInstantSchema,
+  createdAt: utcInstantSchema
+});
+export type PublicScreenletterShare = z.infer<typeof publicScreenletterShareSchema>;
+
+export const reportScreenletterAbuseInputSchema = z.strictObject({
+  category: z.enum(["spam", "harassment", "copyright", "sexual_content", "violence", "other"]),
+  details: z.string().trim().max(2_000).optional()
+});
 
 export const mediaAccessSchema = z.strictObject({
   assetId: idSchema,

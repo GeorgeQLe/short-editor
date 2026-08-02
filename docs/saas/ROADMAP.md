@@ -65,7 +65,7 @@ required.
 | --- | --- | --- | --- | --- |
 | M0 | Repository and contract foundation | Complete | — | Desktop remains isolated; SaaS packages build and test |
 | M1 | Runnable API and PostgreSQL tenancy | Complete | M0 | Authenticated tenant-safe project API runs against PostgreSQL |
-| M2 | Clerk organizations and permissions | Foundation | M1 | Invitations, switching, and roles work end to end |
+| M2 | Clerk organizations and permissions | In progress | M1 | Invitations, switching, and roles work end to end |
 | M3 | Direct upload and ingest | Foundation | M1, M2 | A real 20 GB-capable upload produces validated media artifacts |
 | M4 | Managed transcription and analysis | Foundation | M3 | An episode produces a reviewed transcript and candidates |
 | M5 | Browser editing and server rendering | Foundation | M4 | A reviewed candidate becomes a validated downloadable render |
@@ -141,7 +141,7 @@ Acceptance evidence (2026-08-02):
 
 ## M2 — Clerk organizations and permissions
 
-**Status: Foundation**
+**Status: In progress**
 
 Deliverables:
 

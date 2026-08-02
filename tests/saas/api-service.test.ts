@@ -27,6 +27,8 @@ const OTHER = { ...OWNER, organizationId: "00000000-0000-4000-8000-000000000099"
 const PROJECT: Project = {
   id: "00000000-0000-4000-8000-000000000003",
   name: "Episode",
+  kind: "episode_to_shorts",
+  origin: "siftcut_web",
   revision: 1,
   state: "active",
   createdAt: "2026-08-01T12:00:00.000Z",

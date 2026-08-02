@@ -1,5 +1,23 @@
 # Current work
 
+- [x] SAAS-M2 — Implement Clerk organizations and permissions.
+  - Verify Clerk sessions on every application route; synchronize users,
+    organizations, memberships, invitations, and role changes through signed,
+    idempotent webhooks; enforce the five-active-member limit; and protect
+    organization deletion with recent authentication.
+  - Complete browser sign-in, sign-out, organization creation and switching,
+    invitations, and member management, with role-aware controls backed by
+    server enforcement. The ordered deliverables and complete acceptance gate,
+    including session rejection, tenant-scope, webhook convergence, seat-limit,
+    protected-operation role, and organization-switch isolation coverage, are
+    defined in `docs/saas/ROADMAP.md`.
+  - S3/SQS upload and ingest, Stripe billing, managed processing, and deployment
+    remain deferred to later milestones.
+  - Automated evidence: SaaS typecheck/build and isolated suites pass; the
+    PostgreSQL 17.5 integration gate passes signed-identity persistence,
+    duplicate and out-of-order webhook convergence, synchronized role
+    validation, and the five-seat limit. Live staging Clerk acceptance remains
+    a deployment gate rather than repository implementation work.
 - [x] SAAS-M1 — Make the hosted API runnable against PostgreSQL with
   transaction-local tenant context, production repository adapters, durable
   outbox publication, readiness, migration smoke coverage, and cross-tenant
@@ -69,6 +87,10 @@
 
 ## Completed
 
+- [x] Add the hosted Screenletter contract foundation with project
+  kind/origin metadata, tenant-scoped recording persistence, role-aware
+  lifecycle services, candidate-free edit handoff, revisioned publish/
+  rollback, unlisted signed sharing, and privacy-preserving abuse reports.
 - [x] Establish the SiftCut commercial-beta SaaS foundation without changing
   Electron behavior: add isolated npm workspaces, authenticated multi-tenant
   contracts, infrastructure ports, a role/revision/quota-aware API service,

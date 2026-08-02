@@ -4,6 +4,7 @@ import type {
   Entitlement,
   JobEnvelope,
   Project,
+  ScreenletterRecording,
   UploadSession,
   Usage
 } from "@siftcut/saas-contracts";
@@ -30,6 +31,58 @@ export interface ProjectRepository {
     deletionRequestedAt: string,
     purgeAfter: string
   ): Promise<Project>;
+}
+
+export interface StoredScreenletterShare {
+  recordingId: string;
+  name: string;
+  mode: ScreenletterRecording["mode"];
+  shareRevision: number;
+  objectKey: string;
+  createdAt: string;
+}
+
+export interface ScreenletterRepository {
+  list(context: AuthenticatedContext): Promise<ScreenletterRecording[]>;
+  get(
+    context: AuthenticatedContext,
+    recordingId: string
+  ): Promise<ScreenletterRecording | null>;
+  create(
+    context: AuthenticatedContext,
+    project: Project,
+    recording: ScreenletterRecording
+  ): Promise<ScreenletterRecording>;
+  delete(
+    context: AuthenticatedContext,
+    recordingId: string,
+    deletedAt: string
+  ): Promise<ScreenletterRecording>;
+  retry(
+    context: AuthenticatedContext,
+    recordingId: string,
+    updatedAt: string
+  ): Promise<ScreenletterRecording>;
+  publish(
+    context: AuthenticatedContext,
+    recordingId: string,
+    renderAssetId: string,
+    expectedRevision: number,
+    updatedAt: string
+  ): Promise<ScreenletterRecording>;
+  rollback(
+    context: AuthenticatedContext,
+    recordingId: string,
+    expectedRevision: number,
+    updatedAt: string
+  ): Promise<ScreenletterRecording>;
+  resolvePublic(shareToken: string): Promise<StoredScreenletterShare | null>;
+  reportAbuse(
+    shareToken: string,
+    category: string,
+    details: string | null,
+    reporterHash: string | null
+  ): Promise<boolean>;
 }
 
 export interface UsageRepository {

@@ -4,6 +4,12 @@ import { Pool } from "pg";
 import { PostgresEventRepository, PostgresProjectRepository } from "@siftcut/infrastructure";
 import type { SessionVerifier } from "./auth.js";
 import { createApp } from "./app.js";
+import {
+  ClerkIdentityRepository,
+  ClerkOrganizationService,
+  ClerkSessionVerifier,
+  clerkWebhookHandler
+} from "./clerk.js";
 import { loadConfig, type RuntimeConfig } from "./config.js";
 import { createJsonLogger, type StructuredLogger } from "./logging.js";
 import { migrationReadiness } from "./migrations.js";
@@ -31,7 +37,14 @@ export async function startServer(options: {
     connectionTimeoutMillis: 5_000
   });
   pool.on("error", () => logger.error("postgres_pool_error"));
-  const verifier = options.verifier ?? developmentVerifier(config);
+  const identities = config.clerk ? new ClerkIdentityRepository(pool) : undefined;
+  const organizations = config.clerk && identities
+    ? new ClerkOrganizationService(config.clerk, identities)
+    : undefined;
+  const verifier = options.verifier
+    ?? (config.clerk && identities
+      ? new ClerkSessionVerifier(config.clerk, identities)
+      : developmentVerifier(config));
   const projects = new PostgresProjectRepository(pool);
   const events = new PostgresEventRepository(pool);
   const sseControllers = new Set<AbortController>();
@@ -40,7 +53,13 @@ export async function startServer(options: {
     readiness: () => migrationReadiness(pool),
     logger,
     sseControllers,
-    bodyLimit: config.bodyLimit
+    bodyLimit: config.bodyLimit,
+    ...(config.clerk && identities
+      ? {
+        clerkWebhook: clerkWebhookHandler(config.clerk, identities),
+        deleteOrganization: organizations!.deleteOrganization.bind(organizations)
+      }
+      : {})
   });
   const server = http.createServer(app);
   let activeRequests = 0;

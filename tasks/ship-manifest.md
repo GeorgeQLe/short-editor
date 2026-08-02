@@ -1,5 +1,189 @@
 # Ship manifest
 
+## Clerk organizations and Screenletter hosted contracts — 2026-08-02
+
+### User goal
+
+Ship the completed SAAS-M2 implementation and the validated pending
+Screenletter hosted contract work cleanly to `master`, without losing
+pre-existing working-tree changes or regressing the independent desktop
+application.
+
+### Changed files
+
+- `README.md`
+- `apps/api/migrations/0003_screenletter_contract.sql`
+- `apps/api/migrations/0004_clerk_organizations.sql`
+- `apps/api/package.json`
+- `apps/api/src/app.ts`
+- `apps/api/src/clerk.ts`
+- `apps/api/src/config.ts`
+- `apps/api/src/project-service.ts`
+- `apps/api/src/screenletter-service.ts`
+- `apps/api/src/server.ts`
+- `apps/api/src/service.ts`
+- `apps/web/package.json`
+- `apps/web/src/api.ts`
+- `apps/web/src/main.tsx`
+- `apps/web/src/styles.css`
+- `docs/saas/ROADMAP.md`
+- `package-lock.json`
+- `packages/infrastructure/src/index.ts`
+- `packages/infrastructure/src/postgres.ts`
+- `packages/saas-contracts/src/index.ts`
+- `tasks/history.md`
+- `tasks/ship-manifest.md`
+- `tasks/todo.md`
+- `tests/saas-integration/postgres.test.ts`
+- `tests/saas/api-service.test.ts`
+- `tests/saas/clerk.test.ts`
+- `tests/saas/screenletter-service.test.ts`
+
+There are no earlier unpushed commits in this boundary. Pack configuration and
+`.agents/project.json` are unchanged. Generated build output and generated
+local skill roots are excluded.
+
+### Per-file purpose
+
+- `apps/api/src/clerk.ts`, `config.ts`, `server.ts`, `app.ts`, API/package
+  manifests, and `0004_clerk_organizations.sql` implement production Clerk
+  session verification, signed webhook ingestion, synchronized identity
+  persistence, invitation/member seat enforcement, recent-auth organization
+  deletion, runtime wiring, and required dependencies.
+- `apps/web/src/` and its package manifest provide Clerk sign-in/out,
+  organization creation/switching/member management, role-aware controls,
+  tenant-state invalidation, project loading/creation, and owner deletion UI.
+- `0003_screenletter_contract.sql`, `screenletter-service.ts`, shared contracts,
+  infrastructure ports/adapters, project services, and API routes add the
+  hosted Screenletter project/recording/share contract foundation.
+- Unit and PostgreSQL integration tests cover cryptographic session rejection,
+  production configuration, exact webhook signatures, role drift/revocation,
+  duplicate and out-of-order convergence, invitations and active-seat limits,
+  RLS-safe user deletion, organization deletion, tenant isolation, and
+  Screenletter lifecycle/share behavior.
+- `README.md`, the SaaS roadmap, current/completed task records, history, and
+  this manifest document configuration, milestone status, validation evidence,
+  live acceptance gaps, and rollback boundaries.
+
+### User-goal mapping
+
+- Every application route derives its user, active organization, and role from
+  a verified Clerk JWT and the matching synchronized active membership; path
+  and body tenant IDs never establish authorization scope.
+- Clerk webhook signatures are checked against the exact raw request with a
+  five-minute timestamp window. Event IDs and payload hashes are idempotent,
+  stale membership/invitation events cannot resurrect newer state, and user
+  deletion revokes memberships within each forced-RLS tenant scope.
+- Invitations reserve available seats locally and membership activation
+  rejects a sixth active member with `SEAT_LIMIT`; deployment documentation
+  also requires Clerk's organization membership limit to remain five.
+- Browser organization changes clear all prior tenant-derived state and ignore
+  stale requests before loading the new tenant. Viewer mutation controls are
+  hidden while server role checks remain authoritative.
+- Organization deletion is owner-only, exact-name confirmed, and uses Clerk's
+  signed factor-verification age rather than token issue time.
+- Screenletter records remain tenant scoped; public playback reveals only a
+  short-lived signed preview, and abuse reporters are stored only as salted
+  hashes.
+
+### Tests run
+
+Executable verification against this shipping boundary:
+
+- `npm run typecheck:saas`: all SaaS workspace typechecks passed.
+- `npm run test:saas`: 6 files and 34 tests passed.
+- `npm run test:saas:integration`: 1 file and 8 tests passed against the pinned
+  PostgreSQL 17.5 role-separated harness.
+- `npm run build:saas`: contracts, infrastructure, API, worker, and web builds
+  passed.
+- `npm test`: all 51 desktop files and 365 tests passed.
+- `npm run build`: desktop typecheck, Vite production build, and Node
+  compilation passed.
+- After the adversarial RLS/rejoin fixes, `npm run typecheck -w @siftcut/api`,
+  `npm run build -w @siftcut/api`, and the full 8-test PostgreSQL integration
+  lane passed again against the final source boundary.
+- `git diff --check`: passed.
+
+Documentation and security verification:
+
+- `scripts/audit-task-docs.mjs` is absent, so the repository defines no
+  task-document audit command.
+- A focused added-line scan found no private keys or live AWS, GitHub, OpenAI,
+  Clerk, or webhook credential signatures. Test-only placeholders are
+  intentionally non-secret.
+- `tasks/todo.md`, `docs/saas/ROADMAP.md`, history, and this manifest agree that
+  repository implementation is complete while live M2 staging acceptance
+  remains outstanding.
+
+### Skipped tests
+
+- No lint script or standalone lint/check target exists in `package.json`;
+  TypeScript builds, unit/integration suites, production builds, and diff
+  hygiene cover the available executable gates.
+- Live Clerk browser acceptance was not run because this repository contains no
+  staging Clerk credentials and the protected local release-credential file
+  was neither read nor required. This leaves invitation/member-management,
+  real organization switching, and reverification modal behavior for staging.
+- No visual browser inspection was possible without a configured Clerk
+  publishable key and signed-in organization. The web production bundle and
+  tenant-switch logic are executable-checked, but styling and Clerk modal
+  integration retain visual risk.
+- No signed/packaged desktop artifact was rebuilt because the changed hosted
+  workspaces remain isolated from Electron packaging; the complete desktop
+  suite and production build provide the relevant regression evidence.
+
+### Adversarial review
+
+A failure-oriented changed-file review was used as the equivalent configured
+review lane because no repository-local `quality-sweep`, `expert-review`, or
+`docs/quality-gate-contract.md` is installed. It traced JWT algorithm/issuer/
+audience/expiry/authorized-party validation, organization-less sessions,
+membership revocation and role drift, raw webhook authentication and replay
+windows, duplicate ID hash reuse, event ordering, forced-RLS behavior, rejoin
+identity, invitation and activation races, owner deletion freshness,
+cross-tenant reads, browser stale-request commits, public share disclosure,
+abuse-report privacy, migration ordering, and desktop isolation.
+
+The review found two blocking identity defects. `user.deleted` originally
+attempted to discover memberships before entering a tenant scope, which forced
+RLS reduced to an empty result. It now iterates public organization IDs and
+revokes only after entering each tenant transaction. Membership upsert also
+targeted the external membership ID, so a user rejoining an organization with
+a new Clerk ID could collide on the stable organization/user primary key. Both
+activation and revocation now converge on that primary key and update the
+external ID. PostgreSQL regression coverage proves deletion immediately
+invalidates session resolution and all final executable checks pass.
+
+The desktop suite emits the established `Unexpected internal error` line from
+the redacted-500 fixture. It is accepted fixture output, not a build warning or
+unresolved failure. No other warning remains.
+
+### Residual risk
+
+- M2 remains `In progress` in the roadmap until owner/editor/viewer browser
+  journeys, live invitations, organization switching, and recent-auth deletion
+  pass against staging Clerk.
+- Clerk's instance default membership limit and built-in organization deletion
+  control must be configured as documented; repository code cannot prove
+  dashboard settings locally.
+- Screenletter is a contract/persistence foundation. Production media ingest,
+  its concrete storage wiring, abuse throttling/moderation operations, and a
+  deployed share-page smoke test remain later integration work.
+
+### Rollback note
+
+Revert the shipping commit before applying migrations 0003 or 0004. If either
+migration has reached a persistent environment, restore a pre-migration
+database backup before running the older binary; do not edit production
+migration checksums or ledger rows manually. Clerk-side organization deletions
+cannot be undone by a code rollback.
+
+### Next command
+
+Use `$guide` to configure and execute the live staging Clerk acceptance journey
+for owner, editor, viewer, invitations, organization switching, seat limits,
+and recent-auth deletion.
+
 ## SAAS-M1 runnable API and PostgreSQL tenancy — 2026-08-02
 
 ### User goal

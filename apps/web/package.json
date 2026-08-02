@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@clerk/react": "^6.12.10",
     "@siftcut/saas-contracts": "0.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"

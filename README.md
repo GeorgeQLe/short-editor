@@ -76,8 +76,24 @@ npm run dev:api
 ```
 
 Development bearer mappings are explicit and default to empty. They are
-rejected when `NODE_ENV=production`; Clerk authentication remains M2. The API
-does not expose upload routes until the M3 S3 adapter exists.
+rejected when `NODE_ENV=production`. Production uses Clerk organizations and
+requires `CLERK_ISSUER`, `CLERK_AUDIENCE`, `CLERK_AUTHORIZED_PARTIES`,
+`CLERK_WEBHOOK_SIGNING_SECRET`, and `CLERK_SECRET_KEY`; `CLERK_JWT_KEY` can be
+set for networkless JWT verification, otherwise `CLERK_JWKS_URL` or the
+issuer's well-known JWKS endpoint is used. Configure Clerk to deliver signed
+webhooks to `POST /webhooks/clerk`.
+
+The browser requires `VITE_API_URL` and `VITE_CLERK_PUBLISHABLE_KEY`. Its Clerk
+organization switcher provides sign-in, sign-out, creation, switching,
+invitations, and member management. SiftCut revalidates every signed session
+against its synchronized active membership, clears organization-derived
+browser state before a switch, and enforces owner/editor/viewer permissions on
+the server. Set Clerk's default organization membership limit to five. Disable
+Clerk's built-in organization deletion control and use the SiftCut danger zone:
+it requires an owner, exact typed name, and a signed Clerk
+factor-verification age of at most five minutes.
+
+The API does not expose upload routes until the M3 S3 adapter exists.
 
 `GET /health` is process liveness. `GET /ready` checks both a live pool query
 and the complete checksum-matched migration set. Missing, stale, modified, or

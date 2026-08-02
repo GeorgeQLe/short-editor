@@ -14,6 +14,7 @@ import {
 } from "../../packages/infrastructure/src/postgres.js";
 import type { AuthenticatedContext, JobEnvelope, Project } from "../../packages/saas-contracts/src/index.js";
 import { loadMigrations, migrationReadiness, runMigrations } from "../../apps/api/src/migrations.js";
+import { ClerkIdentityRepository } from "../../apps/api/src/clerk.js";
 
 const MIGRATOR_URL = process.env.TEST_MIGRATOR_DATABASE_URL
   ?? "postgres://siftcut_migrator:local-migrator@127.0.0.1:54329/siftcut_test";
@@ -34,7 +35,7 @@ const B: AuthenticatedContext = { userId: USER_B, organizationId: ORG_B, role: "
 
 beforeAll(async () => {
   await runMigrations(migrator);
-  await migrator.query("TRUNCATE organizations, users CASCADE");
+  await migrator.query("TRUNCATE organizations, users, webhook_events CASCADE");
   await migrator.query(`INSERT INTO users (id, clerk_user_id) VALUES
     ($1, 'user_a'), ($2, 'user_b')`, [USER_A, USER_B]);
   await migrator.query(`INSERT INTO organizations (id, clerk_organization_id, name, state) VALUES
@@ -214,8 +215,103 @@ describe("secure transactional outbox", () => {
   });
 });
 
+describe("Clerk identity convergence", () => {
+  it("keeps revocation across out-of-order events, rejects reused IDs, and enforces seats", async () => {
+    const identities = new ClerkIdentityRepository(migrator);
+    const userId = "clerk_m2_primary";
+    await identities.applyWebhook("evt-user-primary", {
+      type: "user.created",
+      data: { id: userId, created_at: 1_000, email_addresses: [] }
+    }, "hash-user-primary");
+    const membership = {
+      id: "mem_m2_primary",
+      role: "org:editor",
+      organization: { id: "org_a" },
+      public_user_data: { user_id: userId }
+    };
+    await expect(identities.applyWebhook("evt-membership-delete", {
+      type: "organizationMembership.deleted",
+      data: { ...membership, updated_at: 3_000 }
+    }, "hash-delete")).resolves.toBe("applied");
+    await expect(identities.applyWebhook("evt-membership-old-create", {
+      type: "organizationMembership.created",
+      data: { ...membership, updated_at: 2_000 }
+    }, "hash-old-create")).resolves.toBe("stale");
+    await expect(identities.resolveSession(userId, "org_a", "editor")).resolves.toBeNull();
+
+    await expect(identities.applyWebhook("evt-membership-update", {
+      type: "organizationMembership.updated",
+      data: { ...membership, updated_at: 4_000 }
+    }, "hash-update")).resolves.toBe("applied");
+    await expect(identities.resolveSession(userId, "org_a", "editor")).resolves.toMatchObject({
+      organizationId: ORG_A,
+      role: "editor"
+    });
+    await expect(identities.applyWebhook("evt-membership-update", {
+      type: "organizationMembership.updated",
+      data: { ...membership, updated_at: 4_000 }
+    }, "hash-update")).resolves.toBe("duplicate");
+    await expect(identities.applyWebhook("evt-membership-update", {
+      type: "organizationMembership.updated",
+      data: { ...membership, updated_at: 4_000 }
+    }, "different-payload")).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    for (let index = 2; index <= 5; index += 1) {
+      const clerkUserId = `clerk_m2_${index}`;
+      await identities.applyWebhook(`evt-user-${index}`, {
+        type: "user.created",
+        data: { id: clerkUserId, created_at: 1_000 + index, email_addresses: [] }
+      }, `hash-user-${index}`);
+      await identities.applyWebhook(`evt-membership-${index}`, {
+        type: "organizationMembership.created",
+        data: {
+          id: `mem_m2_${index}`,
+          role: "org:viewer",
+          organization: { id: "org_a" },
+          public_user_data: { user_id: clerkUserId },
+          updated_at: 5_000 + index
+        }
+      }, `hash-membership-${index}`);
+    }
+    await expect(identities.applyWebhook("evt-invitation-six", {
+      type: "organizationInvitation.created",
+      data: {
+        id: "inv_m2_6",
+        organization_id: "org_a",
+        email_address: "six@example.test",
+        role: "org:viewer",
+        status: "pending",
+        created_at: 5_500
+      }
+    }, "hash-invitation-six")).rejects.toMatchObject({ code: "SEAT_LIMIT" });
+    await identities.applyWebhook("evt-user-six", {
+      type: "user.created",
+      data: { id: "clerk_m2_6", created_at: 1_006, email_addresses: [] }
+    }, "hash-user-six");
+    await expect(identities.applyWebhook("evt-membership-six", {
+      type: "organizationMembership.created",
+      data: {
+        id: "mem_m2_6",
+        role: "org:viewer",
+        organization: { id: "org_a" },
+        public_user_data: { user_id: "clerk_m2_6" },
+        updated_at: 6_000
+      }
+    }, "hash-membership-six")).rejects.toMatchObject({ code: "SEAT_LIMIT" });
+
+    await expect(identities.applyWebhook("evt-user-primary-delete", {
+      type: "user.deleted",
+      data: { id: userId, updated_at: 7_000 }
+    }, "hash-user-primary-delete")).resolves.toBe("applied");
+    await expect(identities.resolveSession(userId, "org_a", "editor")).resolves.toBeNull();
+  });
+});
+
 function project(id: string, name: string, timestamp: string): Project {
-  return { id, name, revision: 1, state: "active", createdAt: timestamp, updatedAt: timestamp };
+  return {
+    id, name, kind: "episode_to_shorts", origin: "siftcut_web",
+    revision: 1, state: "active", createdAt: timestamp, updatedAt: timestamp
+  };
 }
 function job(projectId: string, uploadId: string): JobEnvelope {
   return {

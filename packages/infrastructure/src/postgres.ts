@@ -5,12 +5,14 @@ import {
   entitlementSchema,
   jobEnvelopeSchema,
   projectSchema,
+  screenletterRecordingSchema,
   uploadSessionSchema,
   usageSchema,
   type AuthenticatedContext,
   type DurableEvent,
   type JobEnvelope,
   type Project,
+  type ScreenletterRecording,
   type UploadSession
 } from "@siftcut/saas-contracts";
 import type {
@@ -20,6 +22,8 @@ import type {
   JobControl,
   LeasedOutboxRecord,
   ProjectRepository,
+  ScreenletterRepository,
+  StoredScreenletterShare,
   StoredUploadSession,
   TransactionalOutbox,
   UploadRepository,
@@ -65,7 +69,7 @@ export class PostgresProjectRepository implements ProjectRepository {
   list(context: AuthenticatedContext): Promise<Project[]> {
     return withTenantTransaction(this.pool, context.organizationId, async (client) => {
       const result = await client.query(`
-        SELECT id, name, revision, state, created_at, updated_at
+        SELECT id, name, kind, origin, revision, state, created_at, updated_at
         FROM projects WHERE state = 'active' ORDER BY updated_at DESC, id
       `);
       return result.rows.map(projectFromRow);
@@ -75,7 +79,7 @@ export class PostgresProjectRepository implements ProjectRepository {
   get(context: AuthenticatedContext, projectId: string): Promise<Project | null> {
     return withTenantTransaction(this.pool, context.organizationId, async (client) => {
       const result = await client.query(`
-        SELECT id, name, revision, state, created_at, updated_at
+        SELECT id, name, kind, origin, revision, state, created_at, updated_at
         FROM projects WHERE id = $1 AND state = 'active'
       `, [projectId]);
       return result.rowCount ? projectFromRow(result.rows[0]) : null;
@@ -86,11 +90,11 @@ export class PostgresProjectRepository implements ProjectRepository {
     return withTenantTransaction(this.pool, context.organizationId, async (client) => {
       const result = await client.query(`
         INSERT INTO projects
-          (id, organization_id, name, revision, state, created_by, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING id, name, revision, state, created_at, updated_at
-      `, [project.id, context.organizationId, project.name, project.revision, project.state,
-        context.userId, project.createdAt, project.updatedAt]);
+          (id, organization_id, name, kind, origin, revision, state, created_by, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id, name, kind, origin, revision, state, created_at, updated_at
+      `, [project.id, context.organizationId, project.name, project.kind, project.origin,
+        project.revision, project.state, context.userId, project.createdAt, project.updatedAt]);
       return projectFromRow(result.rows[0]);
     });
   }
@@ -105,7 +109,7 @@ export class PostgresProjectRepository implements ProjectRepository {
       const result = await client.query(`
         UPDATE projects SET name = $3, revision = revision + 1, updated_at = $4
         WHERE id = $1 AND revision = $2 AND state = 'active'
-        RETURNING id, name, revision, state, created_at, updated_at
+        RETURNING id, name, kind, origin, revision, state, created_at, updated_at
       `, [projectId, expectedRevision, patch.name, patch.updatedAt]);
       if (result.rowCount) return projectFromRow(result.rows[0]);
       return throwProjectMutationError(client, projectId, expectedRevision);
@@ -125,7 +129,7 @@ export class PostgresProjectRepository implements ProjectRepository {
         SET state = 'deleting', revision = revision + 1,
             deletion_requested_at = $3, purge_after = $4, updated_at = $3
         WHERE id = $1 AND revision = $2 AND state = 'active'
-        RETURNING id, name, revision, state, created_at, updated_at
+        RETURNING id, name, kind, origin, revision, state, created_at, updated_at
       `, [projectId, expectedRevision, deletionRequestedAt, purgeAfter]);
       if (!result.rowCount) await throwProjectMutationError(client, projectId, expectedRevision);
       await client.query(`
@@ -135,6 +139,212 @@ export class PostgresProjectRepository implements ProjectRepository {
       return projectFromRow(result.rows[0]);
     });
   }
+}
+
+export class PostgresScreenletterRepository implements ScreenletterRepository {
+  constructor(private readonly pool: Pool) {}
+
+  list(context: AuthenticatedContext): Promise<ScreenletterRecording[]> {
+    return withTenantTransaction(this.pool, context.organizationId, async (client) => {
+      const result = await client.query(`
+        SELECT * FROM screenletter_recordings
+        WHERE state <> 'deleted'
+        ORDER BY updated_at DESC, id
+      `);
+      return result.rows.map(screenletterFromRow);
+    });
+  }
+
+  get(
+    context: AuthenticatedContext,
+    recordingId: string
+  ): Promise<ScreenletterRecording | null> {
+    return withTenantTransaction(this.pool, context.organizationId, async (client) => {
+      const result = await client.query(`
+        SELECT * FROM screenletter_recordings
+        WHERE id = $1 AND state <> 'deleted'
+      `, [recordingId]);
+      return result.rowCount ? screenletterFromRow(result.rows[0]) : null;
+    });
+  }
+
+  create(
+    context: AuthenticatedContext,
+    project: Project,
+    recording: ScreenletterRecording
+  ): Promise<ScreenletterRecording> {
+    return withTenantTransaction(this.pool, context.organizationId, async (client) => {
+      await client.query(`
+        INSERT INTO projects
+          (id, organization_id, name, kind, origin, revision, state, created_by,
+           created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `, [project.id, context.organizationId, project.name, project.kind, project.origin,
+        project.revision, project.state, context.userId, project.createdAt, project.updatedAt]);
+      const result = await client.query(`
+        INSERT INTO screenletter_recordings
+          (id, organization_id, project_id, owner_id, name, mode, state,
+           source_asset_id, proxy_asset_id, published_asset_id, share_token,
+           share_revision, failure_code, created_at, updated_at, deleted_at)
+        VALUES
+          ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        RETURNING *
+      `, [recording.id, context.organizationId, recording.projectId, recording.ownerId,
+        recording.name, recording.mode, recording.state, recording.sourceAssetId,
+        recording.proxyAssetId, recording.publishedAssetId, recording.shareToken,
+        recording.shareRevision, recording.failureCode, recording.createdAt,
+        recording.updatedAt, recording.deletedAt]);
+      return screenletterFromRow(result.rows[0]);
+    });
+  }
+
+  delete(
+    context: AuthenticatedContext,
+    recordingId: string,
+    deletedAt: string
+  ): Promise<ScreenletterRecording> {
+    return withTenantTransaction(this.pool, context.organizationId, async (client) => {
+      const result = await client.query(`
+        UPDATE screenletter_recordings
+        SET state = 'deleted', deleted_at = $2, updated_at = $2
+        WHERE id = $1 AND state <> 'deleted'
+        RETURNING *
+      `, [recordingId, deletedAt]);
+      if (!result.rowCount) throw new RepositoryError("NOT_FOUND", "Recording not found");
+      await client.query(`
+        UPDATE projects SET state = 'deleting', deletion_requested_at = $2,
+          purge_after = $2::timestamptz + interval '24 hours', updated_at = $2,
+          revision = revision + 1
+        WHERE id = $1 AND state = 'active'
+      `, [result.rows[0].project_id, deletedAt]);
+      return screenletterFromRow(result.rows[0]);
+    });
+  }
+
+  retry(
+    context: AuthenticatedContext,
+    recordingId: string,
+    updatedAt: string
+  ): Promise<ScreenletterRecording> {
+    return this.transitionFailed(context, recordingId, updatedAt);
+  }
+
+  publish(
+    context: AuthenticatedContext,
+    recordingId: string,
+    renderAssetId: string,
+    expectedRevision: number,
+    updatedAt: string
+  ): Promise<ScreenletterRecording> {
+    return withTenantTransaction(this.pool, context.organizationId, async (client) => {
+      const result = await client.query(`
+        UPDATE screenletter_recordings r
+        SET published_asset_id = $2, share_revision = share_revision + 1, updated_at = $4
+        FROM artifacts a
+        WHERE r.id = $1 AND r.share_revision = $3 AND r.state = 'ready'
+          AND r.proxy_asset_id IS NOT NULL
+          AND a.id = $2 AND a.project_id = r.project_id
+          AND a.kind = 'render' AND a.state = 'complete'
+        RETURNING r.*
+      `, [recordingId, renderAssetId, expectedRevision, updatedAt]);
+      if (result.rowCount) return screenletterFromRow(result.rows[0]);
+      return throwScreenletterPublishError(client, recordingId, expectedRevision);
+    });
+  }
+
+  rollback(
+    context: AuthenticatedContext,
+    recordingId: string,
+    expectedRevision: number,
+    updatedAt: string
+  ): Promise<ScreenletterRecording> {
+    return withTenantTransaction(this.pool, context.organizationId, async (client) => {
+      const result = await client.query(`
+        UPDATE screenletter_recordings
+        SET published_asset_id = NULL, share_revision = share_revision + 1, updated_at = $3
+        WHERE id = $1 AND share_revision = $2 AND state = 'ready'
+          AND proxy_asset_id IS NOT NULL AND published_asset_id IS NOT NULL
+        RETURNING *
+      `, [recordingId, expectedRevision, updatedAt]);
+      if (result.rowCount) return screenletterFromRow(result.rows[0]);
+      return throwScreenletterPublishError(client, recordingId, expectedRevision);
+    });
+  }
+
+  async resolvePublic(shareToken: string): Promise<StoredScreenletterShare | null> {
+    const result = await this.pool.query(
+      "SELECT * FROM screenletter_public_share($1)", [shareToken]
+    );
+    if (!result.rowCount) return null;
+    const row = result.rows[0];
+    return {
+      recordingId: row.recording_id,
+      name: row.name,
+      mode: row.mode,
+      shareRevision: Number(row.share_revision),
+      objectKey: row.object_key,
+      createdAt: instant(row.created_at)
+    };
+  }
+
+  async reportAbuse(
+    shareToken: string,
+    category: string,
+    details: string | null,
+    reporterHash: string | null
+  ): Promise<boolean> {
+    const result = await this.pool.query(
+      "SELECT screenletter_report_abuse($1, $2, $3, $4) AS accepted",
+      [shareToken, category, details, reporterHash]
+    );
+    return result.rows[0]?.accepted === true;
+  }
+
+  private transitionFailed(
+    context: AuthenticatedContext,
+    recordingId: string,
+    updatedAt: string
+  ): Promise<ScreenletterRecording> {
+    return withTenantTransaction(this.pool, context.organizationId, async (client) => {
+      const result = await client.query(`
+        UPDATE screenletter_recordings
+        SET state = 'awaiting_upload', failure_code = NULL, updated_at = $2
+        WHERE id = $1 AND state = 'failed'
+        RETURNING *
+      `, [recordingId, updatedAt]);
+      if (!result.rowCount) {
+        const found = await client.query(
+          "SELECT state FROM screenletter_recordings WHERE id = $1", [recordingId]
+        );
+        if (!found.rowCount) throw new RepositoryError("NOT_FOUND", "Recording not found");
+        throw new RepositoryError("INVALID_STATE", "Only failed recordings can be retried", {
+          state: found.rows[0].state
+        });
+      }
+      return screenletterFromRow(result.rows[0]);
+    });
+  }
+}
+
+async function throwScreenletterPublishError(
+  client: Queryable,
+  recordingId: string,
+  expectedRevision: number
+): Promise<never> {
+  const found = await client.query(`
+    SELECT share_revision, state, proxy_asset_id, published_asset_id
+    FROM screenletter_recordings WHERE id = $1
+  `, [recordingId]);
+  if (!found.rowCount) throw new RepositoryError("NOT_FOUND", "Recording not found");
+  if (Number(found.rows[0].share_revision) !== expectedRevision) {
+    throw new RepositoryError("REVISION_CONFLICT", "Share revision is stale", {
+      expectedRevision,
+      actualRevision: Number(found.rows[0].share_revision)
+    });
+  }
+  throw new RepositoryError("INVALID_STATE", "Recording or render is not publishable", {
+    state: found.rows[0].state
+  });
 }
 
 async function throwProjectMutationError(
@@ -477,8 +687,28 @@ function queueFor(kind: JobEnvelope["kind"]): "ingest" | "analysis" | "render" {
 
 function projectFromRow(row: QueryResultRow): Project {
   return projectSchema.parse({
-    id: row.id, name: row.name, revision: row.revision, state: row.state,
+    id: row.id, name: row.name, kind: row.kind, origin: row.origin,
+    revision: row.revision, state: row.state,
     createdAt: instant(row.created_at), updatedAt: instant(row.updated_at)
+  });
+}
+function screenletterFromRow(row: QueryResultRow): ScreenletterRecording {
+  return screenletterRecordingSchema.parse({
+    id: row.id,
+    projectId: row.project_id,
+    ownerId: row.owner_id,
+    name: row.name,
+    mode: row.mode,
+    state: row.state,
+    sourceAssetId: row.source_asset_id,
+    proxyAssetId: row.proxy_asset_id,
+    publishedAssetId: row.published_asset_id,
+    shareToken: row.share_token,
+    shareRevision: Number(row.share_revision),
+    failureCode: row.failure_code,
+    createdAt: instant(row.created_at),
+    updatedAt: instant(row.updated_at),
+    deletedAt: row.deleted_at ? instant(row.deleted_at) : null
   });
 }
 function uploadFromRow(row: QueryResultRow): StoredUploadSession {
