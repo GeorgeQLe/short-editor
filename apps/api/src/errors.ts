@@ -1,5 +1,6 @@
 import type { SaasErrorCode } from "@siftcut/saas-contracts";
 import { ZodError } from "zod";
+import { RepositoryError } from "@siftcut/infrastructure";
 
 const statusByCode: Record<SaasErrorCode, number> = {
   AUTHENTICATION_REQUIRED: 401,
@@ -32,8 +33,18 @@ export class SaasError extends Error {
 
 export function normalizeError(error: unknown): SaasError {
   if (error instanceof SaasError) return error;
+  if (error instanceof RepositoryError) {
+    if (error.code === "NOT_FOUND") return new SaasError("NOT_FOUND", error.message);
+    if (error.code === "REVISION_CONFLICT") {
+      return new SaasError("REVISION_CONFLICT", error.message, error.details);
+    }
+    return new SaasError("VALIDATION_ERROR", error.message, error.details);
+  }
   if (error instanceof ZodError) {
     return new SaasError("VALIDATION_ERROR", "Invalid request", error.issues);
+  }
+  if (error && typeof error === "object" && "status" in error && error.status === 413) {
+    return new SaasError("VALIDATION_ERROR", "Request body is too large");
   }
   return new SaasError("INTERNAL_ERROR", "Unexpected internal error");
 }

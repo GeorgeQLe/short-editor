@@ -78,6 +78,9 @@ export const updateProjectInputSchema = z.strictObject({
   expectedRevision: z.number().int().positive(),
   name: z.string().trim().min(1).max(160)
 });
+export const deleteProjectInputSchema = z.strictObject({
+  expectedRevision: z.number().int().positive()
+});
 
 export const subscriptionSchema = z.strictObject({
   organizationId: idSchema,

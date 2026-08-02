@@ -60,6 +60,41 @@ The core listens on `127.0.0.1:43120` by default. Packaged builds use
 application-managed paths and do not require PATH or environment setup.
 Environment overrides remain available for development and automated tests.
 
+### Hosted API with PostgreSQL
+
+The M1 hosted API is isolated from the desktop runtime and uses PostgreSQL 17.5.
+Start the local role-separated database, apply migrations as the migrator, and
+run the project/event API as the non-owner API role:
+
+```bash
+npm run db:up
+export MIGRATOR_DATABASE_URL='postgres://siftcut_migrator:local-migrator@127.0.0.1:54329/siftcut'
+npm run db:migrate
+export DATABASE_URL='postgres://siftcut_api:local-api@127.0.0.1:54329/siftcut'
+export DEV_AUTH_TOKENS='{"local-owner":{"userId":"00000000-0000-4000-8000-000000000001","organizationId":"00000000-0000-4000-8000-000000000002","role":"owner","sessionId":"local-owner"}}'
+npm run dev:api
+```
+
+Development bearer mappings are explicit and default to empty. They are
+rejected when `NODE_ENV=production`; Clerk authentication remains M2. The API
+does not expose upload routes until the M3 S3 adapter exists.
+
+`GET /health` is process liveness. `GET /ready` checks both a live pool query
+and the complete checksum-matched migration set. Missing, stale, modified, or
+newer-than-binary schemas return HTTP 503 with a categorical reason and no
+connection details. Requests receive an `x-request-id`, JSON bodies default to
+a 1 MB limit, and logs are structured JSON with credential-shaped fields and
+configured connection strings redacted.
+
+`SIGTERM` and `SIGINT` stop new connections, cancel open event streams, drain
+ordinary requests up to `SHUTDOWN_TIMEOUT_MS` (15 seconds by default), stop an
+attached outbox publisher, and close the PostgreSQL pool. Run the M1 acceptance
+gate against the isolated `siftcut_test` database with:
+
+```bash
+npm run verify:saas:m1
+```
+
 ### Development transcription setup
 
 Install the worker dependency independently from the Node dependencies:

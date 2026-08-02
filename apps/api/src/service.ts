@@ -3,6 +3,7 @@ import {
   completeUploadInputSchema,
   createProjectInputSchema,
   createUploadInputSchema,
+  deleteProjectInputSchema,
   updateProjectInputSchema,
   uploadPartsInputSchema,
   type AuthenticatedContext,
@@ -73,6 +74,23 @@ export class ApiService {
       name: input.name,
       updatedAt: this.now().toISOString()
     });
+  }
+
+  deleteProject(
+    context: AuthenticatedContext,
+    projectId: string,
+    raw: unknown
+  ): Promise<Project> {
+    requireRole(context, ["owner"]);
+    const input = deleteProjectInputSchema.parse(raw);
+    const requestedAt = this.now();
+    return this.dependencies.projects.delete(
+      context,
+      projectId,
+      input.expectedRevision,
+      requestedAt.toISOString(),
+      new Date(requestedAt.getTime() + 24 * 60 * 60 * 1000).toISOString()
+    );
   }
 
   async createUpload(context: AuthenticatedContext, raw: unknown): Promise<UploadSession> {

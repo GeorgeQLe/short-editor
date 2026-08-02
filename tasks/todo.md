@@ -1,6 +1,6 @@
 # Current work
 
-- [ ] SAAS-M1 — Make the hosted API runnable against PostgreSQL with
+- [x] SAAS-M1 — Make the hosted API runnable against PostgreSQL with
   transaction-local tenant context, production repository adapters, durable
   outbox publication, readiness, migration smoke coverage, and cross-tenant
   integration tests.

@@ -1,14 +1,6 @@
 import { jobEnvelopeSchema, type JobEnvelope } from "@siftcut/saas-contracts";
-import type { ArtifactStorage } from "@siftcut/infrastructure";
-
-export interface JobControl {
-  claim(job: JobEnvelope): Promise<"claimed" | "already_complete" | "already_running">;
-  assertOrganizationOwnsInputs(job: JobEnvelope): Promise<void>;
-  cancellationRequested(jobId: string): Promise<boolean>;
-  heartbeat(jobId: string, stage: string, progress: number): Promise<void>;
-  succeed(jobId: string, output: Record<string, unknown>): Promise<void>;
-  fail(jobId: string, failure: ClassifiedFailure): Promise<void>;
-}
+import type { ArtifactStorage, JobControl } from "@siftcut/infrastructure";
+export type { JobControl } from "@siftcut/infrastructure";
 
 export interface ScratchSpace {
   create(jobId: string): Promise<string>;

@@ -1,5 +1,198 @@
 # Ship manifest
 
+## SAAS-M1 runnable API and PostgreSQL tenancy — 2026-08-02
+
+### User goal
+
+Ship the pending SAAS-M1 implementation cleanly to `master`: make the hosted
+API runnable against PostgreSQL with tenant-safe production repositories,
+durable outbox behavior, migration/readiness coverage, and no desktop
+regression.
+
+### Changed files
+
+- `README.md`
+- `apps/api/migrations/0002_saas_m1_runtime.sql`
+- `apps/api/package.json`
+- `apps/api/src/app.ts`
+- `apps/api/src/config.ts`
+- `apps/api/src/errors.ts`
+- `apps/api/src/logging.ts`
+- `apps/api/src/migrate.ts`
+- `apps/api/src/migrations.ts`
+- `apps/api/src/project-service.ts`
+- `apps/api/src/publisher.ts`
+- `apps/api/src/server.ts`
+- `apps/api/src/service.ts`
+- `apps/worker/src/processor.ts`
+- `docker-compose.yml`
+- `docs/saas/ROADMAP.md`
+- `infra/postgres/init.sql`
+- `package-lock.json`
+- `package.json`
+- `packages/infrastructure/package.json`
+- `packages/infrastructure/src/index.ts`
+- `packages/infrastructure/src/postgres.ts`
+- `packages/saas-contracts/src/index.ts`
+- `tasks/history.md`
+- `tasks/ship-manifest.md`
+- `tasks/todo.md`
+- `tests/saas-integration/postgres.test.ts`
+- `tests/saas/api-service.test.ts`
+- `tests/saas/contracts.test.ts`
+- `tests/saas/runtime.test.ts`
+- `vitest.config.ts`
+- `vitest.saas.integration.config.ts`
+
+The committed `apps/api/migrations/0001_saas_foundation.sql` is intentionally
+byte-for-byte unchanged. Generated build output and generated local skill roots
+are excluded. `.agents/project.json` and pack configuration are unchanged.
+There are no earlier unpushed commits in this shipping boundary.
+
+### Per-file purpose
+
+- `README.md`, root/package workspace manifests, the lockfile, Docker Compose,
+  and `infra/postgres/init.sql` document and provide the pinned local
+  role-separated PostgreSQL runtime and M1 commands.
+- `0002_saas_m1_runtime.sql` adds completion evidence, forced RLS, outbox leases
+  and retry state, narrow security-definer publisher functions, and
+  publisher-only execution grants without granting direct table reads.
+- API runtime files validate environment configuration, redact structured
+  logs, execute and verify migrations, serve health/readiness and authenticated
+  project/event routes, enforce request IDs/body limits, and drain the server,
+  SSE streams, publisher, and pool on shutdown.
+- `apps/api/src/service.ts`, `project-service.ts`, shared contracts, and
+  infrastructure interfaces add owner-only, revision-checked project deletion
+  and shared durable job/outbox types.
+- `packages/infrastructure/src/postgres.ts` implements transaction-local tenant
+  context plus PostgreSQL project, upload, usage, entitlement, event, outbox,
+  and worker-job adapters.
+- `apps/api/src/publisher.ts` implements bounded lease claims, token-protected
+  acknowledgements, exponential retry, and abandoned-claim compatibility.
+- `apps/worker/src/processor.ts` consumes the shared job-control contract.
+- Unit and integration tests cover runtime configuration/redaction, readiness
+  categories, migration compatibility, project deletion, tenant isolation,
+  optimistic concurrency, atomic completion/outbox behavior, worker
+  redelivery, publisher permissions, claim tokens, retry, and lease recovery.
+- `vitest.config.ts` keeps the PostgreSQL suite isolated from desktop tests;
+  `vitest.saas.integration.config.ts` supplies its serial integration lane.
+- The SaaS roadmap, current task, history, and this manifest close M1 with
+  exact acceptance and rollback evidence.
+
+### User-goal mapping
+
+- Every tenant repository operation enters a database transaction and sets
+  `app.organization_id` locally before RLS-protected queries.
+- The API role cannot bypass RLS; the publisher role cannot read tenant tables
+  and can invoke only token-protected outbox functions.
+- Project mutations remain optimistic and owner-only deletion immediately
+  removes a project from ordinary reads while requesting active-job
+  cancellation.
+- Upload completion, job creation, and outbox creation share one transaction;
+  publisher leases use `SKIP LOCKED`, retry accounting, claim tokens, and
+  abandoned-lease recovery.
+- Readiness requires a live database plus the exact known migration set.
+  Legacy committed migration checksums remain stable while their transaction
+  wrappers are safely nested by the runner.
+- The hosted runtime remains isolated from the Electron product, whose full
+  test and production build gates remain green.
+
+### Tests run
+
+Executable verification against the final shipping boundary:
+
+- `npm run typecheck:saas`: all SaaS workspace typechecks passed.
+- `npm run test:saas`: 4 files and 23 tests passed.
+- `npm run test:saas:integration`: 1 file and 7 tests passed against the pinned
+  PostgreSQL 17.5 harness with separate migrator, API, and publisher roles.
+- `npm test`: all 51 desktop files and 365 tests passed.
+- `npm run build`: desktop TypeScript, Vite production build, and Node
+  compilation passed.
+- `npm run build:saas`: contracts, infrastructure, API, worker, and web builds
+  passed.
+- Built API smoke: `GET /ready` returned HTTP 200 with an `x-request-id`
+  against `siftcut_test`; SIGINT logged shutdown start and `api_stopped` with
+  exit code 0.
+- `git diff --check`: passed.
+
+Documentation and security verification:
+
+- A focused changed-file scan found no live private-key, AWS access-key,
+  GitHub-token, or OpenAI-token signatures. The checked-in local Docker
+  passwords and development bearer mapping are explicit non-production
+  fixtures.
+- `scripts/audit-task-docs.mjs` is absent, so the repository defines no
+  task-document audit command.
+- `tasks/todo.md` closes SAAS-M1 and the roadmap records M1 complete.
+
+The first combined gate run stopped at integration setup because the existing
+isolated `siftcut_test` database had recorded the checksum from the pending
+working-tree edit to `0001`. Its test-only migration metadata was reconciled to
+the immutable committed checksum; the failed integration lane and all
+remaining downstream gates then passed. This was a local harness-state issue,
+not an accepted source failure.
+
+### Skipped tests
+
+- No lint script or standalone lint/check target exists in `package.json`;
+  TypeScript builds, unit/integration suites, and diff hygiene cover the
+  repository-defined executable gates.
+- A signed/packaged desktop artifact was not rebuilt because M1 changes no
+  Electron source, package configuration, or runtime resource. The full
+  desktop production build and all desktop tests provide the relevant
+  regression evidence; native packaged Windows remains a later release gate.
+- No cloud Clerk, S3/SQS, Stripe, or deployed-host test is relevant to M1.
+  Those adapters and acceptance gates are explicitly owned by M2 and later
+  milestones.
+- No visual inspection was relevant because this boundary changes no UI or
+  rendered asset.
+
+### Adversarial review
+
+A failure-oriented changed-file review was used as the equivalent review lane
+because no repository-local `quality-sweep` or `expert-review` command is
+installed and `docs/quality-gate-contract.md` is absent. It traced historical
+migration compatibility, transaction rollback and lock release, RLS and
+security-definer boundaries, known-ID cross-tenant access, revision races,
+project-deletion visibility, atomic completion/outbox insertion, concurrent
+claims, stale acknowledgement tokens, retry timing, abandoned leases, job
+redelivery, readiness disclosure, configuration/log redaction, body bounds,
+SSE cancellation, and server/pool shutdown.
+
+The review found one blocking defect: removing `BEGIN`/`COMMIT` from the
+already-committed M0 migration changed its checksum and would reject an
+existing initialized database. The historical file is restored exactly, and
+the migration runner now unwraps only legacy outer transaction statements at
+execution time while hashing the original bytes. Focused unit coverage and the
+full PostgreSQL migration suite pass. No blocking finding remains.
+
+The desktop test suite emits the established `Unexpected internal error` line
+from the redacted-500 fixture. It is intentionally accepted test evidence, not
+a build warning or unresolved runtime failure. No other warning was emitted.
+
+### Residual risk
+
+- Production authentication intentionally fails closed until Clerk lands in
+  M2; the current bearer mapping is development-only and rejected in
+  production.
+- Real S3/SQS dispatch, upload reconciliation, managed worker media processing,
+  and cloud observability remain M3 and later work. The M1 publisher is covered
+  against PostgreSQL leases and a dispatcher port, not a live queue.
+- The packaged Windows application and a deployed hosted environment were not
+  exercised on this macOS/local-PostgreSQL boundary.
+
+### Rollback note
+
+Revert the SAAS-M1 commit before applying `0002_saas_m1_runtime.sql`. If 0002
+has already been applied, restore a pre-M1 database backup before running M0
+code; do not edit or delete migration ledger rows in a real environment.
+Desktop rollback requires only the same commit revert.
+
+### Next command
+
+No next executable task is currently promoted in `tasks/todo.md`; use
+`$investigate` only when selecting and scoping the next milestone.
+
 ## Hosted commercial-beta M0 foundation — 2026-08-02
 
 ### User goal

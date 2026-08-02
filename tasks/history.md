@@ -2,6 +2,25 @@
 
 ## 2026-08-02
 
+- Completed SAAS-M1 with a runnable role-separated PostgreSQL 17.5 harness,
+  checksum- and advisory-lock-aware migrations, transaction-local tenant
+  context, forced row-level security, production project/upload/usage/event/job
+  adapters, leased outbox publication, readiness, bounded requests,
+  structured redacted logging, graceful shutdown, and revision-checked project
+  deletion.
+- Failure-oriented shipping review found that the pending implementation had
+  removed the transaction wrapper from the already-committed M0 migration,
+  changing its checksum for previously initialized databases. The migration is
+  now byte-for-byte unchanged; the runner unwraps legacy transaction boundaries
+  only at execution time, with regression coverage for wrapper compatibility
+  and stale, modified, ahead, and unavailable readiness states.
+- Executable verification passed 23 SaaS unit tests, 7 role-separated
+  PostgreSQL integration tests, all 51 desktop test files and 365 tests, the
+  desktop production build, and every SaaS workspace build. A built API
+  returned HTTP 200 from `/ready` against the current test schema and handled
+  SIGINT with a clean pool/server shutdown. The existing intentional
+  `Unexpected internal error` stderr fixture remains accepted; no new warning
+  or unresolved validation failure remains.
 - Established the hosted SiftCut commercial-beta foundation as npm workspaces
   around the unchanged Electron root package. Shared SaaS contracts now define
   authenticated organization roles, projects, entitlements, usage, public

@@ -64,7 +64,7 @@ required.
 | ID | Milestone | Status | Depends on | Exit outcome |
 | --- | --- | --- | --- | --- |
 | M0 | Repository and contract foundation | Complete | — | Desktop remains isolated; SaaS packages build and test |
-| M1 | Runnable API and PostgreSQL tenancy | In progress | M0 | Authenticated tenant-safe project API runs against PostgreSQL |
+| M1 | Runnable API and PostgreSQL tenancy | Complete | M0 | Authenticated tenant-safe project API runs against PostgreSQL |
 | M2 | Clerk organizations and permissions | Foundation | M1 | Invitations, switching, and roles work end to end |
 | M3 | Direct upload and ingest | Foundation | M1, M2 | A real 20 GB-capable upload produces validated media artifacts |
 | M4 | Managed transcription and analysis | Foundation | M3 | An episode produces a reviewed transcript and candidates |
@@ -96,7 +96,7 @@ Acceptance evidence:
 
 ## M1 — Runnable API and PostgreSQL tenancy
 
-**Status: In progress**
+**Status: Complete**
 
 Deliverables:
 
@@ -126,6 +126,18 @@ Acceptance gate:
 - readiness fails when required database state or migrations are unavailable;
 - API shutdown drains active requests and releases database connections; and
 - desktop tests and packaging remain unchanged.
+
+Acceptance evidence (2026-08-02):
+
+- the checksum/advisory-lock migration suite passed against the pinned local
+  PostgreSQL 17.5 harness and the built API returned ready against the current
+  schema;
+- role-separated integration coverage passed tenant isolation, concurrent
+  revision, atomic completion/outbox, job redelivery, claim-token, retry, and
+  abandoned-lease cases; and
+- the complete `npm run verify:saas:m1` constituent gates passed: M1 suites,
+  the full desktop test suite, desktop typecheck/production build, and every
+  SaaS workspace build.
 
 ## M2 — Clerk organizations and permissions
 

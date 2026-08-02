@@ -34,7 +34,7 @@ const PROJECT: Project = {
 };
 
 function fixture() {
-  const projectsByOrg = new Map<string, Project[]>([[OWNER.organizationId, [PROJECT]]]);
+  const projectsByOrg = new Map<string, Project[]>([[OWNER.organizationId, [{ ...PROJECT }]]]);
   const uploadsByOrg = new Map<string, Map<string, StoredUploadSession>>();
   const reservations = new Map<string, number>();
   const outbox: JobEnvelope[] = [];
@@ -42,7 +42,9 @@ function fixture() {
   const projects: ProjectRepository = {
     async list(context) { return projectsByOrg.get(context.organizationId) ?? []; },
     async get(context, id) {
-      return (projectsByOrg.get(context.organizationId) ?? []).find((project) => project.id === id) ?? null;
+      return (projectsByOrg.get(context.organizationId) ?? []).find(
+        (project) => project.id === id && project.state === "active"
+      ) ?? null;
     },
     async create(context, project) {
       const current = projectsByOrg.get(context.organizationId) ?? [];
@@ -58,6 +60,19 @@ function fixture() {
         });
       }
       Object.assign(project, patch, { revision: project.revision + 1 });
+      return project;
+    },
+    async delete(context, id, expectedRevision, deletionRequestedAt) {
+      const project = await this.get(context, id);
+      if (!project) throw new SaasError("NOT_FOUND", "Project not found");
+      if (project.revision !== expectedRevision) {
+        throw new SaasError("REVISION_CONFLICT", "Project revision is stale");
+      }
+      Object.assign(project, {
+        revision: project.revision + 1,
+        state: "deleting",
+        updatedAt: deletionRequestedAt
+      });
       return project;
     }
   };
@@ -149,6 +164,16 @@ describe("multi-tenant API service", () => {
     expect(() => service.createProject({ ...OWNER, role: "viewer" }, {
       name: "Forbidden"
     })).toThrow(expect.objectContaining({ code: "FORBIDDEN_ROLE" }));
+  });
+
+  it("allows only owners to revision-check project deletion", async () => {
+    const { service } = fixture();
+    expect(() => service.deleteProject({ ...OWNER, role: "editor" }, PROJECT.id, {
+      expectedRevision: 1
+    })).toThrow(expect.objectContaining({ code: "FORBIDDEN_ROLE" }));
+    await expect(service.deleteProject(OWNER, PROJECT.id, { expectedRevision: 1 }))
+      .resolves.toMatchObject({ state: "deleting", revision: 2 });
+    await expect(service.getProject(OWNER, PROJECT.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("returns structured optimistic revision conflicts", async () => {

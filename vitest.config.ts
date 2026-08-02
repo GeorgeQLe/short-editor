@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.{ts,tsx}"],
-    exclude: ["tests/saas/**"],
+    exclude: ["tests/saas/**", "tests/saas-integration/**"],
     fileParallelism: true,
     testTimeout: 15_000
   }

@@ -23,6 +23,13 @@ export interface ProjectRepository {
     expectedRevision: number,
     patch: Pick<Project, "name" | "updatedAt">
   ): Promise<Project>;
+  delete(
+    context: AuthenticatedContext,
+    projectId: string,
+    expectedRevision: number,
+    deletionRequestedAt: string,
+    purgeAfter: string
+  ): Promise<Project>;
 }
 
 export interface UsageRepository {
@@ -88,10 +95,33 @@ export interface JobDispatcher {
   enqueue(job: JobEnvelope): Promise<void>;
 }
 
+export interface LeasedOutboxRecord {
+  outboxId: string;
+  envelope: JobEnvelope;
+  attempt: number;
+  claimToken: string;
+}
+
 export interface TransactionalOutbox {
   append(job: JobEnvelope): Promise<void>;
-  claim(limit: number): Promise<JobEnvelope[]>;
-  markDelivered(jobId: string): Promise<void>;
+  claim(limit: number): Promise<LeasedOutboxRecord[]>;
+  markDelivered(outboxId: string, claimToken: string): Promise<boolean>;
+  markFailed(outboxId: string, claimToken: string, retryAt: Date): Promise<boolean>;
+}
+
+export interface ClassifiedJobFailure {
+  code: string;
+  message: string;
+  retryable: boolean;
+}
+
+export interface JobControl {
+  claim(job: JobEnvelope): Promise<"claimed" | "already_complete" | "already_running">;
+  assertOrganizationOwnsInputs(job: JobEnvelope): Promise<void>;
+  cancellationRequested(jobId: string): Promise<boolean>;
+  heartbeat(jobId: string, stage: string, progress: number): Promise<void>;
+  succeed(jobId: string, output: Record<string, unknown>): Promise<void>;
+  fail(jobId: string, failure: ClassifiedJobFailure): Promise<void>;
 }
 
 export interface EventRepository {
@@ -107,3 +137,5 @@ export interface EventRepository {
 export interface CredentialProvider {
   getAnalysisCredential(provider: string): Promise<string>;
 }
+
+export * from "./postgres.js";

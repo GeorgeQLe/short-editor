@@ -3,6 +3,7 @@ import {
   authenticatedContextSchema,
   completeUploadInputSchema,
   createUploadInputSchema,
+  deleteProjectInputSchema,
   jobEnvelopeSchema,
   saasErrorCodes
 } from "../../packages/saas-contracts/src/index.js";
@@ -62,6 +63,11 @@ describe("SaaS contracts", () => {
       checksumSha256: `${"A".repeat(43)}=`
     };
     expect(() => completeUploadInputSchema.parse({ parts: [part, part] })).toThrow();
+  });
+
+  it("keeps project deletion revision-checked and strict", () => {
+    expect(deleteProjectInputSchema.parse({ expectedRevision: 2 })).toEqual({ expectedRevision: 2 });
+    expect(() => deleteProjectInputSchema.parse({ expectedRevision: 2, force: true })).toThrow();
   });
 
   it("defines all commercial beta error codes", () => {
