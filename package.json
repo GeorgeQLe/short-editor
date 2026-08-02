@@ -1,5 +1,5 @@
 {
-  "name": "short-editor",
+  "name": "@siftcut/desktop",
   "version": "0.1.0",
   "private": true,
   "description": "macOS-first, local AI-assisted YouTube Shorts editor",
@@ -14,12 +14,20 @@
     "url": "https://github.com/GeorgeQLe/short-editor/issues"
   },
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "main": "dist/electron/main.js",
   "scripts": {
     "dev": "npm run build && concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
     "dev:core": "tsx watch src/core/cli.ts",
     "dev:web": "vite",
     "build": "npm run typecheck && vite build && tsc -p tsconfig.node.json",
+    "build:saas": "npm run build -w @siftcut/saas-contracts && npm run build -w @siftcut/infrastructure && npm run build -w @siftcut/api && npm run build -w @siftcut/worker && npm run build -w @siftcut/web",
+    "typecheck:saas": "npm run build -w @siftcut/saas-contracts && npm run build -w @siftcut/infrastructure && npm run typecheck -w @siftcut/api && npm run typecheck -w @siftcut/worker && npm run typecheck -w @siftcut/web",
+    "test:saas": "npm run build -w @siftcut/saas-contracts && npm run build -w @siftcut/infrastructure && vitest run --config vitest.saas.config.ts",
+    "verify": "npm run test && npm run build && npm run typecheck:saas && npm run test:saas",
     "smoke:preload": "electron dist/electron/preload-smoke.js",
     "smoke:renderer": "electron dist/electron/renderer-smoke.js",
     "typecheck": "tsc --noEmit",

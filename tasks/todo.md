@@ -1,5 +1,14 @@
 # Current work
 
+- [ ] SAAS-M1 — Make the hosted API runnable against PostgreSQL with
+  transaction-local tenant context, production repository adapters, durable
+  outbox publication, readiness, migration smoke coverage, and cross-tenant
+  integration tests.
+  - The ordered execution and acceptance gate are defined in
+    `docs/saas/ROADMAP.md`.
+  - Clerk, S3/SQS, Stripe, managed processing, and full AWS deployment remain
+    later milestones; M1 must preserve the independent Electron build and test
+    gates.
 - [x] UI-01.1 — Complete the library, watched-folder, relink, provider-status,
   and cloud-authorization workflow.
   - Named-fixture macOS acceptance passed on commit `af8ab23` with isolated
@@ -60,6 +69,12 @@
 
 ## Completed
 
+- [x] Establish the SiftCut commercial-beta SaaS foundation without changing
+  Electron behavior: add isolated npm workspaces, authenticated multi-tenant
+  contracts, infrastructure ports, a role/revision/quota-aware API service,
+  multipart browser upload and worker primitives, a tenant-scoped PostgreSQL
+  schema, initial `us-east-1` Terraform resources, executable SaaS tests, a
+  separate hosted-product specification, and an M0–M9 delivery roadmap.
 - [x] Establish the SiftCut product identity across application copy, release
   metadata, support surfaces, and repository documentation; add a reproducible
   vertical film-cut app icon, use it in the macOS package and sidebar header,

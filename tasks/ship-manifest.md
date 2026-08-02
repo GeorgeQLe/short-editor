@@ -1,5 +1,133 @@
 # Ship manifest
 
+## Hosted commercial-beta M0 foundation — 2026-08-02
+
+### User goal
+
+Ship the pending hosted SiftCut repository and contract foundation cleanly to
+`master` while keeping the independent Electron desktop product buildable and
+unchanged in behavior.
+
+### Changed files
+
+- Workspace boundary: `package.json`, `package-lock.json`, `tsconfig.json`,
+  `vitest.config.ts`, `vitest.saas.config.ts`, and package manifests/configs
+  under `apps/` and `packages/`.
+- Hosted contracts and runtime primitives:
+  `packages/saas-contracts/src/index.ts`,
+  `packages/infrastructure/src/index.ts`, `apps/api/src/`, `apps/worker/src/`,
+  and `apps/web/src/`.
+- Persistence and infrastructure foundation:
+  `apps/api/migrations/0001_saas_foundation.sql` and `infra/terraform/`.
+- Product documentation: `README.md`, `docs/saas/SPEC.md`, and
+  `docs/saas/ROADMAP.md`.
+- Workflow/session records: `.agents/project.json`, `sync.md`,
+  `tasks/todo.md`, `tasks/history.md`, and `tasks/ship-manifest.md`.
+- Verification: `tests/saas/`.
+
+Ignored generated `dist/` directories and generated local skill roots are not
+included.
+
+### Per-file purpose
+
+- Root workspace configuration preserves the desktop package while giving the
+  web, API, worker, shared contracts, and infrastructure interfaces isolated
+  build boundaries and verification commands.
+- Shared contracts define verified tenant/role context, revisioned projects,
+  entitlements, usage, public upload sessions, assets, versioned jobs, durable
+  events, and structured SaaS errors without exposing storage credentials.
+- API, worker, and browser primitives establish role-aware project and upload
+  flows, transactional completion/outbox interfaces, idempotent worker stages,
+  cancellation and scratch cleanup, and direct multipart browser upload.
+- PostgreSQL and Terraform files provide the first reviewable tenant schema,
+  RLS policies, usage/outbox records, encrypted storage/queues/logs, lifecycle
+  cleanup, and alarms without claiming a deployed environment.
+- The SaaS specification and roadmap explicitly separate hosted requirements
+  from the desktop specification and distinguish foundation code from
+  production-ready milestones.
+- Project designation and sync instructions record the installed Git workflow
+  and dependency refresh behavior.
+
+### User-goal mapping
+
+- The desktop test/build surface remains the root package and has separate SaaS
+  exclusions.
+- Hosted code has explicit workspace, contract, persistence, infrastructure,
+  and test boundaries.
+- M0 is documented as complete only at foundation level; SAAS-M1 is promoted
+  into `tasks/todo.md` as the next executable work.
+- No desktop/SaaS data migration, synchronization, deployment, or production
+  readiness is claimed.
+
+### Tests run
+
+Executable verification:
+
+- `npm run verify`: all 51 desktop test files and 365 tests passed; the desktop
+  typecheck, Vite build, Node compilation, SaaS package builds/typechecks, and
+  the SaaS tests passed.
+- `npm run build:saas`: contracts, infrastructure, API, worker, and web
+  production builds passed.
+- `terraform fmt -check -recursive infra/terraform`: passed.
+- `git diff --check`: passed.
+
+Documentation and security checks:
+
+- Focused secret-pattern scanning found only the existing synthetic token-like
+  value in `tests/api-release-contract.test.ts`; that tracked fixture is outside
+  this diff and remains intentional.
+- `scripts/audit-task-docs.mjs` is absent, so there is no repository-defined
+  task-document audit command.
+
+### Skipped tests
+
+- PostgreSQL migration execution and tenant-isolation integration tests are not
+  available in M0 because the PostgreSQL runtime and adapters are SAAS-M1 work.
+- Terraform `validate`/plan was not run because this repository has no checked-in
+  initialized provider lock or environment variable set; formatting is the M0
+  acceptance gate and live infrastructure remains undeployed.
+- Clerk, Stripe, S3 multipart, SQS, CloudFront, media processing, load,
+  deletion, restore, and production smoke tests require later milestone
+  adapters and environments. Mock tests are explicitly not represented as
+  production acceptance.
+
+### Adversarial review
+
+A failure-oriented review covered tenant identifiers as authorization input,
+role-denied mutations, known cross-tenant UUID reads, optimistic revision
+conflicts, upload quota reservations, tenant-scoped object keys, bounded and
+unique multipart metadata, completion plus outbox ordering, worker redelivery,
+validation-before-promotion, cancellation, scratch cleanup, credential/path
+redaction, streaming errors after headers, public storage settings, encryption,
+DLQ/lifecycle behavior, desktop/SaaS test separation, generated build output,
+secret-like additions, and overclaiming foundation status.
+
+The review confirmed that upload-session reconciliation, production adapters,
+database transaction-local tenant context, and live integration gates are
+explicitly assigned to SAAS-M1/M3 rather than silently claimed by M0. No
+blocking finding remains inside the documented M0 boundary.
+
+### Residual risk
+
+- The initial SQL and Terraform are unexecuted foundation definitions; their
+  behavior must be proven against real PostgreSQL and isolated AWS staging
+  environments before later milestones can complete.
+- Multipart completion recovery, reservation reconciliation, and browser
+  reload persistence are intentionally deferred to M3.
+- Authentication is an interface boundary only; complete Clerk JWT and webhook
+  verification remains M2 work.
+
+### Rollback note
+
+Revert the M0 feature commit to remove the hosted workspaces, hosted
+specification, migration, and Terraform definitions. The existing desktop
+database, bundle identity, and data paths require no rollback or migration.
+
+### Next command
+
+Run `$exec` for SAAS-M1 to add the PostgreSQL-backed API runtime and tenant
+integration gates.
+
 ## SiftCut product identity and icon system — 2026-07-31
 
 ### User goal

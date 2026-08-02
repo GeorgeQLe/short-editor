@@ -6,6 +6,7 @@
   "skill_pack_version": 1,
   "enabled_skills": {
     "ship-end": "exec-loop",
-    "investigate": "code-debug"
+    "investigate": "code-debug",
+    "sync": "gitops"
   }
 }

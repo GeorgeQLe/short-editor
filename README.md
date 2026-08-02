@@ -11,6 +11,12 @@ The authoritative v1 engineering requirements and current implementation matrix
 are in [`SPEC.md`](SPEC.md). If this README, source comments, tests, or current
 code conflict with the specification, `SPEC.md` wins.
 
+The hosted commercial beta is an independent product surface. Its proposed
+requirements and boundaries are in
+[`docs/saas/SPEC.md`](docs/saas/SPEC.md), with delivery tracked in
+[`docs/saas/ROADMAP.md`](docs/saas/ROADMAP.md); they do not alter the desktop
+specification or synchronize desktop data.
+
 Release consumers can use the generated
 [`docs/release-interfaces-v1.md`](docs/release-interfaces-v1.md) guide and its
 linked machine-readable HTTP, MCP schema, and compatibility artifacts.

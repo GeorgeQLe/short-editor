@@ -1,5 +1,36 @@
 # Session history
 
+## 2026-08-02
+
+- Established the hosted SiftCut commercial-beta foundation as npm workspaces
+  around the unchanged Electron root package. Shared SaaS contracts now define
+  authenticated organization roles, projects, entitlements, usage, public
+  upload sessions, assets, versioned jobs, durable events, and structured
+  errors; infrastructure-only upload records retain S3 keys and multipart IDs
+  without exposing them through API responses.
+- Added role-aware, optimistic-revision project and multipart-upload services,
+  verified-session middleware, durable SSE handling, quota reservation,
+  checksum validation, tenant-scoped object keys, and an atomic
+  upload-completion/outbox port. Failure-oriented review added bounds for signed
+  part numbers, rejected duplicate completion metadata, sorted completed parts,
+  and protected streaming error handling after headers are sent.
+- Added the initial tenant-scoped PostgreSQL schema with row-level security,
+  immutable usage ledger, webhook idempotency, jobs, artifacts, events, and
+  transactional outbox; added versioned worker lifecycle primitives and
+  browser upload support; and added initial encrypted S3, KMS, SQS/DLQ,
+  lifecycle, logging, secrets, and queue-age Terraform resources constrained to
+  `us-east-1`.
+- Created `docs/saas/SPEC.md` as the independent hosted-product authority and
+  `docs/saas/ROADMAP.md` as an M0–M9 delivery plan with dependencies,
+  acceptance gates, critical path, deferred scope, and an explicit distinction
+  between foundation code and production readiness. SAAS-M1 is now the active
+  task.
+- Executable verification passed all 51 desktop test files and 365 tests, the
+  desktop production build, all SaaS workspace typechecks/builds, and 12 SaaS
+  contract/service/worker tests. Terraform formatting and `git diff --check`
+  pass. No live Clerk, PostgreSQL, AWS, Stripe, FFmpeg cloud-worker, or hosted
+  end-to-end test was claimed; those remain roadmap milestones.
+
 ## 2026-07-31
 
 - Renamed the public product surface from Short Editor to SiftCut while
