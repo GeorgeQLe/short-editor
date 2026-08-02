@@ -122,6 +122,36 @@ describe("Clerk webhook authentication and runtime configuration", () => {
 });
 
 describe("organization deletion", () => {
+  it("creates a deterministic personal Screenletter organization idempotently", async () => {
+    const identities = {} as ClerkIdentityRepository;
+    const request = vi.fn(async () => new Response(
+      JSON.stringify({ id: "org_personal" }),
+      { status: 201, headers: { "content-type": "application/json" } }
+    ));
+    const service = new ClerkOrganizationService({
+      issuer: "https://clerk.example.test",
+      audience: "siftcut-api",
+      authorizedParties: ["https://app.example.test"],
+      webhookSigningSecret: "whsec_secret",
+      secretKey: "sk_test"
+    }, identities, () => new Date(), request);
+    const event = {
+      type: "user.created",
+      data: { id: "user_123", first_name: "George", last_name: "Le" }
+    };
+    await expect(service.ensurePersonalOrganization(event)).resolves.toBeUndefined();
+    const firstBody = JSON.parse(request.mock.calls[0]![1]!.body as string);
+    expect(firstBody).toMatchObject({
+      name: "George Le's Screenletter",
+      created_by: "user_123",
+      public_metadata: { product: "screenletter", personal: true }
+    });
+    expect(firstBody.slug).toMatch(/^screenletter-[a-f0-9]{20}$/);
+
+    request.mockResolvedValueOnce(new Response(null, { status: 422 }));
+    await expect(service.ensurePersonalOrganization(event)).resolves.toBeUndefined();
+  });
+
   it("requires owner role, exact typed confirmation, and authentication within five minutes", async () => {
     const identities = {
       organizationForContext: vi.fn(async () => ({

@@ -6,13 +6,19 @@ import {
   PostgresEventRepository,
   PostgresJobControl,
   PostgresProjectRepository,
+  PostgresScreenletterRepository,
   PostgresTransactionalOutbox,
   PostgresUploadRepository,
   PostgresUsageRepository,
   RepositoryError,
   withTenantTransaction
 } from "../../packages/infrastructure/src/postgres.js";
-import type { AuthenticatedContext, JobEnvelope, Project } from "../../packages/saas-contracts/src/index.js";
+import type {
+  AuthenticatedContext,
+  JobEnvelope,
+  Project,
+  ScreenletterRecording
+} from "../../packages/saas-contracts/src/index.js";
 import { loadMigrations, migrationReadiness, runMigrations } from "../../apps/api/src/migrations.js";
 import { ClerkIdentityRepository } from "../../apps/api/src/clerk.js";
 
@@ -153,6 +159,84 @@ describe("PostgreSQL tenant repositories", () => {
     })).rejects.toThrow("injected outbox failure");
     await migrator.query("DROP TRIGGER reject_outbox ON outbox");
     expect((await uploads.get(A, failingId))?.state).toBe("completing");
+  });
+
+  it("isolates Screenletter shares and revision-checks publish and rollback", async () => {
+    const recordings = new PostgresScreenletterRepository(api);
+    const timestamp = new Date().toISOString();
+    const screenProject: Project = {
+      id: "30000000-0000-4000-8000-000000000010",
+      name: "Screen demo",
+      kind: "screenletter_recording",
+      origin: "screenletter_ios",
+      revision: 1,
+      state: "active",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    const recording: ScreenletterRecording = {
+      id: "50000000-0000-4000-8000-000000000001",
+      projectId: screenProject.id,
+      ownerId: USER_A,
+      name: screenProject.name,
+      mode: "screen_microphone",
+      state: "created",
+      sourceAssetId: null,
+      proxyAssetId: null,
+      publishedAssetId: null,
+      shareToken: "50000000-0000-4000-8000-000000000002",
+      shareRevision: 1,
+      failureCode: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      deletedAt: null
+    };
+    await recordings.create(A, screenProject, recording);
+    await expect(recordings.get(B, recording.id)).resolves.toBeNull();
+
+    const proxyId = "50000000-0000-4000-8000-000000000003";
+    const renderId = "50000000-0000-4000-8000-000000000004";
+    await withTenantTransaction(migrator, ORG_A, async (client) => {
+      for (const [id, kind, objectKey] of [
+        [proxyId, "proxy", `orgs/${ORG_A}/screen/proxy.mp4`],
+        [renderId, "render", `orgs/${ORG_A}/screen/render.mp4`]
+      ]) {
+        await client.query(`
+          INSERT INTO artifacts
+            (id, organization_id, project_id, kind, object_key, content_hash,
+             byte_length, media_type, producer_name, producer_version, input_hash,
+             state, created_at, completed_at)
+          VALUES ($1, $2, $3, $4, $5, $6, 100, 'video/mp4', 'test', '1',
+            $6, 'complete', $7, $7)
+        `, [id, ORG_A, screenProject.id, kind, objectKey, id.replace(/-/g, ""), timestamp]);
+      }
+      await client.query(`
+        UPDATE screenletter_recordings
+        SET state = 'ready', source_asset_id = $2, proxy_asset_id = $2
+        WHERE id = $1
+      `, [recording.id, proxyId]);
+    });
+
+    const published = await recordings.publish(A, recording.id, renderId, 1, timestamp);
+    expect(published).toMatchObject({ publishedAssetId: renderId, shareRevision: 2 });
+    await expect(recordings.publish(A, recording.id, renderId, 1, timestamp))
+      .rejects.toMatchObject({ code: "REVISION_CONFLICT" });
+    await expect(recordings.resolvePublic(recording.shareToken)).resolves.toMatchObject({
+      recordingId: recording.id,
+      shareRevision: 2,
+      objectKey: `orgs/${ORG_A}/screen/render.mp4`
+    });
+    await expect(recordings.reportAbuse(
+      recording.shareToken, "spam", "test", "hashed"
+    )).resolves.toBe(true);
+    await expect(recordings.rollback(A, recording.id, 2, timestamp)).resolves.toMatchObject({
+      publishedAssetId: null,
+      shareRevision: 3
+    });
+    await expect(recordings.resolvePublic(recording.shareToken)).resolves.toMatchObject({
+      shareRevision: 3,
+      objectKey: `orgs/${ORG_A}/screen/proxy.mp4`
+    });
   });
 
   it("isolates events and immediately hides revision-checked deletions", async () => {

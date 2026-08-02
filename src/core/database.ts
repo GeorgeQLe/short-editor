@@ -663,6 +663,24 @@ const migrations: readonly Migration[] = [
       addCompositionLayerVisibility(db, "templates");
       addCompositionLayerVisibility(db, "short_projects");
     }
+  },
+  {
+    version: 19,
+    name: "screen demo template",
+    up: (db) => {
+      const template = starterTemplates.find(({ id }) => id === "screen-demo-v1");
+      if (!template) throw new Error("Screen Demo starter template is unavailable");
+      db.prepare(`
+        INSERT OR IGNORE INTO templates(
+          id,name,description,version,revision,parent_template_id,built_in,
+          composition_json,created_at,updated_at
+        ) VALUES(@id,@name,@description,@version,@revision,@parentTemplateId,1,
+          @composition,@createdAt,@updatedAt)
+      `).run({
+        ...template,
+        composition: JSON.stringify(template.composition)
+      });
+    }
   }
 ];
 

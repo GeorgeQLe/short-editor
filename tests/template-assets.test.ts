@@ -78,9 +78,9 @@ function storedAsset(
 }
 
 describe("Template lineage and Short snapshots", () => {
-  it("ships four immutable built-ins and materializes the news preset from the Short title", () => {
+  it("ships five immutable built-ins and materializes the news preset from the Short title", () => {
     const { service, candidate } = setup();
-    expect(starterTemplates).toHaveLength(4);
+    expect(starterTemplates).toHaveLength(5);
     expect(starterTemplates.every((template) => template.builtIn)).toBe(true);
     const project = service.createShort(candidate.id, "news-brief-speaker-v1");
     expect(project.title).toBe(candidate.topic);
@@ -101,6 +101,23 @@ describe("Template lineage and Short snapshots", () => {
         id: "topic", type: "text", content: { binding: "short_title" }
       }),
       expect.objectContaining({ id: "logo", type: "logo", assetId: null })
+    ]));
+  });
+
+  it("ships a safe-area-aware screen demo with editable fit and crop tracks", () => {
+    const template = starterTemplates.find(({ id }) => id === "screen-demo-v1")!;
+    expect(template.composition.safeArea).toEqual({
+      top: 150, right: 72, bottom: 300, left: 72
+    });
+    expect(template.composition.layers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "screen",
+        type: "video",
+        fit: "fit",
+        cropTarget: "screen",
+        manualCropTrack: []
+      }),
+      expect.objectContaining({ id: "captions", type: "captions" })
     ]));
   });
 

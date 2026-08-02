@@ -91,6 +91,12 @@
   kind/origin metadata, tenant-scoped recording persistence, role-aware
   lifecycle services, candidate-free edit handoff, revisioned publish/
   rollback, unlisted signed sharing, and privacy-preserving abuse reports.
+  - Added idempotent personal Screenletter organizations for new Clerk users,
+    the `screen-demo-v1` vertical composition, owner-safe public lookup
+    migrations under forced RLS, and integrated iOS capture/share contracts.
+  - Production activation remains gated on the concrete M3 S3 multipart,
+    ingest/proxy, and CloudFront-signing implementation plus physical-device
+    beta acceptance.
 - [x] Establish the SiftCut commercial-beta SaaS foundation without changing
   Electron behavior: add isolated npm workspaces, authenticated multi-tenant
   contracts, infrastructure ports, a role/revision/quota-aware API service,

@@ -2,6 +2,22 @@
 
 ## 2026-08-02
 
+- Completed the integrated Screenletter MVP foundation across SiftCut and the
+  private iOS repository. New Clerk users receive deterministic personal
+  organizations; forced-RLS public share lookups can resolve only through
+  security-definer ownership; and the built-in `screen-demo-v1` composition
+  supplies vertical safe areas, fit/crop behavior, and captions.
+- Added the iOS 18 SwiftUI capture client with ReplayKit screen-plus-microphone
+  recording, camera capture, ten-minute limits, App Group recovery, hashing,
+  resumable background multipart state, failed-upload retention, stable
+  unlisted sharing, and explicit SiftCut editing handoff. The private
+  `GeorgeQLe/screenletter` repository passed Swift package tests and an unsigned
+  simulator app/extension build.
+- Shipping validation exposed a real cross-Python timeout classification defect:
+  this macOS runtime's `socket.timeout` is not a `TimeoutError`. The worker now
+  catches both explicitly, and the final aggregate verification passes all 51
+  desktop files and 367 tests, the production build, SaaS typechecks, 35 SaaS
+  tests, and the nine-test PostgreSQL integration lane.
 - Implemented SAAS-M2 Clerk organizations and permissions with production
   configuration, RS256 issuer/audience/expiry/authorized-party verification,
   active-organization and synchronized-role enforcement, signed raw-body

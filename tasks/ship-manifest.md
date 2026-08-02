@@ -1,5 +1,201 @@
 # Ship manifest
 
+## Screenletter + SiftCut integrated MVP — 2026-08-02
+
+### User goal
+
+Build and ship the integrated MVP foundation for Screenletter as a distinct
+iOS capture/share product backed by SiftCut Cloud, while preserving SiftCut
+Desktop's local-only contract and refusing to bypass the live M2/M3 production
+gates.
+
+### Changed files
+
+SiftCut `master` shipping boundary:
+
+- `apps/api/migrations/0004_screenletter_public_functions.sql`
+- `apps/api/migrations/0005_screenletter_public_asset_lookup.sql`
+- `apps/api/src/clerk.ts`
+- `apps/api/src/server.ts`
+- `docs/saas/SCREENLETTER.md`
+- `resources/worker/worker.py`
+- `src/core/database.ts`
+- `src/shared/templates.ts`
+- `tasks/history.md`
+- `tasks/ship-manifest.md`
+- `tasks/todo.md`
+- `tests/saas-integration/postgres.test.ts`
+- `tests/saas/clerk.test.ts`
+- `tests/template-assets.test.ts`
+
+Screenletter `main` shipping boundary, commit `fdc2b49`:
+
+- `.github/workflows/ci.yml`
+- `.github/workflows/testflight.yml`
+- `.gitignore`
+- `App/BackgroundMultipartUploader.swift`
+- `App/CameraCaptureView.swift`
+- `App/CaptureRecovery.swift`
+- `App/ContentView.swift`
+- `App/Info.plist`
+- `App/LibraryModel.swift`
+- `App/LibraryView.swift`
+- `App/Screenletter.entitlements`
+- `App/ScreenletterApp.swift`
+- `BroadcastUploadExtension/BroadcastUploadExtension.entitlements`
+- `BroadcastUploadExtension/Info.plist`
+- `BroadcastUploadExtension/SampleHandler.swift`
+- `Config/ExportOptions.plist`
+- `Package.swift`
+- `README.md`
+- `Sources/ScreenletterCore/APIClient.swift`
+- `Sources/ScreenletterCore/APIModels.swift`
+- `Sources/ScreenletterCore/AppGroup.swift`
+- `Sources/ScreenletterCore/MultipartPlan.swift`
+- `Sources/ScreenletterCore/RecordingManifest.swift`
+- `Sources/ScreenletterCore/UploadCheckpoint.swift`
+- `Tests/ScreenletterCoreTests/CheckpointTests.swift`
+- `Tests/ScreenletterCoreTests/MultipartPlanTests.swift`
+- `project.yml`
+
+Split Capture is clean and has no session changes. Pack configuration,
+`.agents/project.json`, generated local skill roots, Xcode derived data, and
+generated `Screenletter.xcodeproj` are outside the boundary.
+
+### Per-file purpose
+
+- The two SiftCut migrations permit only table-owner security-definer functions
+  to perform the cross-tenant recording/project/artifact lookup required by an
+  unlisted share while leaving API-role access tenant scoped.
+- `clerk.ts`, `server.ts`, and their test create a deterministic personal
+  Screenletter organization on `user.created` and preserve webhook-redelivery
+  idempotency.
+- `templates.ts`, desktop migration 19, and the template regression add and
+  persist the `screen-demo-v1` vertical safe-area composition.
+- The PostgreSQL regression proves tenant isolation, successful publish and
+  rollback, exactly-once revision increments, stale-request rejection, public
+  asset selection, and abuse-report insertion under forced RLS.
+- `worker.py` explicitly recognizes `socket.timeout` on Python runtimes where
+  it is not a `TimeoutError`, preserving retryable provider-unavailable
+  semantics.
+- The hosted integration document and task records state implemented behavior,
+  acceptance evidence, production gates, rollback, and next work.
+- Screenletter app files implement Clerk sign-in and organization activation,
+  recording preparation/library UX, stable sharing, SiftCut handoff, camera
+  capture, recovery, multipart upload/checkpointing, and local retention.
+- The ReplayKit extension and shared core files implement App Group manifests,
+  fragmented H.264/AAC screen-plus-microphone capture, a ten-minute stop,
+  API models/client behavior, checksums, and resumable part state.
+- XcodeGen, entitlements/plists, package tests, CI, TestFlight configuration,
+  and repository documentation make the iOS build reproducible without
+  committing credentials or a generated Xcode project.
+
+### User-goal mapping
+
+- Screenletter remains a separate private iOS product and owns capture,
+  recovery, upload state, library, and stable unlisted sharing.
+- SiftCut retains tenant-safe hosted project/recording metadata, manual
+  candidate-free edit handoff, the screen composition, revision-safe explicit
+  publication/rollback, and private signed delivery contracts.
+- The app uploads one canonical source through the SiftCut multipart contract;
+  no Supabase, Mux, mobile editor, desktop synchronization, public S3 object, or
+  automatic polished-media replacement was added.
+- Dependency injection and documentation keep production sharing disabled until
+  real S3 ingest/proxy and CloudFront signing pass M3 acceptance.
+
+### Tests run
+
+Executable verification:
+
+- Screenletter `swift test`: three tests passed.
+- Screenletter `xcodegen generate`: project generation passed.
+- Screenletter unsigned simulator build with
+  `xcodebuild -project Screenletter.xcodeproj -scheme Screenletter -destination
+  'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build`: app and
+  ReplayKit extension build passed.
+- SiftCut `npm run verify`: all 51 desktop files and 367 tests passed,
+  TypeScript and Vite production builds passed, all SaaS workspace typechecks
+  passed, and all six SaaS files / 35 tests passed.
+- SiftCut `npm run test:saas:integration`: all nine PostgreSQL tests passed
+  against the role-separated PostgreSQL 17.5 harness.
+- Targeted `npm test -- --run tests/ollama-worker-host.test.ts`: all seven tests
+  passed after the timeout fix.
+- `git diff --check`: passed in both changed repositories.
+
+Documentation and boundary checks:
+
+- Focused credential-pattern scans found only CI secret-variable references
+  and the repository's pre-existing well-known AWS documentation example key;
+  no credential value, private key, or release-credential file entered either
+  shipping boundary.
+- No task-document audit script exists in SiftCut or Screenletter.
+
+### Skipped tests
+
+- No live Clerk staging journey was run because no staging credentials or
+  configured Clerk instance were placed in scope. Unit and PostgreSQL contract
+  tests cover repository behavior; real Apple sign-in, cross-product session
+  continuity, invitations, and dashboard membership limits remain live gates.
+- No physical-iPhone ReplayKit, camera, interruption, rotation, low-storage, or
+  background-upload test was run because those require registered bundle/App
+  Group identifiers, signing, and human device access.
+- No TestFlight archive/upload was attempted because App Store Connect secrets
+  and provisioning are external manual inputs. The unsigned simulator build is
+  executable evidence for source and target integration, not signing.
+- No live S3 multipart, ingest, proxy, or CloudFront test was run because the M3
+  production implementation is intentionally not wired. Local contracts and
+  PostgreSQL tests cannot prove AWS delivery behavior.
+
+### Adversarial review
+
+A failure-oriented exact-diff review served as the repository's equivalent
+review lane because no callable `quality-sweep` or `expert-review` skill is
+installed. It inspected webhook retry ordering, deterministic organization
+identity, forced-RLS table-owner boundaries, public asset joins, CAS revision
+semantics, migration ordering, template collision behavior, private object
+exposure, App Group consistency, multipart persistence, failed-source
+retention, share readiness, CI secret handling, and desktop isolation.
+
+The aggregate gate exposed one blocking defect outside the Screenletter diff:
+Python's socket timeout was being classified as malformed provider output on
+this runtime. Explicit `SocketTimeout` handling fixed the behavior and the
+targeted and aggregate suites now pass. The review accepted Clerk HTTP 422 as
+idempotent only because the deterministic organization slug makes webhook
+redelivery converge; monitoring should still surface persistent 422 responses
+during staging acceptance.
+
+The established `Unexpected internal error` stderr line remains intentional
+redacted-500 fixture output, not an unresolved warning. No other warning or
+failure remains.
+
+### Residual risk
+
+- Production Screenletter cannot share media until the M3 `ArtifactStorage`,
+  S3 multipart lifecycle, ingest/proxy worker, and short-lived CloudFront signer
+  are implemented and explicitly injected.
+- ReplayKit/camera behavior, background transfers, Apple/Clerk sign-in,
+  provisioning, and TestFlight remain unproven on a physical iPhone.
+- The hosted browser manual-range editor, transcription-on-edit, final render
+  publication UI, and operational abuse moderation still require their M4/M5
+  product wiring.
+- `screenletter.com` and `screenletter.app` reservation remains a launch blocker
+  outside repository automation.
+
+### Rollback note
+
+Revert the two SiftCut commits produced by this ship in reverse order. If
+migrations 0004 or 0005 have reached persistent PostgreSQL, restore the prior
+database backup before deploying the older binary rather than modifying
+migration checksums. Revert Screenletter commit `fdc2b49` from `main` to return
+that repository to its initial scaffold. Existing Clerk organizations and
+uploaded private media are external state and are not deleted by a code revert.
+
+### Next command
+
+Use `$exec` in SiftCut to implement the concrete M3 S3 multipart,
+ingest/proxy, and CloudFront `ArtifactStorage` wiring before enabling production
+Screenletter routes.
+
 ## Clerk organizations and Screenletter hosted contracts — 2026-08-02
 
 ### User goal

@@ -56,7 +56,7 @@ export async function startServer(options: {
     bodyLimit: config.bodyLimit,
     ...(config.clerk && identities
       ? {
-        clerkWebhook: clerkWebhookHandler(config.clerk, identities),
+        clerkWebhook: clerkWebhookHandler(config.clerk, identities, Date.now, organizations),
         deleteOrganization: organizations!.deleteOrganization.bind(organizations)
       }
       : {})

@@ -211,6 +211,42 @@ export class ClerkOrganizationService {
     private readonly request: typeof fetch = fetch
   ) {}
 
+  async ensurePersonalOrganization(event: ClerkWebhookEvent): Promise<void> {
+    if (event.type !== "user.created") return;
+    const clerkUserId = text(event.data.id);
+    const givenName = [
+      optionalText(event.data.first_name),
+      optionalText(event.data.last_name)
+    ].filter(Boolean).join(" ").trim();
+    const name = givenName ? `${givenName}'s Screenletter` : "My Screenletter";
+    const slug = `screenletter-${createHash("sha256")
+      .update(clerkUserId)
+      .digest("hex")
+      .slice(0, 20)}`;
+    const response = await this.request("https://api.clerk.com/v1/organizations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.config.secretKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name,
+        slug,
+        created_by: clerkUserId,
+        public_metadata: { product: "screenletter", personal: true }
+      })
+    });
+    // A deterministic slug makes webhook redelivery idempotent even if the
+    // first response was lost after Clerk committed the organization.
+    if (response.ok || response.status === 422) return;
+    throw new SaasError(
+      "INTERNAL_ERROR",
+      "The identity provider could not create the personal organization",
+      null,
+      response.status >= 500
+    );
+  }
+
   async deleteOrganization(context: AuthenticatedContext, raw: unknown): Promise<void> {
     if (context.role !== "owner") {
       throw new SaasError("FORBIDDEN_ROLE", "Only an owner can delete the organization");
@@ -260,7 +296,8 @@ export class ClerkOrganizationService {
 export function clerkWebhookHandler(
   config: ClerkConfig,
   identities: ClerkIdentityRepository,
-  now: () => number = Date.now
+  now: () => number = Date.now,
+  organizations?: ClerkOrganizationService
 ): RequestHandler {
   return async (request, response, next) => {
     try {
@@ -292,6 +329,7 @@ export function clerkWebhookHandler(
         event,
         createHash("sha256").update(request.body).digest("hex")
       );
+      await organizations?.ensurePersonalOrganization(event);
       response.status(200).json({ received: true, result });
     } catch (error) {
       next(error);

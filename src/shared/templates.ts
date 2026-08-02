@@ -157,6 +157,62 @@ export const starterTemplates: Template[] = [
         }
       ]
     }
+  },
+  {
+    id: "screen-demo-v1",
+    name: "Screen Demo",
+    version: 1,
+    revision: 1,
+    parentTemplateId: null,
+    builtIn: true,
+    createdAt: builtInAt,
+    updatedAt: builtInAt,
+    description: "Vertical screen recording with safe areas, original narration, and captions.",
+    composition: {
+      width: 1080,
+      height: 1920,
+      background: "#0d0f12",
+      safeArea: { top: 150, right: 72, bottom: 300, left: 72 },
+      captionStylePreset: {
+        fontFamily: "Inter",
+        fontWeight: 700,
+        fontSizePx: 62,
+        position: { x: 0.5, y: 0.82 },
+        maxWidth: 0.84,
+        textColor: "#ffffff",
+        highlightColor: "#7dd3fc",
+        textTransform: "none",
+        outline: { color: "#0d0f12", widthPx: 5 },
+        background: { color: "#0d0f12cc", paddingPx: 14, cornerRadiusPx: 12 }
+      },
+      layers: [
+        {
+          id: "screen",
+          visible: true,
+          type: "video",
+          source: "episode",
+          assetId: null,
+          region: { x: 0.0667, y: 0.0781, width: 0.8666, height: 0.72 },
+          fit: "fit",
+          cropTarget: "screen",
+          automaticCropTrack: {
+            frames: [],
+            provenance: null,
+            fallback: { mode: "fit", reason: "missing_samples" }
+          },
+          manualCropTrack: []
+        },
+        {
+          id: "captions",
+          visible: true,
+          type: "captions",
+          source: "none",
+          assetId: null,
+          region: { x: 0.08, y: 0.79, width: 0.84, height: 0.14 },
+          fit: "fit"
+        }
+      ]
+    }
   }
 ];
 
