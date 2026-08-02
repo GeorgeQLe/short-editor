@@ -13,6 +13,7 @@ import math
 import os
 from pathlib import Path
 import shutil
+from socket import timeout as SocketTimeout
 import subprocess
 import sys
 import threading
@@ -758,7 +759,7 @@ def ollama_provider_call(job_id, request_id, job, cancelled):
     except PermissionError as policy_error:
         error(request_id, job_id, "PROVIDER_UNAVAILABLE", str(policy_error), False)
         return
-    except (HTTPError, URLError, TimeoutError):
+    except (HTTPError, URLError, TimeoutError, SocketTimeout):
         error(request_id, job_id, "PROVIDER_UNAVAILABLE", "The configured Ollama endpoint is unavailable", True)
         return
     except (KeyError, OSError, ValueError, TypeError):
