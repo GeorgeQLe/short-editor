@@ -1,5 +1,16 @@
 # Current work
 
+- [ ] SAAS-M2-STAGING — Complete live Clerk and Railway staging acceptance.
+  - The feature implementation, Railway four-service assets, role-separated
+    container smoke, full M1 verification, SaaS build, and sanitized acceptance
+    record are complete on `feat/railway-clerk-staging`.
+  - Remaining work requires user-controlled Railway sign-in, workspace/plan
+    selection, GitHub authorization, masked password/Clerk secret entry, Clerk
+    session-token and webhook configuration, ordered deployment, and the
+    non-personal multi-user journeys recorded in
+    `docs/saas/acceptance/SAAS-M2-clerk-staging-2026-08-02.md`.
+  - Keep M2 in progress until every live checkbox passes. Retain Organization A
+    as a regression fixture and intentionally delete Organization B.
 - [x] SAAS-M2 — Implement Clerk organizations and permissions.
   - Verify Clerk sessions on every application route; synchronize users,
     organizations, memberships, invitations, and role changes through signed,

@@ -1,5 +1,162 @@
 # Ship manifest
 
+## Railway staging and Clerk acceptance — 2026-08-02
+
+### User goal
+
+Create a feature branch and draft PR that fixes Clerk v2 token and deletion
+reverification compatibility, adds a persistent four-service Railway staging
+stack with only the web gateway public, verifies it locally, and records live
+acceptance without exposing credentials or claiming M2 complete early.
+
+### Changed files
+
+- `.dockerignore`
+- `apps/api/src/app.ts`
+- `apps/api/src/clerk.ts`
+- `apps/web/src/api.ts`
+- `apps/web/src/main.tsx`
+- `docs/saas/acceptance/SAAS-M2-clerk-staging-2026-08-02.md`
+- `infra/railway/README.md`
+- `infra/railway/api/Dockerfile`
+- `infra/railway/api/railway.toml`
+- `infra/railway/migrator/Dockerfile`
+- `infra/railway/migrator/bootstrap.sh`
+- `infra/railway/migrator/railway.toml`
+- `infra/railway/postgres/10-siftcut-roles.sh`
+- `infra/railway/postgres/Dockerfile`
+- `infra/railway/postgres/railway.toml`
+- `infra/railway/web/Caddyfile`
+- `infra/railway/web/Dockerfile`
+- `infra/railway/web/railway.toml`
+- `tasks/history.md`
+- `tasks/ship-manifest.md`
+- `tasks/todo.md`
+- `tests/saas/clerk-reverification.test.ts`
+- `tests/saas/clerk.test.ts`
+- `tests/saas/railway-assets.test.ts`
+
+### Per-file purpose
+
+- API Clerk code accepts v1 `org_id`/`org_role` and v2 `o.id`/`o.rol`,
+  normalizes roles, strictly checks `azp`, derives freshness from the newest
+  verified factor, and emits Clerk's exact strict reverification object through
+  dedicated error middleware.
+- Web API/UI code defaults requests to the browser origin, uses the
+  session-bound Clerk token, preserves the reverification hint for
+  `useReverification`, recognizes `204`, and makes modal cancellation a
+  non-error outcome.
+- Railway assets define pinned, private PostgreSQL/migrator/API services and a
+  public Caddy web gateway, with separate runtime/migration roles, explicit
+  readiness, SPA fallback, and manual ordered deployment documentation.
+- Tests cover both Clerk claim versions, audience/authorized-party rejection,
+  role normalization, the exact stale-auth envelope, retry-compatible response
+  handling, cancellation, and deployment asset invariants.
+- Acceptance/task records distinguish locally verified implementation from
+  user-controlled live gates and keep M2 in progress.
+
+### User-goal mapping
+
+- Only Caddy/web is designed to receive a public Railway domain. Its `/v1`,
+  webhook, health, and readiness routes proxy over Railway private networking.
+- PostgreSQL first-boot credentials, migration credentials, and API runtime
+  credentials are separate; the API image has no migrator/admin variable.
+- Clerk session claims retain signed session/factor age and active organization
+  data while adding `aud=siftcut-api`; synchronized membership remains the
+  authorization source of truth.
+- The acceptance record preserves Organization A, deletes Organization B, and
+  refuses to mark M2 complete before the seat, role, tenant, webhook, and
+  deletion journeys pass live.
+
+### Tests run
+
+Executable verification:
+
+- `npm run verify:saas:m1`: passed 51 desktop files / 367 tests, 8 SaaS files /
+  47 tests, and 9 PostgreSQL integration tests, plus desktop and SaaS
+  typecheck/build gates.
+- `npm run build:saas`: all five SaaS workspaces built.
+- Four Docker builds passed for PostgreSQL 17.5, migrator, API, and web.
+- The isolated container smoke proved the database is owned by the
+  non-superuser migrator, both migrator/API roles lack superuser, createdb,
+  createrole, and bypass-RLS capabilities, migrations completed, and the API
+  role could read migration state.
+- The public local Caddy gateway returned success from `/_health`, `/health`,
+  and `/ready`, and returned `index.html` for an unknown SPA route.
+- Final targeted `npm run typecheck:saas`, `npm run test:saas`, and
+  `git diff --check` passed after the last auth boundary change.
+
+Documentation and boundary checks:
+
+- `.dockerignore` excludes `.release-config` at every depth without reading it,
+  along with Git metadata, environment files, local databases, logs, and build
+  artifacts.
+- No task-document audit script or explicit deploy contract exists.
+
+### Skipped tests
+
+- No live Railway deployment or Clerk dashboard journey ran because sign-in,
+  workspace/plan selection, GitHub authorization, and masked secret entry are
+  user-controlled manual handoffs.
+- No personal account or personal data was used. Multi-user roles,
+  organization switching, the sixth-seat denial, five-minute aging, webhook
+  delivery, and the final automatic deletion retry remain live gates.
+- No production deployment ran; the requested target is staging and the
+  repository has no `deploy.md` or `tasks/deploy.md` contract.
+
+### Adversarial review
+
+A failure-oriented exact-boundary review served as the configured equivalent
+review lane because no quality-sweep or expert-review skill is installed. It
+checked claim-version precedence, missing/invalid authorized parties, local
+membership drift, factor-age derivation, Clerk hint preservation, empty `204`
+handling, modal cancellation, reverse-proxy path preservation, public-service
+scope, database ownership, RLS bypass, default grants, migration idempotency,
+container context leakage, runtime credential scope, deployment ordering, and
+rollback.
+
+The review found and fixed three executable container defects: the workspace
+root TypeScript config was missing, root npm dependencies pulled an irrelevant
+native desktop dependency, and the precreated database retained administrator
+ownership. It also found a security/compatibility error in the original plan:
+Clerk named custom JWTs do not include session-bound `sid`/`fva` or the active
+v2 `o` claim. The web now uses a customized session token with
+`aud=siftcut-api`, which is the documented token containing all required
+claims.
+
+The established `Unexpected internal error` stderr line remains intentional
+redacted-500 fixture output. Docker's publishable-key heuristic warning was
+removed with an explicit parser directive because a Clerk publishable key is
+designed to be embedded in the public Vite bundle. npm 11 also reported that
+the workspace `esbuild` install script is not yet listed in npm's optional
+`allowScripts` policy; the package installed, the Vite executable ran, and the
+web production build passed, so this informational supply-chain prompt is
+accepted for the pinned lockfile rather than bypassed.
+
+### Residual risk
+
+- Railway config-as-code paths, build variables, private DNS, volume mounting,
+  service sizing, and generated-domain routing remain unproven in the actual
+  target workspace.
+- Clerk dashboard settings and supported reverification factors may differ from
+  the development fixture and must pass the recorded live journey.
+- Automatic retry relies on Clerk invalidating or refreshing the session-token
+  cache after modal verification; only the documented hook contract and local
+  response boundary are tested until live acceptance.
+
+### Rollback note
+
+No schema migration changed. Roll back by restoring the previous API/web
+deployments and disabling the new Clerk webhook. Do not delete the persistent
+staging volume or alter applied migration checksums. Before merge, the branch
+can be abandoned without affecting `master`.
+
+### Next command
+
+Use `$guide` to complete Railway sign-in/configuration, direct masked secret
+entry, Clerk session-token/webhook setup, ordered deployment, and the live
+acceptance checklist.
+
 ## Screenletter + SiftCut integrated MVP — 2026-08-02
 
 ### User goal

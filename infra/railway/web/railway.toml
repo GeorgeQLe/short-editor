@@ -1,0 +1,8 @@
+[build]
+dockerfilePath = "infra/railway/web/Dockerfile"
+
+[deploy]
+healthcheckPath = "/_health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
