@@ -11,6 +11,7 @@ import type {
 } from "@siftcut/saas-contracts";
 import type { SessionVerifier } from "./auth.js";
 import { contextOf, requireSession } from "./auth.js";
+import { ClerkReverificationRequiredError } from "./clerk.js";
 import { normalizeError } from "./errors.js";
 import type { StructuredLogger } from "./logging.js";
 
@@ -372,6 +373,11 @@ export function createApp(
   });
 
   const errors: ErrorRequestHandler = (error, _request, response, _next) => {
+    const clerkError = clerkErrorResponse(error);
+    if (clerkError) {
+      response.status(clerkError.status).json(clerkError.body);
+      return;
+    }
     const normalized = normalizeError(error);
     const status = error && typeof error === "object" && "status" in error && error.status === 413
       ? 413
@@ -388,6 +394,15 @@ export function createApp(
   };
   app.use(errors);
   return app;
+}
+
+export function clerkErrorResponse(error: unknown): {
+  status: 403;
+  body: ClerkReverificationRequiredError["body"];
+} | null {
+  return error instanceof ClerkReverificationRequiredError
+    ? { status: error.status, body: error.body }
+    : null;
 }
 
 function screenletterViewer(tokenLiteral: string): string {

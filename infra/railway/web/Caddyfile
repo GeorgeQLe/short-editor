@@ -1,0 +1,30 @@
+:{$PORT:8080} {
+	encode zstd gzip
+
+	handle /_health {
+		header Content-Type text/plain
+		respond "ok" 200
+	}
+
+	handle /v1/* {
+		reverse_proxy {$API_UPSTREAM}
+	}
+
+	handle /webhooks/clerk {
+		reverse_proxy {$API_UPSTREAM}
+	}
+
+	handle /health {
+		reverse_proxy {$API_UPSTREAM}
+	}
+
+	handle /ready {
+		reverse_proxy {$API_UPSTREAM}
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

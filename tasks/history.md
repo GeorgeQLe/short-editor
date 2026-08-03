@@ -2,6 +2,28 @@
 
 ## 2026-08-02
 
+- Added the persistent Railway staging stack for SAAS-M2: PostgreSQL 17.5 with
+  a persistent volume and separate first-boot roles, an idempotent
+  checksum-aware run-to-completion migrator, a private API with readiness, and
+  a single public Caddy/Vite gateway with private routing and SPA fallback.
+- Updated Clerk verification for v1 and v2 organization claims, strict
+  audience/authorized-party enforcement, and Clerk-standard deletion
+  reverification. The web client preserves the `403` hint, retries after the
+  Clerk modal, handles `204`, and treats cancellation separately. Freshness
+  uses the newest verified factor so a strict second-factor modal can satisfy
+  the five-minute retry boundary.
+- Failure-oriented review corrected three staging blockers before shipping:
+  Docker builds omitted the root TypeScript config, root dependency install
+  pulled an irrelevant native desktop module, and the initial PostgreSQL
+  database remained owned by the administrator. It also replaced the proposed
+  named custom JWT with a customized Clerk session token because Clerk custom
+  JWTs cannot carry the required `sid`, `fva`, and active v2 organization
+  claims.
+- Executable verification passed the full M1 gate (51 desktop files / 367
+  tests, 8 SaaS files / 47 tests, and 9 PostgreSQL integration tests), every
+  SaaS workspace build, all four Docker image builds, database role/migration
+  checks, public gateway health/readiness, and SPA fallback. Live Railway and
+  Clerk acceptance remains open and M2 stays in progress.
 - Completed the integrated Screenletter MVP foundation across SiftCut and the
   private iOS repository. New Clerk users receive deterministic personal
   organizations; forced-RLS public share lookups can resolve only through

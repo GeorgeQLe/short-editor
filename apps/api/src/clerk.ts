@@ -37,6 +37,30 @@ interface ClerkClaims extends JWTPayload {
   fva?: [number, number];
   org_id?: string;
   org_role?: string;
+  o?: {
+    id?: string;
+    rol?: string;
+  };
+}
+
+export const STRICT_REVERIFICATION_PAYLOAD = {
+  clerk_error: {
+    type: "forbidden",
+    reason: "reverification-error",
+    metadata: {
+      reverification: "strict"
+    }
+  }
+} as const;
+
+export class ClerkReverificationRequiredError extends Error {
+  readonly status = 403;
+  readonly body = STRICT_REVERIFICATION_PAYLOAD;
+
+  constructor() {
+    super("Recent authentication is required");
+    this.name = "ClerkReverificationRequiredError";
+  }
 }
 
 export interface ClerkWebhookEvent {
@@ -175,23 +199,27 @@ export class ClerkSessionVerifier implements SessionVerifier {
     });
     const claims = verified.payload;
     if (claims.sts === "pending") throw new Error("Organization enrollment is incomplete");
-    if (claims.azp && !this.config.authorizedParties.includes(claims.azp)) {
+    if (!claims.azp || !this.config.authorizedParties.includes(claims.azp)) {
       throw new Error("The token authorized party is not allowed");
     }
-    if (!claims.sub || !claims.sid || !claims.org_id || !claims.org_role) {
+    const organizationId = claims.o?.id ?? claims.org_id;
+    const organizationRole = claims.o?.rol ?? claims.org_role;
+    if (!claims.sub || !claims.sid || !organizationId || !organizationRole) {
       throw new Error("The session has no active organization");
     }
-    const role = clerkRole(claims.org_role);
-    const synchronized = await this.identities.resolveSession(claims.sub, claims.org_id, role);
+    const role = clerkRole(organizationRole);
+    const synchronized = await this.identities.resolveSession(claims.sub, organizationId, role);
     if (!synchronized) throw new Error("The organization membership is not active");
+    const factorAgeMinutes = Array.isArray(claims.fva)
+      ? claims.fva.filter((age) => Number.isFinite(age) && age >= 0)
+      : [];
     return authenticatedContextSchema.parse({
       ...synchronized,
       sessionId: claims.sid,
-      ...(claims.iat && Array.isArray(claims.fva)
-        && Number.isFinite(claims.fva[0]) && claims.fva[0] >= 0
+      ...(claims.iat && factorAgeMinutes.length
         ? {
           authenticatedAt: new Date(
-            claims.iat * 1000 - claims.fva[0] * 60 * 1000
+            claims.iat * 1000 - Math.min(...factorAgeMinutes) * 60 * 1000
           ).toISOString()
         }
         : {})
@@ -257,11 +285,7 @@ export class ClerkOrganizationService {
     const now = this.now();
     if (authenticatedAt > now.getTime()
       || now.getTime() - authenticatedAt > 5 * 60 * 1000) {
-      throw new SaasError(
-        "AUTHENTICATION_REQUIRED",
-        "Recent authentication is required to delete the organization",
-        { maxAuthenticationAgeSeconds: 300 }
-      );
+      throw new ClerkReverificationRequiredError();
     }
     const organization = await this.identities.organizationForContext(context);
     if (!organization) throw new SaasError("NOT_FOUND", "Organization not found");

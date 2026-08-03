@@ -7,8 +7,10 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedContext } from "../../packages/saas-contracts/src/index.js";
 import {
+  ClerkReverificationRequiredError,
   ClerkOrganizationService,
   ClerkSessionVerifier,
+  STRICT_REVERIFICATION_PAYLOAD,
   type ClerkConfig,
   type ClerkIdentityRepository,
   verifyStandardWebhook
@@ -23,7 +25,7 @@ const INTERNAL: AuthenticatedContext = {
 };
 
 describe("Clerk session verification", () => {
-  it("checks cryptography, issuer, audience, authorized party, organization, and role", async () => {
+  it("accepts v1 organization claims and checks every token boundary", async () => {
     const { privateKey, publicKey } = await generateKeyPair("RS256");
     const config: ClerkConfig = {
       issuer: "https://clerk.example.test",
@@ -55,8 +57,58 @@ describe("Clerk session verification", () => {
       azp: "https://evil.example"
     })}`)).rejects.toThrow("authorized party");
     await expect(verifier.verifyAuthorizationHeader(`Bearer ${await token(privateKey, config, {
+      azp: null
+    })}`)).rejects.toThrow("authorized party");
+    await expect(verifier.verifyAuthorizationHeader(`Bearer ${await token(privateKey, config, {
       orgId: undefined
     })}`)).rejects.toThrow("active organization");
+  });
+
+  it.each([
+    ["org:admin", "owner"],
+    ["admin", "owner"],
+    ["org:editor", "editor"],
+    ["editor", "editor"],
+    ["org:viewer", "viewer"]
+  ] as const)("accepts Clerk v2 organization claims and normalizes %s", async (
+    claimedRole,
+    normalizedRole
+  ) => {
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
+    const config = await clerkConfig(publicKey);
+    const identities = {
+      resolveSession: vi.fn(async () => ({ ...INTERNAL, role: normalizedRole }))
+    } as unknown as ClerkIdentityRepository;
+    const verifier = new ClerkSessionVerifier(config, identities);
+
+    await expect(verifier.verifyAuthorizationHeader(
+      `Bearer ${await token(privateKey, config, {
+        claimVersion: 2,
+        organizationRole: claimedRole
+      })}`
+    )).resolves.toMatchObject({ role: normalizedRole, sessionId: "sess_1" });
+    expect(identities.resolveSession).toHaveBeenCalledWith(
+      "user_1", "org_1", normalizedRole
+    );
+  });
+
+  it("uses the freshest verified factor after strict reverification", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
+    const config = await clerkConfig(publicKey);
+    const identities = {
+      resolveSession: vi.fn(async () => INTERNAL)
+    } as unknown as ClerkIdentityRepository;
+    const verifier = new ClerkSessionVerifier(config, identities);
+
+    await expect(verifier.verifyAuthorizationHeader(
+      `Bearer ${await token(privateKey, config, {
+        claimVersion: 2,
+        factorAges: [9, 0],
+        issuedAt: 1_785_686_400
+      })}`
+    )).resolves.toMatchObject({
+      authenticatedAt: "2026-08-02T16:00:00.000Z"
+    });
   });
 
   it("rejects a valid Clerk claim after local membership revocation or role drift", async () => {
@@ -178,7 +230,16 @@ describe("organization deletion", () => {
     await expect(service.deleteOrganization({
       ...INTERNAL,
       authenticatedAt: "2026-08-02T11:54:59.000Z"
-    }, { confirmation: "Acme" })).rejects.toMatchObject({ code: "AUTHENTICATION_REQUIRED" });
+    }, { confirmation: "Acme" })).rejects.toEqual(
+      expect.objectContaining({
+        status: 403,
+        body: STRICT_REVERIFICATION_PAYLOAD
+      })
+    );
+    await expect(service.deleteOrganization({
+      ...INTERNAL,
+      authenticatedAt: "2026-08-02T11:54:59.000Z"
+    }, { confirmation: "Acme" })).rejects.toBeInstanceOf(ClerkReverificationRequiredError);
     await expect(service.deleteOrganization({
       ...INTERNAL,
       authenticatedAt: "2026-08-02T11:59:00.000Z"
@@ -205,24 +266,49 @@ async function token(
   override: {
     audience?: string;
     expiresAt?: string | number;
-    azp?: string;
+    azp?: string | null;
     orgId?: string | undefined;
+    claimVersion?: 1 | 2;
+    organizationRole?: string;
+    factorAges?: [number, number];
+    issuedAt?: number;
   } = {}
 ) {
-  const claims: Record<string, string> = {
-    sid: "sess_1",
-    azp: override.azp ?? "https://app.example.test",
-    org_role: "org:admin"
-  };
-  if (!("orgId" in override) || override.orgId !== undefined) {
-    claims.org_id = override.orgId ?? "org_1";
+  const claims: Record<string, unknown> = { sid: "sess_1" };
+  if (override.azp !== null) {
+    claims.azp = override.azp ?? "https://app.example.test";
   }
+  if (!("orgId" in override) || override.orgId !== undefined) {
+    if (override.claimVersion === 2) {
+      Object.assign(claims, {
+        o: {
+          id: override.orgId ?? "org_1",
+          rol: override.organizationRole ?? "org:admin"
+        }
+      });
+    } else {
+      claims.org_id = override.orgId ?? "org_1";
+      claims.org_role = override.organizationRole ?? "org:admin";
+    }
+  }
+  if (override.factorAges) claims.fva = override.factorAges;
   return new SignJWT(claims)
     .setProtectedHeader({ alg: "RS256" })
     .setSubject("user_1")
     .setIssuer(config.issuer)
     .setAudience(override.audience ?? config.audience)
-    .setIssuedAt()
+    .setIssuedAt(override.issuedAt)
     .setExpirationTime(override.expiresAt ?? "5 minutes")
     .sign(privateKey);
+}
+
+async function clerkConfig(publicKey: CryptoKey): Promise<ClerkConfig> {
+  return {
+    issuer: "https://clerk.example.test",
+    audience: "siftcut-api",
+    authorizedParties: ["https://app.example.test"],
+    webhookSigningSecret: `whsec_${Buffer.alloc(32, 7).toString("base64")}`,
+    secretKey: "sk_test",
+    jwtKey: await exportSPKI(publicKey)
+  };
 }

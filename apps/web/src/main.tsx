@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ClerkProvider,
@@ -8,14 +8,21 @@ import {
   SignInButton,
   UserButton,
   useAuth,
-  useOrganization
+  useOrganization,
+  useReverification
 } from "@clerk/react";
+import { isReverificationCancelledError } from "@clerk/react/errors";
 import type {
   AuthenticatedContext,
   OrganizationRole,
   Project
 } from "@siftcut/saas-contracts";
-import { CloudApi, CloudApiError } from "./api.js";
+import {
+  CloudApi,
+  CloudApiError,
+  completeOrganizationDeletion,
+  parseDeletionResponse
+} from "./api.js";
 import "./styles.css";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -63,6 +70,13 @@ function OrganizationWorkspace() {
   const [deletionConfirmation, setDeletionConfirmation] = useState("");
   const [deleting, setDeleting] = useState(false);
   const api = useMemo(() => new CloudApi({ getToken }), [getToken, orgId]);
+  const deleteOrganizationRequest = useCallback(async (confirmation: string) => (
+    parseDeletionResponse(await api.fetch("/organization", {
+      method: "DELETE",
+      body: JSON.stringify({ confirmation })
+    }))
+  ), [api]);
+  const reverifiedDeleteOrganization = useReverification(deleteOrganizationRequest);
 
   // An organization change immediately discards every tenant-derived value.
   // Fetches from the previous organization are prevented from committing by
@@ -129,10 +143,15 @@ function OrganizationWorkspace() {
     setDeleting(true);
     setError(null);
     try {
-      await api.request<void>("/organization", {
-        method: "DELETE",
-        body: JSON.stringify({ confirmation: deletionConfirmation })
-      });
+      const outcome = await completeOrganizationDeletion(
+        reverifiedDeleteOrganization,
+        deletionConfirmation,
+        isReverificationCancelledError
+      );
+      if (outcome === "cancelled") {
+        setDeleting(false);
+        return;
+      }
       window.location.assign("/");
     } catch (reason) {
       setError(apiMessage(reason));
