@@ -25,6 +25,12 @@ import {
   templateUpdateInputSchema,
   transcriptUpdateInputSchema
 } from "../shared/domain.js";
+import {
+  cancelShortWorkflowInputSchema,
+  createShortWorkflowInputSchema,
+  exportRenderInputSchema,
+  resumeShortWorkflowInputSchema
+} from "../shared/workflow-contracts.js";
 import { AppError, errorEnvelope, normalizeError } from "../shared/errors.js";
 import {
   candidateGenerateInput,
@@ -452,6 +458,39 @@ export function createApi(service: CoreService, desktopToken?: string) {
       ...handlers
     );
   }
+
+  const v2 = (handler: (request: Request) => unknown | Promise<unknown>): RequestHandler =>
+    async (req, res) => {
+      try { res.json({ apiVersion: "v2", data: await handler(req) }); }
+      catch (error) {
+        const normalized = normalizeError(error);
+        res.status(normalized.status).json({
+          apiVersion: "v2",
+          error: {
+            code: normalized.code, message: normalized.message,
+            details: normalized.details ?? null, retryable: normalized.retryable
+          }
+        });
+      }
+    };
+  app.post("/v2/workflows/short-from-mp4", v2((req) =>
+    service.createShortFromMp4(body(createShortWorkflowInputSchema, req))));
+  app.get("/v2/workflows/:id", v2((req) =>
+    service.getShortWorkflow(uuid.parse(req.params.id))));
+  app.post("/v2/workflows/:id/resume", v2((req) => {
+    const input = body(resumeShortWorkflowInputSchema.omit({ workflowId: true }), req);
+    return service.resumeShortWorkflow(uuid.parse(req.params.id), input.expectedRevision, input.action);
+  }));
+  app.post("/v2/workflows/:id/cancel", v2((req) => {
+    const input = body(cancelShortWorkflowInputSchema.omit({ workflowId: true }), req);
+    return service.cancelShortWorkflow(uuid.parse(req.params.id), input.expectedRevision);
+  }));
+  app.post("/v2/renders/export", v2((req) =>
+    service.exportRender(body(exportRenderInputSchema, req))));
+  app.use("/v2", (_req, res) => res.status(404).json({
+    apiVersion: "v2",
+    error: { code: "NOT_FOUND", message: "API operation not found", details: null, retryable: false }
+  }));
 
   app.use("/v1", (_req, res) => res.status(404).json(errorEnvelope(
     new AppError("NOT_FOUND", "API operation not found", 404)

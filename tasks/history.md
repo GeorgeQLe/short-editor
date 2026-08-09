@@ -1,5 +1,28 @@
 # Session history
 
+## 2026-08-09
+
+- Added a persisted MCP v2 MP4-to-Short state machine spanning import, local
+  transcription, deterministic Candidate selection, draft assembly, review,
+  preflight, rendering, export, failure, retry, cancellation, and completion.
+  Restart reconciliation reuses active analysis jobs, selected Candidates,
+  existing Shorts, immutable preflights, active renders, and completed exports.
+- Added the separate five-tool v2 interface and retained the generated v1
+  interface byte-for-byte. The default workflow cannot render until an exact
+  optimistic `approve_draft`; unattended completion requires explicit
+  `auto_approve`. Export rejects traversal and invalid renders and never
+  overwrites an existing file.
+- Added typed, snapshot-bound hook, lower-third, and end-card layers rendered
+  by the existing deterministic FFmpeg pipeline with packaged Inter fonts and
+  application-owned motion expressions. No caller code, SVG, JavaScript, or
+  FFmpeg expressions execute, and Remotion was not added; Motion Canvas is
+  documented as the preferred MIT candidate for future expansion.
+- Added headless MCP core ownership, existing-core attachment, actionable port
+  and data-lock failures, graceful shutdown, migration 20, v2 contract/docs,
+  and executable workflow/render/restart coverage. Failure-oriented review
+  caught and fixed an initial v1 schema drift by moving graphics from the v1
+  composition union into the typed v2 workflow/render snapshot contract.
+
 ## 2026-08-02
 
 - Completed the integrated Screenletter MVP foundation across SiftCut and the

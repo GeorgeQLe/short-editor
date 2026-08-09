@@ -47,6 +47,14 @@ import {
   watchedFolderConfigurationResultSchema,
   watchedFolderSchema
 } from "../shared/domain.js";
+import {
+  cancelShortWorkflowInputSchema,
+  createShortWorkflowInputSchema,
+  exportRenderInputSchema,
+  renderExportResultSchema,
+  resumeShortWorkflowInputSchema,
+  shortWorkflowSchema
+} from "../shared/workflow-contracts.js";
 
 export type McpHttpMethod = "GET" | "POST" | "PUT" | "DELETE";
 
@@ -593,6 +601,132 @@ export function createMcpServer(options: McpServerFactoryOptions = {}): McpServe
         input as Record<string, unknown>,
         options
       );
+      return toolResult(result.envelope, !result.ok);
+    });
+  }
+  return server;
+}
+
+const v2Envelope = <T extends z.ZodType>(data: T) => z.strictObject({
+  apiVersion: z.literal("v2"), data: data.optional(),
+  error: z.strictObject({
+    code: z.string(), message: z.string(), details: z.unknown().nullable(), retryable: z.boolean()
+  }).optional()
+}).superRefine((value, context) => {
+  if ((value.data === undefined) === (value.error === undefined)) {
+    context.addIssue({ code: "custom", message: "Exactly one of data or error is required" });
+  }
+});
+
+export interface McpV2ToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: z.ZodType;
+  outputSchema: z.ZodType;
+  annotations: McpToolDefinition["annotations"];
+  request: (input: Record<string, unknown>) => McpHttpRequest;
+}
+
+function defineV2(
+  name: string,
+  description: string,
+  inputSchema: z.ZodType,
+  output: z.ZodType,
+  request: (input: Record<string, unknown>) => McpHttpRequest,
+  readOnly = false
+): McpV2ToolDefinition {
+  return Object.freeze({
+    name, description, inputSchema, outputSchema: v2Envelope(output), request,
+    annotations: Object.freeze({
+      readOnlyHint: readOnly, destructiveHint: false as const,
+      idempotentHint: readOnly, openWorldHint: true as const
+    })
+  });
+}
+
+export const MCP_V2_TOOL_INVENTORY: readonly McpV2ToolDefinition[] = Object.freeze([
+  defineV2(
+    "workflows.create_short_from_mp4",
+    "Create a durable MP4-to-Short workflow. Review is required unless auto_approve is explicit.",
+    createShortWorkflowInputSchema,
+    shortWorkflowSchema,
+    (input) => mutate("POST", "/v2/workflows/short-from-mp4", input)
+  ),
+  defineV2(
+    "workflows.get", "Get durable workflow progress, proposal, warnings, and output.",
+    z.strictObject({ workflowId: uuid }), shortWorkflowSchema,
+    ({ workflowId }) => get(`/v2/workflows/${workflowId}`), true
+  ),
+  defineV2(
+    "workflows.resume", "Approve a paused draft or retry a retryable workflow failure.",
+    resumeShortWorkflowInputSchema, shortWorkflowSchema,
+    ({ workflowId, ...body }) => mutate("POST", `/v2/workflows/${workflowId}/resume`, body)
+  ),
+  defineV2(
+    "workflows.cancel", "Cancel active workflow jobs while retaining projects and artifacts.",
+    cancelShortWorkflowInputSchema, shortWorkflowSchema,
+    ({ workflowId, ...body }) => mutate("POST", `/v2/workflows/${workflowId}/cancel`, body)
+  ),
+  defineV2(
+    "renders.export", "Copy a validated successful render without overwriting an existing file.",
+    exportRenderInputSchema, renderExportResultSchema,
+    (input) => mutate("POST", "/v2/renders/export", input)
+  )
+]);
+export const MCP_V2_TOOL_NAMES = Object.freeze(MCP_V2_TOOL_INVENTORY.map(({ name }) => name));
+
+export function serializeMcpV2ToolInventory(): string {
+  const serialized = MCP_V2_TOOL_INVENTORY.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    annotations: tool.annotations,
+    inputSchema: z.toJSONSchema(tool.inputSchema, { io: "input", unrepresentable: "any" }),
+    outputSchema: z.toJSONSchema(tool.outputSchema, { io: "output", unrepresentable: "any" })
+  })).sort((left, right) => left.name.localeCompare(right.name));
+  return `${JSON.stringify(serialized, null, 2)}\n`;
+}
+
+async function executeMcpV2Tool(
+  definition: McpV2ToolDefinition,
+  input: Record<string, unknown>,
+  options: McpServerFactoryOptions
+): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
+  const configured = options.coreUrl ?? process.env.SHORT_EDITOR_CORE_URL ?? "http://127.0.0.1:43120/v1";
+  const root = configured.replace(/\/(?:v1|v2)\/?$/, "");
+  const request = definition.request(input);
+  try {
+    const response = await (options.fetch ?? globalThis.fetch)(`${root}${request.path}`, {
+      method: request.method,
+      headers: { "Content-Type": "application/json" },
+      body: request.body === undefined ? undefined : JSON.stringify(request.body)
+    });
+    const payload = await response.json();
+    const parsed = definition.outputSchema.safeParse(payload);
+    if (parsed.success) return { ok: response.ok, envelope: parsed.data as Record<string, unknown> };
+  } catch { /* redacted below */ }
+  return { ok: false, envelope: {
+    apiVersion: "v2",
+    error: { code: "DEPENDENCY_UNAVAILABLE", message: "Core API is unavailable", details: null, retryable: true }
+  } };
+}
+
+export function createMcpV2Server(options: McpServerFactoryOptions = {}): McpServer {
+  const server = new McpServer({ name: "short-editor", version: "2.0.0" });
+  for (const definition of MCP_TOOL_INVENTORY) {
+    server.registerTool(definition.name, {
+      description: definition.description, inputSchema: definition.inputSchema,
+      outputSchema: definition.outputSchema, annotations: definition.annotations
+    }, async (input) => {
+      const result = await executeMcpHttpTool(definition, input as Record<string, unknown>, options);
+      return toolResult(result.envelope, !result.ok);
+    });
+  }
+  for (const definition of MCP_V2_TOOL_INVENTORY) {
+    server.registerTool(definition.name, {
+      description: definition.description, inputSchema: definition.inputSchema,
+      outputSchema: definition.outputSchema, annotations: definition.annotations
+    }, async (input) => {
+      const result = await executeMcpV2Tool(definition, input as Record<string, unknown>, options);
       return toolResult(result.envelope, !result.ok);
     });
   }

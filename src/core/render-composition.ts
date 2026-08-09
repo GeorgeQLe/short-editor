@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import type {
   CaptionCue,
   Composition,
-  ManualCropControl
+  ManualCropControl,
+  MotionGraphicLayer
 } from "../shared/domain.js";
 import type { RenderSnapshot } from "./render-preflight.js";
 import {
@@ -157,6 +158,14 @@ export function buildRenderGraph(
       `[canvas_${canvasIndex}][${prepared}]overlay=x=${region.x}:y=${region.y}:` +
       `eof_action=repeat:shortest=1[canvas_${canvasIndex + 1}]`
     );
+    canvasIndex++;
+  }
+  for (const layer of snapshot.graphics) {
+    if (!layer.visible) continue;
+    const next = `canvas_${canvasIndex + 1}`;
+    lines.push(`${motionGraphicFilter(
+      `[canvas_${canvasIndex}]`, layer, snapshot.short.composition, fontDirectory
+    )}[${next}]`);
     canvasIndex++;
   }
   lines.push(`[canvas_${canvasIndex}]fps=30,format=yuv420p[vout]`);
@@ -546,6 +555,60 @@ function textLayerFilter(
       `box=${style.backgroundColor === "#00000000" ? 0 : 1}:` +
       `boxcolor=${ffColor(style.backgroundColor)}:boxborderw=${style.backgroundPaddingPx}`;
   });
+  return chain;
+}
+
+function motionGraphicFilter(
+  input: string,
+  layer: MotionGraphicLayer,
+  composition: Composition,
+  fontDirectory: string
+): string {
+  const region = pixelRegion(layer.region, composition);
+  const start = seconds(layer.startMs);
+  const end = seconds(layer.endMs);
+  const enable = `between(t\\,${start}\\,${end})`;
+  const colors = layer.theme === "light"
+    ? { panel: "0xf4f4f4@0.94", primary: "0x111111", secondary: "0x333333" }
+    : layer.theme === "accent"
+      ? { panel: "0x5b35f2@0.94", primary: "0xffffff", secondary: "0xe8e2ff" }
+      : { panel: "0x101114@0.94", primary: "0xffffff", secondary: "0xd0d2d8" };
+  const primarySize = layer.preset === "end_card" ? 72 : layer.preset === "hook" ? 66 : 48;
+  const secondarySize = layer.preset === "end_card" ? 38 : 32;
+  const primary = layoutInterTextLines(
+    layer.primaryText, Math.max(1, region.width - 80), primarySize, 700, fontDirectory, true
+  ).lines.slice(0, layer.preset === "end_card" ? 3 : 2);
+  const secondary = layer.secondaryText
+    ? layoutInterTextLines(
+      layer.secondaryText, Math.max(1, region.width - 80), secondarySize, 400, fontDirectory, true
+    ).lines.slice(0, 2)
+    : [];
+  const bold = `${fontDirectory}/Inter-Bold.otf`;
+  const regular = `${fontDirectory}/Inter-Regular.otf`;
+  const animationSpan = Math.max(.001, Math.min(.35, (layer.endMs - layer.startMs) / 2000));
+  const settledX = region.x + 40;
+  const incomingX = layer.preset === "lower_third" ? region.x - region.width : region.x + 40;
+  const x = layer.preset === "end_card"
+    ? `${settledX}`
+    : `if(lt(t\\,${number(layer.startMs / 1000 + animationSpan)})\\,` +
+      `${number(incomingX)}+(${number(settledX - incomingX)})*` +
+      `(1-pow(1-(t-${start})/${number(animationSpan)}\\,3))\\,${number(settledX)})`;
+  let chain = `${input}drawbox=x=${region.x}:y=${region.y}:w=${region.width}:h=${region.height}:` +
+    `color=${colors.panel}:t=fill:enable='${enable}'`;
+  let y = region.y + 36;
+  for (const line of primary) {
+    chain += `,drawtext=fontfile='${escapeFilter(bold)}':text='${escapeText(line)}':` +
+      `expansion=none:fontsize=${primarySize}:fontcolor=${colors.primary}:x='${x}':y=${number(y)}:` +
+      `enable='${enable}'`;
+    y += Math.round(primarySize * 1.22);
+  }
+  y += secondary.length ? 12 : 0;
+  for (const line of secondary) {
+    chain += `,drawtext=fontfile='${escapeFilter(regular)}':text='${escapeText(line)}':` +
+      `expansion=none:fontsize=${secondarySize}:fontcolor=${colors.secondary}:x=${number(settledX)}:` +
+      `y=${number(y)}:enable='${enable}'`;
+    y += Math.round(secondarySize * 1.2);
+  }
   return chain;
 }
 
