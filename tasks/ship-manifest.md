@@ -13,6 +13,7 @@ presets, and exports validated results without overwriting files.
 
 - `docs/mcp-v2-tools.json`
 - `docs/mp4-short-workflow-v2.md`
+- `package-lock.json`
 - `package.json`
 - `scripts/generate-mcp-v2-tool-inventory.ts`
 - `src/core/api.ts`
@@ -83,6 +84,10 @@ Executable verification:
 - `npm run generate:mcp-inventory`: regenerated v1 and v2 artifacts; v1 has no
   diff and the v2 drift test passes.
 - `git diff --check`: passed.
+- Post-push `npm audit --omit=dev` identified existing vulnerable locked
+  versions of Hono and fast-uri. `npm audit fix` updated only lockfile
+  resolutions; final audit reports zero vulnerabilities, all SaaS workspaces
+  and the desktop production build pass, and the affected contract suites pass.
 
 Documentation and task checks:
 

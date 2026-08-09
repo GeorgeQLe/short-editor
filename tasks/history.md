@@ -22,6 +22,10 @@
   and executable workflow/render/restart coverage. Failure-oriented review
   caught and fixed an initial v1 schema drift by moving graphics from the v1
   composition union into the typed v2 workflow/render snapshot contract.
+- The push surfaced five existing default-branch Dependabot advisories. A
+  separate lockfile-only security update moved Hono, fast-uri, and transitive
+  parser utilities to fixed releases; final runtime audit reports zero
+  vulnerabilities and both hosted and desktop builds remain clean.
 
 ## 2026-08-02
 
