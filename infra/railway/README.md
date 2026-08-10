@@ -21,9 +21,11 @@ Disable automatic GitHub deployments for all four services. Keep `api` and
 `web` on the smallest always-on staging instances during acceptance. Attach a
 persistent volume to `/var/lib/postgresql/data` on `postgres`.
 
-Enter secret values only in Railway's masked variable controls. Never put
-values in this repository, shell history, deployment screenshots, or support
-logs.
+The repository-root `siftcut-staging.envbank.yaml` is the non-secret variable
+contract. It intentionally contains Railway names but no immutable project,
+environment, or service IDs; `envbank railway bind` resolves and pins those
+IDs only after the live services exist. Never put imported values or tokens in
+this repository, shell history, screenshots, temporary files, or support logs.
 
 ### PostgreSQL
 
@@ -84,3 +86,62 @@ After merge, repoint each service to `master`, keep automatic deployments
 disabled, and redeploy in the same order. Rollback restores the previous
 `api`/`web` deployments and disables the Clerk webhook if needed; it does not
 delete staging data or rewrite migration checksums.
+
+## Safe staging handoff
+
+Complete the repository-independent work in this order:
+
+1. In Railway, manually create project `siftcut-staging`, environment
+   `staging`, the four services above, the PostgreSQL volume, and a public
+   domain only for `web`. Keep automatic deployments disabled.
+2. In Clerk, manually configure the customized session token, five-seat
+   organization limit, `org:editor` role, organization deletion controls, and
+   web webhook. Obtain the five manifest imports: `CLERK_ISSUER`,
+   `CLERK_AUTHORIZED_PARTIES`, `CLERK_SECRET_KEY`,
+   `CLERK_WEBHOOK_SIGNING_SECRET`, and `VITE_CLERK_PUBLISHABLE_KEY`.
+3. From a trusted local intake process, pipe one JSON object containing exactly
+   those five keys directly to EnvBank. Do not use command arguments,
+   environment variables, a clipboard, or an intermediate file:
+
+   ```sh
+   trusted-clerk-json-command | envbank bundle prepare \
+     --manifest siftcut-staging.envbank.yaml \
+     --config /secure/path/device.json \
+     --passphrase-file /secure/path/passphrase
+   ```
+
+4. Pipe a Railway project token scoped to the exact project and environment
+   directly to the binding command:
+
+   ```sh
+   trusted-railway-token-command | envbank railway bind \
+     --manifest siftcut-staging.envbank.yaml \
+     --config /secure/path/device.json \
+     --passphrase-file /secure/path/passphrase
+   ```
+
+5. Review the names-only plan, confirm the apply interactively, and verify the
+   local rollout evidence:
+
+   ```sh
+   envbank railway plan --manifest siftcut-staging.envbank.yaml \
+     --config /secure/path/device.json \
+     --passphrase-file /secure/path/passphrase
+   envbank railway apply --plan PLAN_ID \
+     --config /secure/path/device.json \
+     --passphrase-file /secure/path/passphrase
+   envbank railway verify --bundle short-editor/siftcut-staging/staging \
+     --config /secure/path/device.json \
+     --passphrase-file /secure/path/passphrase
+   ```
+
+6. Manually deploy `postgres`, `migrator`, `api`, and `web` in order, accept
+   the Clerk webhook, and complete the live journeys in the M2 acceptance
+   record.
+
+EnvBank apply stages single-variable Railway upserts with `skipDeploys: true`;
+it never deploys a service. Verification reports local committed-write
+evidence while remote variable presence remains `unknown`, because the Railway
+read API returns values. EnvBank does not capture the Clerk dashboard and has
+no provider-variable deletion command. The manifest's `VITE_API_URL` absence
+is therefore names-only intent, not a deletion or proof of remote absence.

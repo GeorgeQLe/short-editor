@@ -4,9 +4,13 @@
   - The feature implementation, Railway four-service assets, role-separated
     container smoke, full M1 verification, SaaS build, and sanitized acceptance
     record are complete on `feat/railway-clerk-staging`.
+  - The actionable, non-secret EnvBank bundle manifest and contract-drift tests
+    are complete. Live binding remains intentionally deferred: the manifest
+    contains no Railway project, environment, or service IDs.
   - Remaining work requires user-controlled Railway sign-in, workspace/plan
-    selection, GitHub authorization, masked password/Clerk secret entry, Clerk
-    session-token and webhook configuration, ordered deployment, and the
+    selection, GitHub authorization, trusted Clerk import and scoped-token
+    intake, Clerk session-token and webhook configuration, ordered deployment,
+    and the
     non-personal multi-user journeys recorded in
     `docs/saas/acceptance/SAAS-M2-clerk-staging-2026-08-02.md`.
   - Keep M2 in progress until every live checkbox passes. Retain Organization A

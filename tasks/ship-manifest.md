@@ -1,5 +1,80 @@
 # Ship manifest
 
+## SiftCut staging EnvBank manifest — 2026-08-10
+
+### User goal
+
+Add an actionable, non-secret EnvBank contract to the existing Railway/Clerk
+staging PR, protect it against drift, and document the safe live handoff without
+preparing a vault, writing provider variables, or deploying services.
+
+### Changed files
+
+- `siftcut-staging.envbank.yaml`
+- `tests/saas/railway-assets.test.ts`
+- `infra/railway/README.md`
+- `docs/saas/acceptance/SAAS-M2-clerk-staging-2026-08-02.md`
+- `tasks/todo.md`
+- `tasks/history.md`
+- `tasks/ship-manifest.md`
+
+### Per-file purpose and user-goal mapping
+
+- The manifest declares the version-1 bundle, password policy, ten records,
+  derived database URLs, ordered Railway services, authoritative constants,
+  record-backed Clerk imports, and intended-absent `VITE_API_URL` without
+  values or immutable provider IDs.
+- The Railway asset test pins the manifest identity, record set, service order,
+  constants, derived templates, record-backed imports, and absent variable
+  using text-level contract assertions while leaving schema validation to
+  EnvBank.
+- The Railway README and M2 acceptance record define trusted JSON preparation,
+  scoped-token binding, names-only planning, confirmed apply, local-evidence
+  verification, and the separately authorized manual deployment and live
+  journey.
+- Todo and history records close the repository manifest gap while retaining
+  live M2 acceptance as the active task.
+
+### Tests run
+
+- `envbank bundle check --manifest siftcut-staging.envbank.yaml`
+- `npx vitest run --config vitest.saas.config.ts tests/saas/railway-assets.test.ts`
+- `npm run test:saas`
+- `npm run typecheck:saas`
+- `git diff --check`
+
+### Skipped tests
+
+- PostgreSQL integration, Docker builds, and browser/live-host journeys are
+  unchanged by this contract-and-documentation slice; the focused and full SaaS
+  lanes cover the executable change. Live provider operations are explicitly
+  deferred and were not authorized for this repository-only task.
+
+### Adversarial review
+
+- Inspect the exact shipping diff and commit for credential-shaped material,
+  accidental provider IDs, schema duplication, destination-only imports,
+  service-order drift, incorrect runtime constants, and accidental inclusion of
+  the unrelated `apps/web`, `apps/web/public`, or `vercel.json` worktree edits.
+
+### Residual risk
+
+- EnvBank verification cannot prove remote variable presence because Railway's
+  read API returns values; it reports local committed-write evidence and remote
+  state remains `unknown`. Intended absence is not a provider deletion.
+- Railway IDs, Clerk settings, deployed health, webhook delivery, and the
+  multi-user live journey remain unverified until the manual acceptance run.
+
+### Rollback note
+
+Revert the focused manifest commit. No provider or deployment rollback is
+needed because this slice performs no external mutation.
+
+### Next command
+
+Use `$guide` to create and bind the live Railway/Clerk staging target, then
+complete the ordered deployment and M2 acceptance checklist.
+
 ## Railway staging and Clerk acceptance — 2026-08-02
 
 ### User goal

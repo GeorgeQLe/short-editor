@@ -1,0 +1,79 @@
+version: 1
+bundle: short-editor/siftcut-staging/staging
+
+policies:
+  password-32:
+    type: password
+    length: 32
+    lowercase: true
+    uppercase: true
+    digits: true
+    symbols: true
+
+records:
+  POSTGRES_PASSWORD:
+    source: generate
+    policy: password-32
+  MIGRATOR_PASSWORD:
+    source: generate
+    policy: password-32
+  API_PASSWORD:
+    source: generate
+    policy: password-32
+  MIGRATOR_DATABASE_URL:
+    source: derive
+    template: postgresql://siftcut_migrator:${secret:MIGRATOR_PASSWORD}@postgres.railway.internal:5432/siftcut
+  DATABASE_URL:
+    source: derive
+    template: postgresql://siftcut_api:${secret:API_PASSWORD}@postgres.railway.internal:5432/siftcut
+  CLERK_ISSUER:
+    source: import
+    sensitivity: public
+  CLERK_AUTHORIZED_PARTIES:
+    source: import
+    sensitivity: public
+  CLERK_SECRET_KEY:
+    source: import
+    sensitivity: secret
+  CLERK_WEBHOOK_SIGNING_SECRET:
+    source: import
+    sensitivity: secret
+  VITE_CLERK_PUBLISHABLE_KEY:
+    source: import
+    sensitivity: public
+
+targets:
+  railway:
+    project: siftcut-staging
+    environment: staging
+    services:
+      postgres:
+        order: 1
+        variables:
+          POSTGRES_DB: {source: constant, value: siftcut}
+          POSTGRES_USER: {source: constant, value: postgres}
+          POSTGRES_PASSWORD: {source: record, record: POSTGRES_PASSWORD}
+          MIGRATOR_PASSWORD: {source: record, record: MIGRATOR_PASSWORD}
+          API_PASSWORD: {source: record, record: API_PASSWORD}
+      migrator:
+        order: 2
+        variables:
+          MIGRATOR_DATABASE_URL: {source: record, record: MIGRATOR_DATABASE_URL}
+      api:
+        order: 3
+        variables:
+          NODE_ENV: {source: constant, value: production}
+          PORT: {source: constant, value: "3000"}
+          CLERK_AUDIENCE: {source: constant, value: siftcut-api}
+          DATABASE_URL: {source: record, record: DATABASE_URL}
+          CLERK_ISSUER: {source: record, record: CLERK_ISSUER}
+          CLERK_AUTHORIZED_PARTIES: {source: record, record: CLERK_AUTHORIZED_PARTIES}
+          CLERK_SECRET_KEY: {source: record, record: CLERK_SECRET_KEY}
+          CLERK_WEBHOOK_SIGNING_SECRET: {source: record, record: CLERK_WEBHOOK_SIGNING_SECRET}
+      web:
+        order: 4
+        variables:
+          API_UPSTREAM: {source: constant, value: "http://api.railway.internal:3000"}
+          VITE_CLERK_PUBLISHABLE_KEY: {source: record, record: VITE_CLERK_PUBLISHABLE_KEY}
+        absent:
+          - VITE_API_URL

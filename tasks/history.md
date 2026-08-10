@@ -1,5 +1,18 @@
 # Session history
 
+## 2026-08-10
+
+- Checked in the actionable, non-secret SiftCut staging EnvBank manifest with
+  ten generated, derived, and trusted-import records, exact four-service
+  Railway mappings, and contract-drift coverage. The authoritative EnvBank
+  check accepted it with canonical digest
+  `66407628c562fd200b276e48ecdec8b7c3e713d6ee90dceb800efc660ef44f2d`.
+- Replaced direct masked-field handoff guidance with the trusted JSON prepare,
+  scoped-token bind, names-only plan, confirmed `skipDeploys` apply, local
+  committed-write verification, and separate manual deployment sequence. No
+  vault preparation, provider binding/write, deployment, domain creation, or
+  Clerk mutation occurred; live M2 acceptance remains in progress.
+
 ## 2026-08-02
 
 - Added the persistent Railway staging stack for SAAS-M2: PostgreSQL 17.5 with

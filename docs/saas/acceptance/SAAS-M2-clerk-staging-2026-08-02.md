@@ -30,13 +30,17 @@ Railway acceptance.
 - Railway assets define private PostgreSQL, migrator, and API services plus one
   public Caddy/Vite gateway. Database migration and runtime roles use separate
   credentials.
+- The repository-root EnvBank manifest declares the ten generated, derived,
+  and trusted-import records plus the ordered Railway variable contract. It
+  contains no credential values or immutable provider IDs.
 
 ## Local verification
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
+| EnvBank manifest check | Pass | 10 records; Railway target; canonical digest `66407628c562fd200b276e48ecdec8b7c3e713d6ee90dceb800efc660ef44f2d` |
 | SaaS typecheck | Pass | `npm run typecheck:saas` |
-| SaaS unit tests | Pass | 8 files, 47 tests |
+| SaaS unit tests | Pass | 8 files, 50 tests |
 | Full M1 verification | Pass | 51 desktop files / 367 tests; 8 SaaS files / 47 tests; 9 PostgreSQL integration tests |
 | SaaS production build | Pass | All five SaaS workspaces built |
 | Four Docker image builds | Pass | PostgreSQL 17.5, migrator, API, and Caddy/web |
@@ -53,10 +57,10 @@ tokens, secret fields, or personal data in evidence.
 - [ ] Confirm custom `org:editor` role exists.
 - [ ] After Railway creates the public web domain, register
   `https://<railway-domain>/webhooks/clerk`.
-- [ ] Copy the new webhook signing secret directly into Railway's masked
-  `CLERK_WEBHOOK_SIGNING_SECRET` field.
-- [ ] Copy the Clerk secret key directly into Railway's masked
-  `CLERK_SECRET_KEY` field.
+- [ ] Obtain `CLERK_ISSUER`, `CLERK_AUTHORIZED_PARTIES`, `CLERK_SECRET_KEY`,
+  `CLERK_WEBHOOK_SIGNING_SECRET`, and `VITE_CLERK_PUBLISHABLE_KEY` for direct
+  trusted-stdin intake by EnvBank. Do not copy them into task records or
+  evidence.
 
 ## Railway deployment handoff
 
@@ -64,11 +68,17 @@ tokens, secret fields, or personal data in evidence.
 - [ ] Select the workspace and plan.
 - [ ] Authorize the GitHub repository.
 - [ ] Disable automatic GitHub deployments on all four services.
-- [ ] Generate independent PostgreSQL administrator, migrator, and API
-  passwords and enter them only in masked Railway fields.
 - [ ] Attach a persistent volume at `/var/lib/postgresql/data`.
+- [ ] Generate a public domain only for `web`, then finish the Clerk authorized
+  party and webhook configuration.
+- [ ] Pipe one trusted JSON object with the five Clerk imports directly to
+  `envbank bundle prepare --manifest siftcut-staging.envbank.yaml`.
+- [ ] Pipe the scoped Railway project token directly to
+  `envbank railway bind --manifest siftcut-staging.envbank.yaml`.
+- [ ] Run `envbank railway plan --manifest siftcut-staging.envbank.yaml`, review
+  names only, confirm `envbank railway apply --plan PLAN_ID`, and run
+  `envbank railway verify --bundle short-editor/siftcut-staging/staging`.
 - [ ] Deploy in order: PostgreSQL, migrator, API, web.
-- [ ] Generate a public domain only for `web`.
 - [ ] Verify public `/_health`, `/health`, and `/ready`.
 - [ ] Confirm PostgreSQL, migrator, and API have no public domain.
 - [ ] Monitor deployment/runtime logs and Clerk webhook deliveries for non-2xx
@@ -102,11 +112,21 @@ personal data.
 | --- | --- |
 | Pending | Pending |
 
+EnvBank has no Clerk-dashboard capture path and no provider-variable deletion
+command. Apply uses Railway single-variable upserts with `skipDeploys: true`,
+so deployment remains a separate manual action. EnvBank verification reports
+local committed-write evidence while remote presence stays `unknown`;
+`VITE_API_URL` is intended absent, but the workflow neither reads its value nor
+deletes it.
+
 ## Blockers
 
 - Railway and Clerk dashboard setup require user-controlled sign-in,
-  workspace/plan selection, GitHub authorization, and direct masked secret
-  entry.
+  workspace/plan selection, GitHub authorization, trusted Clerk-value intake,
+  and a scoped Railway project token.
+- No vault was prepared, Railway target bound or applied, service deployed,
+  domain created, or Clerk setting mutated during the repository-only manifest
+  change.
 - Live multi-user acceptance has not yet run.
 
 Do not mark M2 complete in the roadmap or history until these blockers are
