@@ -66,19 +66,19 @@ Executable verification:
 - `npm run test:saas`: 51 tests passed.
 - `npm run test:cloudflare`: 14 Miniflare/D1/R2/Worker tests passed.
 - Focused marketing/brand suite: 9 tests passed.
-- Full desktop suite: 372/374 passed under parallel load; the two timing-
-  sensitive affected files then passed 22/22 in an isolated rerun.
+- Full desktop suite: 383/383 passed after the two timing-sensitive files that
+  timed out under a simultaneous multi-command load passed 21/21 in isolation.
 - Terraform format/validate, Wrangler deploy dry-run, local D1 migration
   application, configured-key web build, missing-Clerk-key negative build, and
-  `git diff --check` passed.
+  `git diff --check` passed. `npm audit --audit-level=high` reports zero
+  vulnerabilities.
 
-Accepted warnings: Miniflare reports that its bundled runtime falls back from
-the future `2026-08-15` compatibility date to its latest supported
-`2025-10-11` date; the Worker tests pass under that conservative runtime, while
-the pinned Wrangler dry-run accepts the configured date. The desktop suite's
-established `Unexpected internal error` stderr line remains the intentional
-redacted-500 fixture. The missing-key build errors are expected negative-gate
-evidence, not regressions.
+Accepted warnings: the R2 test intentionally reads a synthetic MP4 response as
+text while checking authorization behavior, so the Workers runtime warns about
+interpreting a `video/mp4` body as text. The desktop suite's established
+`Unexpected internal error` stderr line remains the intentional redacted-500
+fixture. The missing-key build errors are expected negative-gate evidence, not
+regressions.
 
 Documentation/task checks:
 
@@ -116,6 +116,13 @@ Vitest lane; labeled the older Railway acceptance record historical; required
 the public Turnstile key in configured builds; and surfaced missing required
 form fields before bot verification.
 
+Merge reconciliation upgraded Vitest and Cloudflare's Workers pool to their
+supported Vitest 4 integration, removing six high-severity dependency
+advisories. The Cloudflare config now uses `cloudflareTest()`, storage fixtures
+follow its per-file isolation model, and the desktop TypeScript project
+explicitly excludes Cloudflare/SaaS-only suites while retaining the marketing
+component coverage it owns.
+
 The staged secret scan identified only the intentionally base64-encoded
 `test-webhook-secret` Miniflare fixture. It is explicitly annotated as a test
 allowance; the post-annotation staged scan passes with no findings.
@@ -125,9 +132,9 @@ allowance; the post-annotation staged scan passes with no findings.
 - Turnstile, Clerk, Terraform resources, and the full private-media processing
   journey still require live staging acceptance. Local Miniflare cannot prove
   hosted bindings, DNS, provider dashboards, or queue operations.
-- Browser screenshot/accessibility inspection is outstanding. The full desktop
-  aggregate suite showed two load-sensitive flakes, although both affected
-  suites passed immediately in isolation and no changed code intersects them.
+- Browser screenshot/accessibility inspection is outstanding. Two desktop
+  tests timed out only while four validation commands ran concurrently; both
+  affected suites and the subsequent unshared 383-test run passed.
 
 ### Rollback note
 
@@ -215,6 +222,154 @@ needed because this slice performs no external mutation.
 
 Use `$guide` to create and bind the live Railway/Clerk staging target, then
 complete the ordered deployment and M2 acceptance checklist.
+
+## Durable MP4-to-Short MCP workflow — 2026-08-09
+
+### User goal
+
+Add an agent-driven, restart-safe workflow that turns an existing MP4 into a
+reviewable or explicitly unattended Short, preserves every granular v1 tool
+and the deterministic FFmpeg renderer, adds three safe native graphics
+presets, and exports validated results without overwriting files.
+
+### Changed files
+
+- `docs/mcp-v2-tools.json`
+- `docs/mp4-short-workflow-v2.md`
+- `package-lock.json`
+- `package.json`
+- `scripts/generate-mcp-v2-tool-inventory.ts`
+- `src/core/api.ts`
+- `src/core/bootstrap.ts`
+- `src/core/database.ts`
+- `src/core/render-composition.ts`
+- `src/core/render-preflight.ts`
+- `src/core/service.ts`
+- `src/core/short-workflows.ts`
+- `src/mcp/registry.ts`
+- `src/mcp/server.ts`
+- `src/shared/domain.ts`
+- `src/shared/workflow-contracts.ts`
+- `tasks/history.md`
+- `tasks/ship-manifest.md`
+- `tasks/todo.md`
+- `tests/render.test.ts`
+- `tests/workflows-v2.test.ts`
+
+### Per-file purpose
+
+- Workflow contracts define strict inputs, states, progress, revisioned
+  resume/cancel actions, retryable failures, export results, and bounded typed
+  graphics. Migration 20 persists all stable entity/job IDs, warnings,
+  proposals, progress, failure details, and external export paths.
+- `short-workflows.ts` orchestrates idempotent import, accepted transcript
+  reuse or local transcription, deterministic Candidate selection, accepted
+  copy, bounded timeline/draft assembly, review gating, preflight, rendering,
+  restart reattachment, retry, cancellation, and crash-safe export recovery.
+- Core/API/MCP wiring publishes five v2 operations alongside the unchanged 45
+  v1 tools. The stdio entrypoint validates and attaches to a running local core
+  or owns a headless core with a process lock and clean shutdown.
+- Render preflight snapshots capture v2 graphics separately from the frozen v1
+  composition. The existing FFmpeg graph renders only fixed application-owned
+  layouts, easing, colors, safe timing, and packaged Inter font paths.
+- Documentation and generated artifacts define the review/auto-approval
+  boundary, export behavior, native preset constraints, and future Motion
+  Canvas direction. Tests protect persistence, review gating, strict schemas,
+  interface drift, fixed graph construction, and render determinism.
+
+### User-goal mapping
+
+- `review_required` is the schema default and stops at `awaiting_review` with
+  hydrated Candidate, Short, composition, captions, and graphics proposal.
+  Only exact-revision `approve_draft` advances it; `auto_approve` is explicit.
+- Every async boundary is persisted. Recovery avoids duplicate analysis jobs,
+  Candidate selection, Shorts, graphics, preflights, renders, and exports;
+  cancellation retains projects and artifacts.
+- Graphics are typed v2 snapshot layers, not v1 composition changes. They are
+  duration-bounded and rendered through fixed FFmpeg filters with no Remotion
+  or caller-authored executable content.
+- Export requires a successful validated Render, an existing explicit
+  directory, and a plain `.mp4` filename. Exclusive copy prevents overwrite;
+  workflow recovery recognizes an already completed byte-identical export.
+
+### Tests run
+
+Executable verification:
+
+- `npx vitest run --config vitest.config.ts --maxWorkers=4`: passed the full
+  desktop suite after implementation.
+- Targeted post-review run of `tests/workflows-v2.test.ts`,
+  `tests/render.test.ts`, `tests/render-preflight.test.ts`,
+  `tests/mcp-contract.test.ts`, and `tests/migrations.test.ts`: passed.
+- `npm run build`: passed final TypeScript checking, Vite production
+  compilation, and the Node/Electron/MCP TypeScript build after the v1-boundary
+  correction.
+- `npm run generate:mcp-inventory`: regenerated v1 and v2 artifacts; v1 has no
+  diff and the v2 drift test passes.
+- `git diff --check`: passed.
+- Post-push `npm audit --omit=dev` identified existing vulnerable locked
+  versions of Hono and fast-uri. `npm audit fix` updated only lockfile
+  resolutions; final audit reports zero vulnerabilities, all SaaS workspaces
+  and the desktop production build pass, and the affected contract suites pass.
+
+Documentation and task checks:
+
+- No `scripts/audit-task-docs.mjs`, `tasks/roadmap.md`, manual task file, or
+  record/recurring advisory file exists.
+- No conversation export was requested.
+
+### Skipped tests
+
+- No live user-media cloud-provider workflow ran: local analysis remains the
+  default and cloud access still requires an existing desktop authorization.
+- No packaged Windows headless-core smoke ran on this macOS host. Platform-
+  neutral ownership and URL/port logic is typechecked and contract-tested;
+  packaged Windows acceptance remains a release gate.
+- No deployment ran because the repository has no `deploy.md` or
+  `tasks/deploy.md` manual deploy contract.
+
+### Adversarial review
+
+A failure-oriented exact-diff review served as the equivalent adversarial lane
+because no quality-sweep or expert-review skill is installed. It inspected
+restart windows before and after every durable write, duplicate requests,
+optimistic conflicts, cancellation races, retry routing, lost analysis jobs,
+orphan preflights/renders, export crash recovery, traversal/collision handling,
+source immutability, provider failures, graphics timing/text bounds, caller-
+authored expression rejection, port conflicts, data-store ownership, graceful
+shutdown, generated interface drift, and unrelated dirty-worktree isolation.
+
+The review found and fixed an initial violation of the frozen-v1 requirement:
+motion layers had been added to the shared v1 composition union. They now live
+only in the strict v2 workflow contract and immutable render snapshot; the
+regenerated v1 artifact is byte-for-byte unchanged. It also split Candidate,
+preflight, and render transitions into recoverable durable checkpoints and
+added reattachment/reuse paths to prevent duplicate work after crashes.
+
+### Residual risk
+
+- A complete real-media unattended import-to-external-export fixture is not in
+  the default fast suite; existing real FFmpeg determinism coverage plus the
+  workflow persistence fixture exercise the two halves independently.
+- The process lock intentionally prefers safety if a PID is live but unrelated
+  after PID reuse; the error is actionable and requires operator inspection
+  rather than risking concurrent SQLite ownership.
+- Fixed graphics currently omit authored logo timing. Existing imported assets
+  remain available to granular composition tools; future richer animation is
+  explicitly outside this native preset milestone.
+
+### Rollback note
+
+Roll back the workflow commit. Existing databases retain migration 20's
+additive `short_workflows` table, which older code ignores. No source media is
+copied or mutated, and completed render artifacts/projects remain valid. If a
+workflow-owned headless process is running, stop it cleanly before rolling back
+so the `.core-owner.lock` is released.
+
+### Next command
+
+Return to `feat/railway-clerk-staging` and use `$guide` to finish its live
+Railway and Clerk acceptance checklist.
 
 ## Railway staging and Clerk acceptance — 2026-08-02
 

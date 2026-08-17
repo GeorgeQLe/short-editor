@@ -267,6 +267,26 @@ describe("explicit FFmpeg render contracts and graph", () => {
     expect(graph.script).toContain("color=c=#000000:s=1080x1920");
   });
 
+  it.each(["hook", "lower_third", "end_card"] as const)(
+    "builds the fixed %s motion preset deterministically at bounded timings",
+    (preset) => {
+      const snapshot = graphSnapshot(1);
+      snapshot.graphics.push({
+        id: `motion-${preset}`, visible: true, type: "motion_graphic", source: "none",
+        assetId: null, region: { x: .08, y: .2, width: .84, height: .3 }, fit: "fit",
+        preset, startMs: 0, endMs: 4_000, primaryText: "Bounded title",
+        secondaryText: "Packaged Inter only", theme: "accent"
+      });
+      const first = buildRenderGraph(snapshot, "/tmp/filter", "/tmp/output.mp4", "/tmp/fonts");
+      const second = buildRenderGraph(snapshot, "/tmp/filter", "/tmp/output.mp4", "/tmp/fonts");
+      expect(first).toEqual(second);
+      expect(first.script).toContain("enable='between(t\\,0.000000\\,4.000000)'");
+      expect(first.script).toContain("fontfile='/tmp/fonts/Inter-Bold.otf'");
+      expect(first.script).toContain("text='Bounded title'");
+      expect(first.script).not.toContain("eval=");
+    }
+  );
+
   it("bounds and redacts normalization subprocess failures", async () => {
     await expect(normalizeRender(
       "/private/secret/render.mp4",

@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import migration from "../../apps/api/migrations-d1/0001_cloudflare_foundation.sql?raw";
 import {
   D1ProjectRepository,
@@ -11,8 +11,17 @@ import type { AuthenticatedContext, JobEnvelope, Project } from "../../packages/
 const A: AuthenticatedContext = { userId: "10000000-0000-4000-8000-000000000001", organizationId: "10000000-0000-4000-8000-000000000002", role: "owner", sessionId: "a" };
 const B: AuthenticatedContext = { userId: "20000000-0000-4000-8000-000000000001", organizationId: "20000000-0000-4000-8000-000000000002", role: "owner", sessionId: "b" };
 
-beforeEach(async () => {
+beforeAll(async () => {
   await env.DB.exec(migration.replace(/\n/g, " "));
+});
+
+beforeEach(async () => {
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM outbox"),
+    env.DB.prepare("DELETE FROM projects"),
+    env.DB.prepare("DELETE FROM organizations"),
+    env.DB.prepare("DELETE FROM users")
+  ]);
   const now = new Date().toISOString();
   await env.DB.batch([
     env.DB.prepare("INSERT INTO users(id,clerk_user_id,created_at,updated_at) VALUES (?,?,?,?)").bind(A.userId, "ua", now, now),

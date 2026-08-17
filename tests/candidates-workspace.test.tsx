@@ -103,14 +103,14 @@ function setupApi(options: {
   vi.spyOn(api, "analysisArtifacts").mockResolvedValue(options.artifacts ?? []);
   vi.spyOn(api, "candidates").mockResolvedValue(options.candidates ?? []);
   return {
-    announce: vi.fn(),
-    onChanged: vi.fn().mockResolvedValue(undefined)
+    announce: vi.fn<(message: string) => void>(),
+    onChanged: vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
   };
 }
 
 async function selectEpisode(user: ReturnType<typeof userEvent.setup>, props: {
-  announce: ReturnType<typeof vi.fn>;
-  onChanged: ReturnType<typeof vi.fn>;
+  announce: (message: string) => void;
+  onChanged: () => Promise<void>;
 }, selected = episode()) {
   render(<CandidatesWorkspace episodes={[selected]} {...props} />);
   await user.selectOptions(screen.getByLabelText("Episode"), selected.id);

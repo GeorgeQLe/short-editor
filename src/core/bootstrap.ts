@@ -1,6 +1,6 @@
 import { dirname, join, posix, win32 } from "node:path";
 import { homedir, tmpdir } from "node:os";
-import { mkdtempSync } from "node:fs";
+import { closeSync, mkdtempSync, openSync, readFileSync, unlinkSync, writeSync } from "node:fs";
 import { openDatabase } from "./database.js";
 import { Repository } from "./repository.js";
 import { MediaService } from "./media.js";
@@ -48,7 +48,12 @@ export function createCore(
     ? mkdtempSync(join(tmpdir(), "short-editor-memory-"))
     : dirname(selectedDatabasePath);
   ensureLayout(dataDirectory);
-  const repository = new Repository(openDatabase(selectedDatabasePath));
+  const releaseOwnership = selectedDatabasePath === ":memory:"
+    ? () => {}
+    : acquireCoreOwnership(dataDirectory);
+  let repository: Repository;
+  try { repository = new Repository(openDatabase(selectedDatabasePath)); }
+  catch (error) { releaseOwnership(); throw error; }
   const activeCredentialHandles = new Set<string>();
   const jobs = new JobQueue(repository, (handle) => activeCredentialHandles.has(handle));
   const media = new MediaService(repository);
@@ -377,8 +382,13 @@ export function createCore(
     artifacts,
     watchedFolders,
     async () => {
-      await runner.stop();
-      await worker.stop();
+      try {
+        await runner.stop();
+        await worker.stop();
+      } finally {
+        if (repository.db.open) repository.db.close();
+        releaseOwnership();
+      }
     },
     localTranscription,
     ollamaAnalysis,
@@ -393,8 +403,56 @@ export function createCore(
     service.captionEngine
   );
   runner.start();
+  service.startShortWorkflowCoordinator();
   void watchedFolders.start();
   return service;
+}
+
+function acquireCoreOwnership(dataDirectory: string): () => void {
+  const lockPath = join(dataDirectory, ".core-owner.lock");
+  const acquire = () => {
+    try {
+      const descriptor = openSync(lockPath, "wx", 0o600);
+      writeSync(descriptor, `${process.pid}\n`);
+      return descriptor;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      let ownerPid = 0;
+      try { ownerPid = Number(readFileSync(lockPath, "utf8").trim()); } catch { /* stale below */ }
+      let alive = false;
+      if (Number.isInteger(ownerPid) && ownerPid > 0) {
+        try { process.kill(ownerPid, 0); alive = true; }
+        catch (probeError) { alive = (probeError as NodeJS.ErrnoException).code === "EPERM"; }
+      }
+      if (alive) throw new AppError(
+        "DEPENDENCY_UNAVAILABLE",
+        `The SiftCut data store is already owned by core process ${ownerPid}; attach to its API instead.`,
+        503
+      );
+      try { unlinkSync(lockPath); } catch { /* a competing owner will decide the retry */ }
+      try {
+        const descriptor = openSync(lockPath, "wx", 0o600);
+        writeSync(descriptor, `${process.pid}\n`);
+        return descriptor;
+      } catch {
+        throw new AppError(
+          "DEPENDENCY_UNAVAILABLE", "The SiftCut data-store ownership lock is unavailable", 503
+        );
+      }
+    }
+  };
+  const descriptor = acquire();
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    try { closeSync(descriptor); } finally {
+      try {
+        const ownerPid = Number(readFileSync(lockPath, "utf8").trim());
+        if (ownerPid === process.pid) unlinkSync(lockPath);
+      } catch { /* lock was already removed */ }
+    }
+  };
 }
 
 export function defaultDatabasePath(): string {

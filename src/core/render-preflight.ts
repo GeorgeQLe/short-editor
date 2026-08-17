@@ -10,7 +10,8 @@ import type {
   RenderPreflightFinding,
   RenderPreflightFindingCode,
   RenderPreflightResult,
-  ShortProject
+  ShortProject,
+  MotionGraphicLayer
 } from "../shared/domain.js";
 import {
   assetSchema,
@@ -23,6 +24,7 @@ import {
   templateLineageSchema,
   shortProjectSchema
 } from "../shared/domain.js";
+import { motionGraphicLayerSchema } from "../shared/workflow-contracts.js";
 import { AppError } from "../shared/errors.js";
 import { canonicalJson } from "./analysis-cache.js";
 import { buildAudioDecision } from "./audio.js";
@@ -67,6 +69,7 @@ export const renderSnapshotSchema = z.strictObject({
     materializedComposition: compositionSchema
   }),
   sourceRanges: sourceRangesSchema,
+  graphics: z.array(motionGraphicLayerSchema).default([]),
   output: z.strictObject({
     width: z.literal(1080),
     height: z.literal(1920),
@@ -180,7 +183,11 @@ export class RenderPreflightService {
     this.run = options.run ?? runProcess;
   }
 
-  async preflight(shortId: string, expectedRevision: number): Promise<RenderPreflightResult> {
+  async preflight(
+    shortId: string,
+    expectedRevision: number,
+    graphics: readonly MotionGraphicLayer[] = []
+  ): Promise<RenderPreflightResult> {
     const project = this.repository.getShort(shortId);
     if (project.revision !== expectedRevision) {
       throw revisionConflict(expectedRevision, project.revision);
@@ -202,6 +209,14 @@ export class RenderPreflightService {
 
     const assets = await this.inspectAssets(project, ffprobe === null ? null : ffprobePath, findings);
     const durationMs = outputDuration(project);
+    const parsedGraphics = z.array(motionGraphicLayerSchema).parse(graphics);
+    const outside = parsedGraphics.findIndex(({ endMs }) => endMs > durationMs);
+    if (outside >= 0) {
+      throw new AppError("VALIDATION_ERROR", "Motion graphic exceeds the Short output duration", 422, [{
+        path: ["graphics", outside, "endMs"],
+        message: `Motion graphic end must be at most ${durationMs}`
+      }]);
+    }
     if (durationMs > MAXIMUM_RENDER_DURATION_MS) {
       findings.push(finding("DURATION_EXCEEDED", { durationMs, maximumDurationMs: MAXIMUM_RENDER_DURATION_MS }));
     }
@@ -266,6 +281,7 @@ export class RenderPreflightService {
         materializedComposition: project.composition
       },
       sourceRanges: project.sourceRanges,
+      graphics: parsedGraphics,
       output: {
         width: 1080,
         height: 1920,

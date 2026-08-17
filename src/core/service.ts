@@ -80,8 +80,10 @@ import {
 } from "./captions.js";
 import { deriveAudioWarnings } from "./audio.js";
 import { RenderPreflightService } from "./render-preflight.js";
+import { ShortWorkflowService } from "./short-workflows.js";
 
 export class CoreService {
+  readonly shortWorkflows: ShortWorkflowService;
   constructor(
     readonly repository: Repository,
     readonly media: MediaService,
@@ -104,13 +106,27 @@ export class CoreService {
           : undefined
       }
     )
-  ) {}
+  ) {
+    this.shortWorkflows = new ShortWorkflowService(this, repository, artifacts);
+  }
 
   async stop(): Promise<void> {
+    this.shortWorkflows.stop();
     await this.watchedFolders?.stop();
     await this.stopWorker?.();
     if (this.repository.db.open) this.repository.db.close();
   }
+
+  createShortFromMp4(input: unknown) { return this.shortWorkflows.create(input); }
+  getShortWorkflow(id: string) { return this.shortWorkflows.get(id); }
+  resumeShortWorkflow(id: string, expectedRevision: number, action: "approve_draft" | "retry") {
+    return this.shortWorkflows.resume(id, expectedRevision, action);
+  }
+  cancelShortWorkflow(id: string, expectedRevision: number) {
+    return this.shortWorkflows.cancel(id, expectedRevision);
+  }
+  exportRender(input: unknown) { return this.shortWorkflows.exportRender(input); }
+  startShortWorkflowCoordinator() { this.shortWorkflows.start(); }
 
   listEpisodes(search?: string) { return this.repository.listEpisodes(search); }
   getEpisode(id: string) { return this.repository.getEpisode(id); }
@@ -1184,6 +1200,13 @@ export class CoreService {
   }
   preflightRender(shortId: string, expectedRevision: number) {
     return this.renderPreflights.preflight(shortId, expectedRevision);
+  }
+  preflightWorkflowRender(
+    shortId: string,
+    expectedRevision: number,
+    graphics: import("../shared/workflow-contracts.js").MotionGraphicLayer[]
+  ) {
+    return this.renderPreflights.preflight(shortId, expectedRevision, graphics);
   }
   getRenderPreflight(id: string) {
     return this.repository.getRenderPreflight(id).result;

@@ -40,7 +40,7 @@
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "generate:api-inventory": "tsx scripts/generate-api-route-inventory.ts",
-    "generate:mcp-inventory": "tsx scripts/generate-mcp-tool-inventory.ts",
+    "generate:mcp-inventory": "tsx scripts/generate-mcp-tool-inventory.ts && tsx scripts/generate-mcp-v2-tool-inventory.ts",
     "generate:release-interfaces": "npm run generate:api-inventory && npm run generate:mcp-inventory && tsx scripts/generate-release-interface-docs.ts",
     "generate:brand-assets": "electron scripts/render-app-icon.mjs",
     "cf:render-config": "node scripts/render-wrangler-config.mjs",
@@ -71,7 +71,7 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.10.0",
+    "@cloudflare/vitest-pool-workers": "^0.21.3",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -91,7 +91,7 @@
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vite": "^7.1.3",
-    "vitest": "^3.2.4",
+    "vitest": "^4.1.10",
     "wait-on": "^8.0.4"
   },
   "overrides": {

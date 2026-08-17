@@ -6,6 +6,7 @@ export * from "./error-contracts.js";
 export * from "./episode-transitions.js";
 export * from "./openai-contracts.js";
 export * from "./schedule-time.js";
+export * from "./workflow-contracts.js";
 
 export interface ApiResult<T> {
   data: T;

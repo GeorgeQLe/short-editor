@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import migration from "../../apps/api/migrations-d1/0001_cloudflare_foundation.sql?raw";
 import betaMigration from "../../apps/api/migrations-d1/0002_beta_access_requests.sql?raw";
 import { createWorkerApp, type Env } from "../../apps/api/src/worker.js";
@@ -11,9 +11,13 @@ const valid = {
   turnstileToken: "test-turnstile-token"
 };
 
-beforeEach(async () => {
+beforeAll(async () => {
   await env.DB.exec(migration.replace(/\n/g, " "));
   await env.DB.exec(betaMigration.replace(/\n/g, " "));
+});
+
+beforeEach(async () => {
+  await env.DB.prepare("DELETE FROM beta_access_requests").run();
 });
 
 function submit(body: unknown, bindings: Env = env as unknown as Env) {

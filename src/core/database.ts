@@ -681,6 +681,39 @@ const migrations: readonly Migration[] = [
         composition: JSON.stringify(template.composition)
       });
     }
+  },
+  {
+    version: 20,
+    name: "durable mp4 short workflows",
+    up: (db) => db.exec(`
+      CREATE TABLE short_workflows (
+        id TEXT PRIMARY KEY,
+        request_hash TEXT NOT NULL UNIQUE,
+        state TEXT NOT NULL CHECK(state IN (
+          'importing','analyzing','selecting_candidate','assembling_draft',
+          'awaiting_review','preflighting','rendering','exporting','failed',
+          'cancelled','completed'
+        )),
+        revision INTEGER NOT NULL CHECK(revision > 0),
+        input_json TEXT NOT NULL CHECK(json_valid(input_json)),
+        progress REAL NOT NULL CHECK(progress >= 0 AND progress <= 1),
+        stage TEXT NOT NULL,
+        warnings_json TEXT NOT NULL CHECK(json_valid(warnings_json)),
+        graphics_json TEXT NOT NULL CHECK(json_valid(graphics_json)),
+        episode_id TEXT REFERENCES episodes(id),
+        analysis_job_id TEXT REFERENCES jobs(id),
+        candidate_id TEXT REFERENCES candidates(id),
+        short_id TEXT REFERENCES short_projects(id),
+        preflight_id TEXT REFERENCES render_preflights(id),
+        render_id TEXT REFERENCES renders(id),
+        render_job_id TEXT REFERENCES jobs(id),
+        export_path TEXT,
+        failure_json TEXT CHECK(failure_json IS NULL OR json_valid(failure_json)),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX short_workflows_state_updated_idx ON short_workflows(state,updated_at);
+    `)
   }
 ];
 

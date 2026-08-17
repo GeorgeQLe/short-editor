@@ -112,6 +112,16 @@
     and focused desktop/UI regressions. Live staging and responsive screenshot
     acceptance remain in `SAAS-CLOUDFLARE-STAGING`.
 
+- [x] Add the durable MCP v2 MP4-to-Short workflow with restart recovery,
+  review-required and explicit auto-approval modes, optimistic resume/retry,
+  cancellation, validated collision-safe export, and typed native hook,
+  lower-third, and end-card graphics without changing the frozen v1 interface.
+  - The default workflow persists and pauses with its Candidate, timeline,
+    captions, composition, and graphics proposal. Headless MCP operation can
+    attach to the desktop core or exclusively own a local core and data store.
+  - Executable coverage includes migration/restart persistence, v2 artifact
+    drift, review gating, fixed graphics schemas and FFmpeg graph determinism,
+    preflight, rendering, and the unchanged 45-tool v1 contract.
 - [x] Add the hosted Screenletter contract foundation with project
   kind/origin metadata, tenant-scoped recording persistence, role-aware
   lifecycle services, candidate-free edit handoff, revisioned publish/

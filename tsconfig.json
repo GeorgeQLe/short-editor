@@ -15,8 +15,8 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vite/client", "vitest/globals"]
   },
   "include": ["src", "tests", "vite.config.ts", "vitest.config.ts"],
-  "exclude": ["tests/saas"]
+  "exclude": ["tests/saas", "tests/saas-integration", "tests/cloudflare"]
 }
