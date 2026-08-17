@@ -29,19 +29,10 @@ import type {
   UploadRepository,
   UsageRepository
 } from "./index.js";
+import { RepositoryError } from "./repository-error.js";
+export { RepositoryError } from "./repository-error.js";
 
 type Queryable = Pick<PoolClient, "query">;
-
-export class RepositoryError extends Error {
-  constructor(
-    readonly code: "NOT_FOUND" | "REVISION_CONFLICT" | "INVALID_STATE",
-    message: string,
-    readonly details: unknown = null
-  ) {
-    super(message);
-    this.name = "RepositoryError";
-  }
-}
 
 export async function withTenantTransaction<T>(
   pool: Pool,

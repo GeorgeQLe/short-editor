@@ -1,7 +1,15 @@
 # SiftCut
 
-A macOS-first, local desktop application for turning long-form episodes into
-vertical YouTube Shorts.
+Long-form context. Short-form clarity.
+
+SiftCut is a provider-neutral, AI-assisted editing product family for podcast,
+YouTube, and small-studio creator teams:
+
+- **SiftCut Desktop** is the free, MIT-licensed, local/offline-first editor.
+- **SiftCut Cloud** is the paid managed workspace with bounded included AI and
+  media processing, private storage, collaboration, rendering, and support.
+- **SiftCut Mobile** is the paid Cloud companion for capture, review, and
+  managed workflows—not a full mobile edit bay.
 
 SiftCut is open source under the [MIT License](LICENSE). Release builds
 also contain separately licensed third-party components; see
@@ -11,11 +19,14 @@ The authoritative v1 engineering requirements and current implementation matrix
 are in [`SPEC.md`](SPEC.md). If this README, source comments, tests, or current
 code conflict with the specification, `SPEC.md` wins.
 
-The hosted commercial beta is an independent product surface. Its proposed
-requirements and boundaries are in
+The commercial product family shares the SiftCut brand, while Desktop remains
+independently useful and independently specified. Cloud and Mobile share an
+account, subscription, and managed-usage allowance. Their requirements and
+boundaries are in
 [`docs/saas/SPEC.md`](docs/saas/SPEC.md), with delivery tracked in
-[`docs/saas/ROADMAP.md`](docs/saas/ROADMAP.md); they do not alter the desktop
-specification or synchronize desktop data.
+[`docs/saas/ROADMAP.md`](docs/saas/ROADMAP.md) and naming in
+[`docs/saas/BRAND.md`](docs/saas/BRAND.md); they do not alter the authoritative
+desktop specification or imply automatic desktop-data synchronization.
 
 Release consumers can use the generated
 [`docs/release-interfaces-v1.md`](docs/release-interfaces-v1.md) guide and its
@@ -60,7 +71,16 @@ The core listens on `127.0.0.1:43120` by default. Packaged builds use
 application-managed paths and do not require PATH or environment setup.
 Environment overrides remain available for development and automated tests.
 
-### Hosted API with PostgreSQL
+### Hosted platform development
+
+The target hosted platform is Cloudflare Worker, D1, private R2, and Queues,
+configured through Wrangler and Terraform with secrets supplied by EnvBank.
+Use `npm run typecheck:saas`, `npm run test:cloudflare`, and the Worker dry-run
+before staging. The older PostgreSQL/Railway surface below is retained only as
+a temporary rollback and local compatibility path until Cloudflare staging
+acceptance passes.
+
+### Temporary PostgreSQL compatibility path
 
 The M1 hosted API is isolated from the desktop runtime and uses PostgreSQL 17.5.
 Start the local role-separated database, apply migrations as the migrator, and

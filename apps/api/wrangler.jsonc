@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "siftcut-development",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/v1/*", "/webhooks/*", "/internal/*", "/media/*", "/health", "/ready"]
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "siftcut-development-metadata",
+    "database_id": "RENDER_FROM_TERRAFORM",
+    "migrations_dir": "migrations-d1"
+  }],
+  "r2_buckets": [{
+    "binding": "MEDIA",
+    "bucket_name": "siftcut-development-media"
+  }],
+  "queues": { "producers": [
+    { "binding": "INGEST_QUEUE", "queue": "siftcut-development-ingest" },
+    { "binding": "ANALYSIS_QUEUE", "queue": "siftcut-development-analysis" },
+    { "binding": "RENDER_QUEUE", "queue": "siftcut-development-render" }
+  ]},
+  "triggers": { "crons": ["* * * * *"] },
+  "observability": { "enabled": true },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "PUBLIC_BASE_URL": "http://localhost:8787",
+    "TURNSTILE_SITE_KEY": "RENDER_FROM_TERRAFORM",
+    "CLERK_ISSUER": "https://clerk.invalid",
+    "CLERK_AUDIENCE": "siftcut-api",
+    "CLERK_AUTHORIZED_PARTIES": "http://localhost:8787"
+  }
+}

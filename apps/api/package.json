@@ -8,21 +8,27 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/server.js",
     "dev": "tsx src/server.ts",
-    "migrate": "tsx src/migrate.ts"
+    "migrate": "tsx src/migrate.ts",
+    "cf:dev": "wrangler dev",
+    "cf:migrate": "wrangler d1 migrations apply DB --remote",
+    "cf:deploy": "npm run build -w @siftcut/web && wrangler deploy --config wrangler.generated.jsonc"
   },
   "dependencies": {
     "@siftcut/infrastructure": "0.1.0",
     "@siftcut/saas-contracts": "0.1.0",
     "express": "^5.1.0",
+    "hono": "^4.13.2",
     "jose": "^6.2.7",
     "pg": "8.16.3",
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260816.1",
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.0",
     "@types/pg": "8.15.5",
     "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "wrangler": "^4.123.0"
   }
 }

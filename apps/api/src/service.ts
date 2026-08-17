@@ -207,12 +207,17 @@ export class ApiService {
         uploadId: upload.id,
         objectKey: upload.objectKey,
         byteLength: actual.byteLength,
-        checksumSha256: actual.checksumSha256
+        checksumSha256: actual.checksumSha256,
+        providerEvidence: {
+          declaredByteLength: upload.expectedBytes,
+          declaredChecksumSha256: upload.checksumSha256,
+          authoritative: false
+        }
       },
       requestedAt
     };
-    // The PostgreSQL adapter changes the session to complete and inserts this
-    // outbox row in one transaction. A crash can never lose the ingest request.
+    // The persistence adapter changes the session to complete and inserts this
+    // outbox row atomically. A crash can never lose the ingest request.
     return publicUpload(
       await this.dependencies.uploads.completeWithOutbox(context, uploadId, job, actual)
     );

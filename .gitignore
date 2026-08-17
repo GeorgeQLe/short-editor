@@ -6,6 +6,12 @@ build/
 *.db-shm
 *.db-wal
 *.log
+apps/api/wrangler.generated.jsonc
+infra/terraform/backend.s3.tfbackend
+infra/terraform/.terraform/
+infra/terraform/*.tfstate*
+.wrangler/
+apps/api/.wrangler/
 .env
 .DS_Store
 resources/bin/*

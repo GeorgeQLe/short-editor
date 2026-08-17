@@ -1,0 +1,2 @@
+bucket    = "siftcut-terraform-state"
+endpoints = { s3 = "https://ACCOUNT_ID.r2.cloudflarestorage.com" }

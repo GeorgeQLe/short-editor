@@ -191,4 +191,5 @@ export interface CredentialProvider {
   getAnalysisCredential(provider: string): Promise<string>;
 }
 
+export * from "./d1.js";
 export * from "./postgres.js";

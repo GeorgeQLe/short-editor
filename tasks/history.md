@@ -1,5 +1,29 @@
 # Session history
 
+## 2026-08-16
+
+- Reframed SiftCut as one provider-neutral product family: free MIT-licensed
+  Desktop, paid managed Cloud, and paid Mobile companion sharing Cloud identity,
+  subscription, quotas, and processing. Replaced the active hosted plan with a
+  Cloudflare-first Worker/D1/R2/Queues architecture while retaining Railway as
+  a temporary rollback path only.
+- Added the approved brand contract, refactored dark editorial landing page,
+  explicit product preview and beta-status language, accessible request form,
+  development-only marketing mode, configured-build Clerk requirement, and
+  deterministic favicon, app-web icon, and social card derived from the
+  existing master mark.
+- Added the unauthenticated, enumeration-resistant beta request endpoint before
+  session middleware with strict bounded input, normalized unique email,
+  consent timestamp, production Turnstile fail-closed behavior, no raw IP
+  storage, additive D1 migration, Terraform/Wrangler public-key wiring, and
+  EnvBank secret mapping.
+- Executable verification passed 51 SaaS tests, 14 Cloudflare/Miniflare tests,
+  nine focused marketing/brand tests, configured workspace builds, Worker
+  dry-run, Terraform validation, and local D1 migration. A full 374-test
+  desktop run had two timing flakes under parallel load; both affected suites
+  passed all 22 tests in isolation. Live responsive screenshots remain open
+  because the supported in-app browser had no available backend.
+
 ## 2026-08-10
 
 - Checked in the actionable, non-secret SiftCut staging EnvBank manifest with

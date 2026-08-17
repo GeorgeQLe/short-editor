@@ -1,11 +1,16 @@
-variable "aws_region" {
+variable "account_id" {
   type        = string
-  description = "Customer data region; commercial beta is US-only."
-  default     = "us-east-1"
-  validation {
-    condition     = var.aws_region == "us-east-1"
-    error_message = "The commercial beta must be deployed in us-east-1."
-  }
+  description = "Cloudflare account ID."
+}
+
+variable "zone_id" {
+  type        = string
+  description = "Cloudflare zone ID used for the application route."
+}
+
+variable "hostname" {
+  type        = string
+  description = "Version-aligned SPA and API hostname."
 }
 
 variable "environment" {
@@ -17,10 +22,7 @@ variable "environment" {
   }
 }
 
-variable "media_bucket_name" {
-  type = string
-}
-
-variable "web_bucket_name" {
-  type = string
+variable "worker_name" {
+  type        = string
+  description = "Exact Worker script name bound by EnvBank and deployed by Wrangler."
 }

@@ -7,7 +7,7 @@
     "outDir": "dist",
     "noEmit": false,
     "declaration": true,
-    "types": ["node"]
+    "types": ["node", "@cloudflare/workers-types"]
   },
   "include": ["src/**/*.ts"]
 }

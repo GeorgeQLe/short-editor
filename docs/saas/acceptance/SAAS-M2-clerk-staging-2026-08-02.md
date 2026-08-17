@@ -1,5 +1,10 @@
 # SAAS M2 Clerk and Railway staging acceptance
 
+> **Historical rollback-path record.** This document preserves the 2026-08-02
+> evidence and is not an active deployment plan or current staging claim. The
+> Cloudflare-first [`SPEC.md`](../SPEC.md) and [`ROADMAP.md`](../ROADMAP.md) are
+> authoritative; Railway is temporary rollback-only until Cloudflare acceptance.
+
 | Field | Value |
 | --- | --- |
 | Date | 2026-08-02 |

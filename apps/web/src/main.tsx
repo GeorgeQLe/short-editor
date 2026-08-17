@@ -5,7 +5,6 @@ import {
   CreateOrganization,
   OrganizationSwitcher,
   Show,
-  SignInButton,
   UserButton,
   useAuth,
   useOrganization,
@@ -23,16 +22,35 @@ import {
   completeOrganizationDeletion,
   parseDeletionResponse
 } from "./api.js";
+import {
+  Brand as CommercialBrand,
+  CommercialHeader,
+  CommercialHeaderActions,
+  CommercialMarketingPage
+} from "./marketing.js";
 import "./styles.css";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-if (!publishableKey) throw new Error("VITE_CLERK_PUBLISHABLE_KEY is required");
+const marketingOnly = import.meta.env.DEV && import.meta.env.VITE_MARKETING_ONLY === "true";
+if (!publishableKey && !marketingOnly) {
+  throw new Error("VITE_CLERK_PUBLISHABLE_KEY is required");
+}
 
-function App() {
+function App({ authEnabled = true }: { authEnabled?: boolean }) {
+  if (!authEnabled) {
+    return (
+      <div className="app-shell marketing-shell">
+        <CommercialHeader authEnabled={false} />
+        <CommercialMarketingPage />
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
-      <header>
-        <a className="brand" href="/">SiftCut</a>
+      <header className="site-header">
+        <CommercialBrand />
+        <Show when="signed-out"><CommercialHeaderActions /></Show>
         <Show when="signed-in">
           <div className="account-controls">
             <OrganizationSwitcher
@@ -45,21 +63,27 @@ function App() {
         </Show>
       </header>
       <Show when="signed-out">
-        <main className="signed-out">
-          <p className="eyebrow">SiftCut Cloud</p>
-          <h1>Turn long-form video into polished shorts.</h1>
-          <p>Sign in to your organization workspace to continue.</p>
-          <SignInButton mode="modal">
-            <button className="primary">Sign in</button>
-          </SignInButton>
-        </main>
+        <CommercialMarketingPage />
       </Show>
       <Show when="signed-in"><OrganizationWorkspace /></Show>
     </div>
   );
 }
 
+function useDeviceContext(): "desktop" | "mobile" {
+  const [context, setContext] = useState<"desktop" | "mobile">("desktop");
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 720px), (pointer: coarse)");
+    const update = () => setContext(query.matches ? "mobile" : "desktop");
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return context;
+}
+
 function OrganizationWorkspace() {
+  const deviceContext = useDeviceContext();
   const { getToken, orgId, isLoaded: authLoaded } = useAuth();
   const { organization, membership, isLoaded: organizationLoaded } = useOrganization();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -110,9 +134,11 @@ function OrganizationWorkspace() {
   if (!orgId || !organization) {
     return (
       <main className="organization-required">
-        <p className="eyebrow">Organization required</p>
-        <h1>Create your workspace</h1>
-        <p>SiftCut keeps projects and media isolated by organization.</p>
+        <p className="eyebrow">Your first SiftCut space</p>
+        <h1>{deviceContext === "mobile" ? "Start with your team." : "Create your workspace."}</h1>
+        <p>{deviceContext === "mobile"
+          ? "Create or join the right workspace here. Detailed cutting and timeline work remain desktop-first."
+          : "Give your team a private home for projects, roles, and the editorial decisions ahead."}</p>
         <CreateOrganization afterCreateOrganizationUrl="/" />
       </main>
     );
@@ -169,6 +195,13 @@ function OrganizationWorkspace() {
         <span className="session-state">
           {session ? "Secure session active" : "Verifying session"}
         </span>
+      </section>
+
+      <section className={`context-banner ${deviceContext}`}>
+        <span>{deviceContext === "mobile" ? "Mobile check-in" : "Desktop setup"}</span>
+        <p>{deviceContext === "mobile"
+          ? "Review the workspace and project status here. Continue detailed editing on a larger screen."
+          : "Name the episode you want to shape. Upload and editing enter the hosted beta in later milestones."}</p>
       </section>
 
       {canEdit && (
@@ -254,8 +287,8 @@ function apiMessage(reason: unknown): string {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ClerkProvider publishableKey={publishableKey}>
-      <App />
-    </ClerkProvider>
+    {publishableKey ? (
+      <ClerkProvider publishableKey={publishableKey}><App /></ClerkProvider>
+    ) : <App authEnabled={false} />}
   </StrictMode>
 );

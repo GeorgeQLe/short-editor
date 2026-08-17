@@ -1,5 +1,146 @@
 # Ship manifest
 
+## SiftCut product family, Cloud commercial plan, and beta funnel — 2026-08-16
+
+### User goal
+
+Define SiftCut Desktop, Cloud, and Mobile as one commercially coherent product
+family; replace the active AWS/Railway plan with a Cloudflare-first private-beta
+plan; ship a status-accurate creator-team landing page and secure beta-request
+funnel; preserve Desktop independence and the existing brand mark.
+
+### Changed files
+
+- Product/docs: `README.md`, `docs/saas/SPEC.md`, `docs/saas/ROADMAP.md`,
+  `docs/saas/BRAND.md`, and the historical M2 acceptance record.
+- Web: `apps/web/index.html`, `.env.example`, `src/main.tsx`,
+  `src/marketing.tsx`, `src/styles.css`, `vite.config.ts`, public fonts/icons,
+  favicon, and social-card assets.
+- Worker/data: `apps/api/src/worker.ts`, `beta-access.ts`, `r2.ts`, two D1
+  migrations, `wrangler.jsonc`, API workspace configuration, and D1/R2
+  infrastructure adapters/exports.
+- Infrastructure: Terraform configuration/lock/backend example,
+  `scripts/render-wrangler-config.mjs`, `siftcut-staging.envbank.yaml`, root
+  workspace scripts/dependencies, lockfile, and Cloudflare test configuration.
+- Tests/tasks: Cloudflare repository/media/beta tests, SaaS asset/docs tests,
+  marketing and brand tests, Vitest routing, `tasks/todo.md`,
+  `tasks/history.md`, and this manifest. The obsolete Railway-only asset test
+  is removed.
+
+### Per-file purpose
+
+- Authoritative docs define product boundaries, included bounded usage,
+  provider-neutral positioning, current/future status, Cloudflare ownership,
+  rollback boundaries, and deferred pricing/BYOK/overages.
+- Marketing components preserve the existing dark editorial direction while
+  separating public marketing from authenticated workspaces, labeling the
+  preview, distinguishing all three products, exposing status truth, and
+  collecting accessible beta-request fields.
+- The public Worker route validates a strict small payload, verifies Turnstile,
+  normalizes email, inserts idempotently into D1, returns indistinguishable 202
+  envelopes, stores no raw IP, and leaves lead review operator-only.
+- Terraform, Wrangler, EnvBank, D1/R2 adapters, and rendering scripts establish
+  the Cloudflare control plane and deterministic brand derivatives without
+  redesigning the master icon.
+- Executable tests protect validation, consent, Turnstile rejection,
+  duplicates/concurrency, redacted errors, payload limits, route privacy,
+  product/status copy, metadata, asset dimensions, and build configuration.
+
+### User-goal mapping
+
+- Desktop stays free, MIT-licensed, local/offline-first, and governed by the
+  root specification; Cloud and Mobile are paid managed products with one
+  account and bounded included usage.
+- The primary conversion is “Request beta access”; invited users retain a
+  separate sign-in action. No dollar pricing, customer metrics, productivity
+  percentages, provider-led headline, or staging-acceptance overclaim ships.
+- Railway/PostgreSQL is documented and retained only as a temporary rollback
+  path. Vercel configuration is removed.
+
+### Tests run
+
+Executable verification:
+
+- `npm run typecheck:saas` and configured `npm run build:saas`: passed all SaaS
+  workspaces and the production web build.
+- `npm run test:saas`: 51 tests passed.
+- `npm run test:cloudflare`: 14 Miniflare/D1/R2/Worker tests passed.
+- Focused marketing/brand suite: 9 tests passed.
+- Full desktop suite: 372/374 passed under parallel load; the two timing-
+  sensitive affected files then passed 22/22 in an isolated rerun.
+- Terraform format/validate, Wrangler deploy dry-run, local D1 migration
+  application, configured-key web build, missing-Clerk-key negative build, and
+  `git diff --check` passed.
+
+Accepted warnings: Miniflare reports that its bundled runtime falls back from
+the future `2026-08-15` compatibility date to its latest supported
+`2025-10-11` date; the Worker tests pass under that conservative runtime, while
+the pinned Wrangler dry-run accepts the configured date. The desktop suite's
+established `Unexpected internal error` stderr line remains the intentional
+redacted-500 fixture. The missing-key build errors are expected negative-gate
+evidence, not regressions.
+
+Documentation/task checks:
+
+- SaaS doc tests protect Cloudflare architecture, product-family naming,
+  commercial/status boundaries, rollback-only Railway language, and removal of
+  Vercel.
+
+### Skipped tests
+
+- Live mobile/tablet/desktop screenshots and interactive keyboard inspection
+  could not run because the supported in-app browser reported no available
+  backend. Component accessibility assertions, responsive CSS, visible focus,
+  reduced motion, and configured production compilation passed; live visual QA
+  remains the active staging task.
+- No staging deploy, remote D1 migration, provider binding, or production
+  action ran because the repository has no explicit manual deploy contract and
+  production deployment was not authorized.
+
+### Adversarial review
+
+No quality-sweep or expert-review lane is installed, so a failure-oriented
+exact-boundary review is the justified equivalent. It covers public-route
+ordering, strict-object rejection, body byte limits, consent, normalization,
+duplicate/concurrent uniqueness, production verification failure, token/error
+redaction, absence of raw IP and public reads, build-mode bypasses, tenant
+regressions, unsupported capability claims, deterministic asset provenance,
+secret/config separation, migration additivity, and rollback safety.
+
+Findings fixed before ship: moved the lead schema to additive migration 0002;
+made configured builds fail without Clerk while keeping an explicit
+development-only marketing flag; separated the landing page from authenticated
+workspace behavior; removed the generated social image in favor of an
+icon-derived deterministic card; excluded Cloudflare-only tests from the Node
+Vitest lane; labeled the older Railway acceptance record historical; required
+the public Turnstile key in configured builds; and surfaced missing required
+form fields before bot verification.
+
+The staged secret scan identified only the intentionally base64-encoded
+`test-webhook-secret` Miniflare fixture. It is explicitly annotated as a test
+allowance; the post-annotation staged scan passes with no findings.
+
+### Residual risk
+
+- Turnstile, Clerk, Terraform resources, and the full private-media processing
+  journey still require live staging acceptance. Local Miniflare cannot prove
+  hosted bindings, DNS, provider dashboards, or queue operations.
+- Browser screenshot/accessibility inspection is outstanding. The full desktop
+  aggregate suite showed two load-sensitive flakes, although both affected
+  suites passed immediately in isolation and no changed code intersects them.
+
+### Rollback note
+
+Revert the product-family commit on `master`. The additive D1 beta table may
+remain unused safely; if already applied remotely, do not rewrite migration
+history. Restore the prior Worker/assets and leave Railway rollback resources
+intact until Cloudflare acceptance passes.
+
+### Next command
+
+Use `$guide` to complete Cloudflare/Clerk/Turnstile staging setup and responsive
+production visual acceptance.
+
 ## SiftCut staging EnvBank manifest — 2026-08-10
 
 ### User goal

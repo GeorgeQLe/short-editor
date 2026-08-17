@@ -2,78 +2,49 @@ version: 1
 bundle: short-editor/siftcut-staging/staging
 
 policies:
-  password-32:
+  token-48:
     type: password
-    length: 32
+    length: 48
     lowercase: true
     uppercase: true
     digits: true
     symbols: true
 
 records:
-  POSTGRES_PASSWORD:
-    source: generate
-    policy: password-32
-  MIGRATOR_PASSWORD:
-    source: generate
-    policy: password-32
-  API_PASSWORD:
-    source: generate
-    policy: password-32
-  MIGRATOR_DATABASE_URL:
-    source: derive
-    template: postgresql://siftcut_migrator:${secret:MIGRATOR_PASSWORD}@postgres.railway.internal:5432/siftcut
-  DATABASE_URL:
-    source: derive
-    template: postgresql://siftcut_api:${secret:API_PASSWORD}@postgres.railway.internal:5432/siftcut
-  CLERK_ISSUER:
-    source: import
-    sensitivity: public
-  CLERK_AUTHORIZED_PARTIES:
-    source: import
-    sensitivity: public
   CLERK_SECRET_KEY:
     source: import
     sensitivity: secret
   CLERK_WEBHOOK_SIGNING_SECRET:
     source: import
     sensitivity: secret
-  VITE_CLERK_PUBLISHABLE_KEY:
+  STRIPE_SECRET_KEY:
     source: import
-    sensitivity: public
+    sensitivity: secret
+  STRIPE_WEBHOOK_SIGNING_SECRET:
+    source: import
+    sensitivity: secret
+  MEDIA_TOKEN_SIGNING_SECRET:
+    source: generate
+    policy: token-48
+  INTERNAL_WORKER_TOKEN:
+    source: generate
+    policy: token-48
+  TURNSTILE_SECRET_KEY:
+    source: import
+    sensitivity: secret
 
 targets:
-  railway:
+  cloudflare:
     project: siftcut-staging
     environment: staging
     services:
-      postgres:
+      siftcut-staging:
         order: 1
         variables:
-          POSTGRES_DB: {source: constant, value: siftcut}
-          POSTGRES_USER: {source: constant, value: postgres}
-          POSTGRES_PASSWORD: {source: record, record: POSTGRES_PASSWORD}
-          MIGRATOR_PASSWORD: {source: record, record: MIGRATOR_PASSWORD}
-          API_PASSWORD: {source: record, record: API_PASSWORD}
-      migrator:
-        order: 2
-        variables:
-          MIGRATOR_DATABASE_URL: {source: record, record: MIGRATOR_DATABASE_URL}
-      api:
-        order: 3
-        variables:
-          NODE_ENV: {source: constant, value: production}
-          PORT: {source: constant, value: "3000"}
-          CLERK_AUDIENCE: {source: constant, value: siftcut-api}
-          DATABASE_URL: {source: record, record: DATABASE_URL}
-          CLERK_ISSUER: {source: record, record: CLERK_ISSUER}
-          CLERK_AUTHORIZED_PARTIES: {source: record, record: CLERK_AUTHORIZED_PARTIES}
           CLERK_SECRET_KEY: {source: record, record: CLERK_SECRET_KEY}
           CLERK_WEBHOOK_SIGNING_SECRET: {source: record, record: CLERK_WEBHOOK_SIGNING_SECRET}
-      web:
-        order: 4
-        variables:
-          API_UPSTREAM: {source: constant, value: "http://api.railway.internal:3000"}
-          VITE_CLERK_PUBLISHABLE_KEY: {source: record, record: VITE_CLERK_PUBLISHABLE_KEY}
-        absent:
-          - VITE_API_URL
+          STRIPE_SECRET_KEY: {source: record, record: STRIPE_SECRET_KEY}
+          STRIPE_WEBHOOK_SIGNING_SECRET: {source: record, record: STRIPE_WEBHOOK_SIGNING_SECRET}
+          MEDIA_TOKEN_SIGNING_SECRET: {source: record, record: MEDIA_TOKEN_SIGNING_SECRET}
+          INTERNAL_WORKER_TOKEN: {source: record, record: INTERNAL_WORKER_TOKEN}
+          TURNSTILE_SECRET_KEY: {source: record, record: TURNSTILE_SECRET_KEY}

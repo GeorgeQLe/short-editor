@@ -1,20 +1,20 @@
 # Current work
 
-- [ ] SAAS-M2-STAGING — Complete live Clerk and Railway staging acceptance.
-  - The feature implementation, Railway four-service assets, role-separated
-    container smoke, full M1 verification, SaaS build, and sanitized acceptance
-    record are complete on `feat/railway-clerk-staging`.
-  - The actionable, non-secret EnvBank bundle manifest and contract-drift tests
-    are complete. Live binding remains intentionally deferred: the manifest
-    contains no Railway project, environment, or service IDs.
-  - Remaining work requires user-controlled Railway sign-in, workspace/plan
-    selection, GitHub authorization, trusted Clerk import and scoped-token
-    intake, Clerk session-token and webhook configuration, ordered deployment,
-    and the
-    non-personal multi-user journeys recorded in
-    `docs/saas/acceptance/SAAS-M2-clerk-staging-2026-08-02.md`.
-  - Keep M2 in progress until every live checkbox passes. Retain Organization A
-    as a regression fixture and intentionally delete Organization B.
+- [ ] SAAS-CLOUDFLARE-STAGING — Complete live Cloudflare private-beta
+  acceptance.
+  - Apply the Terraform-owned Worker, D1, private R2, Queue/DLQ, route, and
+    Turnstile resources in an isolated staging environment; render the
+    Wrangler bindings and apply EnvBank secrets without exposing values.
+  - Configure the public Clerk and Turnstile keys for the production-mode web
+    build, deploy the version-aligned Worker/assets, and run identity,
+    beta-request, private-media, queue-redelivery, deletion, and rollback
+    checks from `docs/saas/ROADMAP.md`.
+  - Render and inspect mobile, tablet, and desktop production screenshots. The
+    supported in-app browser was unavailable during repository verification,
+    so responsive visual acceptance remains a live gate.
+  - Do not claim the complete upload-to-render journey until its staging
+    evidence passes. Retain Railway/PostgreSQL only as the temporary rollback
+    path until this gate succeeds.
 - [x] SAAS-M2 — Implement Clerk organizations and permissions.
   - Verify Clerk sessions on every application route; synchronize users,
     organizations, memberships, invitations, and role changes through signed,
@@ -101,6 +101,16 @@
     Windows acceptance remains assigned to WIN-03.7.
 
 ## Completed
+
+- [x] Define and implement the SiftCut Desktop, Cloud, and Mobile commercial
+  product family: Cloudflare-first specification and roadmap, approved brand
+  system and deterministic web assets, private-beta landing page, explicit
+  marketing-only development mode, and the public Turnstile-protected D1 beta
+  request funnel.
+  - Executable evidence includes SaaS and Cloudflare suites, configured web and
+    workspace builds, Worker dry-run, Terraform validation, local D1 migration,
+    and focused desktop/UI regressions. Live staging and responsive screenshot
+    acceptance remain in `SAAS-CLOUDFLARE-STAGING`.
 
 - [x] Add the hosted Screenletter contract foundation with project
   kind/origin metadata, tenant-scoped recording persistence, role-aware
