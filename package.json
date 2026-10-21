@@ -68,10 +68,10 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "tar-stream": "^3.2.0",
-    "zod": "^4.0.17"
+    "zod": "4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.21.3",
+    "@cloudflare/vitest-plugin": "^1.4.6",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -85,7 +85,7 @@
     "@types/tar-stream": "^3.1.4",
     "@vitejs/plugin-react": "^5.0.2",
     "concurrently": "^9.2.1",
-    "electron": "^43.2.0",
+    "electron": "^43.8.3",
     "electron-builder": "^26.15.3",
     "jsdom": "^29.1.1",
     "tsx": "^4.20.5",

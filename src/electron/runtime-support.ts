@@ -445,7 +445,13 @@ export async function extractVerifiedModelArchive(input: {
       const destination = confinedJoin(input.stagingDirectory, header.name);
       await mkdir(dirname(destination), { recursive: true });
       const hash = createHash("sha256");
-      stream.on("data", (chunk: Buffer) => hash.update(chunk));
+      stream.on("data", (chunk: unknown) => {
+        if (!Buffer.isBuffer(chunk)) {
+          stream.destroy(new TypeError("Expected binary model archive data"));
+          return;
+        }
+        hash.update(chunk);
+      });
       await pipeline(
         stream,
         createWriteStream(destination, { mode: 0o600, flags: "wx" }),
