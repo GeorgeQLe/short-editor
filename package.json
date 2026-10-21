@@ -59,7 +59,7 @@
     "package:win": "npm run build && electron-builder --win nsis"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "better-sqlite3": "^12.2.0",
     "chokidar": "^4.0.3",
     "cors": "^2.8.5",
