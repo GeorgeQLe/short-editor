@@ -256,6 +256,18 @@ describe("explicit FFmpeg render contracts and graph", () => {
     expect(first.outputArgs).toContain("pipe:1");
   });
 
+  it.each([
+    ["6.1.3", "-filter_complex_script"],
+    ["7.1", "-/filter_complex"],
+    ["8.1.2", "-/filter_complex"],
+    ["9.0.2", "-/filter_complex"]
+  ])("uses a compatible filter-file argument for FFmpeg %s", (version, option) => {
+    const snapshot = graphSnapshot(0);
+    snapshot.dependencyVersions.ffmpeg = version;
+    const graph = buildRenderGraph(snapshot, "/tmp/filter script", "/tmp/output.mp4", "/tmp/fonts");
+    expect(graph.outputArgs.slice(0, 2)).toEqual([option, "/tmp/filter script"]);
+  });
+
   it("omits hidden visual layers from the final render graph", () => {
     const snapshot = graphSnapshot(1);
     snapshot.short.composition.layers = snapshot.short.composition.layers.map((layer) => ({

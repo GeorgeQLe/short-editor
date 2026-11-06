@@ -172,8 +172,12 @@ export function buildRenderGraph(
   buildAudioGraph(snapshot, lines);
   const script = `${lines.join(";\n")}\n`;
   const graphHash = `sha256:${createHash("sha256").update(script).digest("hex")}`;
+  // FFmpeg 7+ supports file arguments; FFmpeg 9 removed the legacy option.
+  // Keep older explicitly versioned external runtimes working as before.
+  const ffmpegMajor = Number(snapshot.dependencyVersions.ffmpeg?.match(/^n?(\d+)(?:\.|$)/i)?.[1]);
+  const filterFileOption = ffmpegMajor < 7 ? "-filter_complex_script" : "-/filter_complex";
   const outputArgs = [
-    "-filter_complex_script", filterScriptPath,
+    filterFileOption, filterScriptPath,
     "-map", "[vout]",
     "-map", "[aout]",
     "-c:v", "libx264",

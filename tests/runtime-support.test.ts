@@ -239,7 +239,10 @@ describe("desktop runtime support", () => {
 async function modelArchive(entries: Array<{ name: string; bytes: Buffer }>): Promise<Buffer> {
   const pack = tar.pack();
   const chunks: Buffer[] = [];
-  pack.on("data", (chunk: Buffer) => chunks.push(chunk));
+  pack.on("data", (chunk: unknown) => {
+    if (!Buffer.isBuffer(chunk)) throw new TypeError("Expected binary archive fixture");
+    chunks.push(chunk);
+  });
   const completed = new Promise<void>((resolve, reject) => {
     pack.on("end", resolve);
     pack.on("error", reject);
