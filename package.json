@@ -84,7 +84,7 @@
     "@types/react-dom": "^19.1.9",
     "@types/tar-stream": "^3.1.4",
     "@vitejs/plugin-react": "^5.0.2",
-    "concurrently": "^9.2.1",
+    "concurrently": "^9.2.5",
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
     "jsdom": "^29.1.1",
